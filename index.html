@@ -347,10 +347,11 @@
     }
     .chip { white-space: nowrap; }
     .grid {
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 10px;
+      justify-content: start;
     }
-    .card { max-width: none; min-height: 0; }
+    .card { max-width: 100%; min-height: 0; }
     .thumb { font-size: 40px; }
     .card-body { padding: 10px; }
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
