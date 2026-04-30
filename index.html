@@ -322,16 +322,34 @@
 
   /* ---------- MOBILE ---------- */
   @media (max-width: 600px) {
+    .nav { flex-wrap: wrap; align-items: stretch; }
+    .brand { width: 100%; }
     .brand h1 { font-size: 15px; }
     .brand small { display: none; }
-    .search { padding: 7px 10px; }
+    .search {
+      width: 100%; min-width: 0;
+      padding: 7px 10px;
+    }
+    .cart-btn {
+      margin-top: 10px;
+      width: auto;
+      flex-shrink: 0;
+    }
     .cart-btn span.label { display: none; }
     .container { flex-direction: column; }
-    .categories { width: 100%; flex-direction: row; overflow-x: auto; gap: 6px; flex-wrap: nowrap; }
+    .categories {
+      width: 100%; flex-direction: row; overflow-x: auto;
+      gap: 8px; flex-wrap: nowrap; padding: 8px 0;
+    }
     .chip { white-space: nowrap; }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .grid {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .card { max-width: none; min-height: 0; }
     .thumb { font-size: 40px; }
-    .info-inner { font-size: 12px; gap: 10px; }
+    .card-body { padding: 10px; }
+    .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
