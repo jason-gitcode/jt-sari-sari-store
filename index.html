@@ -32,7 +32,7 @@
 
   /* ---------- HEADER ---------- */
   header {
-    position: sticky; top: 0; z-index: 50;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
     background: #fff;
     border-bottom: 1px solid var(--line);
   }
@@ -231,14 +231,14 @@
   }
   .remove-x:hover { color: #dc2626; }
 
-  .drawer-foot { border-top: 1px solid var(--line); padding: 16px; background: #fff; display: grid; gap: 10px; }
-  .totals { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
-  .totals.grand { font-size: 16px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .drawer-foot { border-top: 1px solid var(--line); padding: 10px 12px; background: #fff; display: grid; gap: 4px; }
+  .totals { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 13px; }
+  .totals.grand { font-size: 14px; font-weight: 700; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .checkout-btn {
-    width: 100%; padding: 12px;
+    width: 100%; padding: 9px;
     background: var(--accent); color: #fff;
     border-radius: var(--radius);
-    font-weight: 600; font-size: 15px;
+    font-weight: 600; font-size: 14px;
     transition: background .15s;
   }
   .checkout-btn:hover { background: var(--accent-dark); }
@@ -294,8 +294,8 @@
     display: flex; gap: 8px;
   }
   .btn-secondary {
-    flex: 1; padding: 10px; border-radius: 8px;
-    border: 1px solid var(--line); font-size: 14px;
+    flex: 1; padding: 7px; border-radius: 8px;
+    border: 1px solid var(--line); font-size: 13px;
     background: #fff;
   }
   .btn-secondary:hover { background: var(--soft); }
@@ -373,6 +373,7 @@
     <div class="search">
       <span>🔍</span>
       <input type="text" id="search-input" placeholder="Search products..." />
+      <button id="search-clear" onclick="clearSearch()" style="display:none; color:var(--muted); font-size:18px; line-height:1; padding:0 2px; flex-shrink:0;">×</button>
     </div>
     <button class="cart-btn" onclick="openCart()">
       🛒 <span class="label">Cart</span>
@@ -588,7 +589,14 @@ let activeCategory = "All";
 let searchTerm = "";
 
 // ---------- INIT ----------
+function adjustHeaderOffset() {
+  document.body.style.paddingTop = document.querySelector('header').offsetHeight + 'px';
+}
+
 function init() {
+  adjustHeaderOffset();
+  window.addEventListener('resize', adjustHeaderOffset);
+
   // Apply store config to header / info bar
   document.getElementById('store-name').textContent = STORE.name;
   document.getElementById('store-tag').textContent = STORE.tagline;
@@ -604,6 +612,7 @@ function init() {
 
   document.getElementById('search-input').addEventListener('input', (e) => {
     searchTerm = e.target.value.toLowerCase();
+    document.getElementById('search-clear').style.display = searchTerm ? 'inline' : 'none';
     renderProducts();
   });
 
@@ -652,6 +661,14 @@ function addFromModal() {
   renderCart();
   closeProductModal();
   showToast("Added to cart");
+}
+
+// ---------- SEARCH CLEAR ----------
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  searchTerm = '';
+  document.getElementById('search-clear').style.display = 'none';
+  renderProducts();
 }
 
 // ---------- CATEGORIES ----------
@@ -775,10 +792,12 @@ function renderCart() {
 function openCart() {
   document.getElementById('drawer').classList.add('show');
   document.getElementById('overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
 }
 function closeCart() {
   document.getElementById('drawer').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
+  document.body.style.overflow = '';
 }
 
 // ---------- TOAST ----------
