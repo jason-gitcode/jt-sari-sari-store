@@ -222,7 +222,8 @@ function init() {
       </div>
       <div class="field">
         <label for="cust-phone">Mobile number</label>
-        <input type="tel" id="cust-phone" placeholder="0917-123-4567" value="${savedCustomer?.phone || ''}" />
+        <input type="tel" id="cust-phone" placeholder="09171234567" maxlength="11" value="${savedCustomer?.phone || ''}" />
+        <div id="phone-error" style="color:#dc2626;font-size:12px;margin-top:4px;display:none;">Mobile number must be 11 digits and start with 09.</div>
       </div>
     </div>
 
@@ -299,6 +300,26 @@ function init() {
 
     <button class="send-btn" onclick="sendOrder()">Send Order via Messenger</button>
   `;
+
+  // Attach real-time phone validation after HTML is rendered
+  const phoneInput = document.getElementById('cust-phone');
+  const phoneErr   = document.getElementById('phone-error');
+
+  phoneInput.addEventListener('input', function () {
+    this.value = this.value.replace(/[^0-9]/g, '');
+    const val = this.value;
+    const bad = (val.length >= 1 && val[0] !== '0') ||
+                (val.length >= 2 && val[1] !== '9') ||
+                (val.length === 11 && !/^09\d{9}$/.test(val));
+    phoneErr.style.display = bad ? 'block' : 'none';
+    this.style.borderColor  = bad ? '#dc2626' : '';
+  });
+
+  phoneInput.addEventListener('blur', function () {
+    const bad = this.value.length > 0 && !/^09\d{9}$/.test(this.value);
+    phoneErr.style.display = bad ? 'block' : 'none';
+    this.style.borderColor  = bad ? '#dc2626' : '';
+  });
 }
 
 function pickPay(method) {
@@ -345,8 +366,32 @@ function sendOrder() {
   const phase  = document.getElementById('cust-phase').value;
   const street = document.getElementById('cust-street').value;
 
-  if (!name || !phone) { showToast("Please fill in your name and phone number."); return; }
-  if (!block || !lot || !phase || !street) { showToast("Please complete your delivery address."); return; }
+  let hasError = false;
+
+  if (!name) {
+    showToast("Please fill in your name.");
+    hasError = true;
+  }
+
+  const phoneErr   = document.getElementById('phone-error');
+  const phoneInput = document.getElementById('cust-phone');
+  const validPhone = /^09\d{9}$/.test(phone);
+  if (!validPhone) {
+    if (phoneErr)   phoneErr.style.display = 'block';
+    if (phoneInput) phoneInput.style.borderColor = '#dc2626';
+    if (!hasError)  showToast("Mobile number must be 11 digits and start with 09.");
+    hasError = true;
+  } else {
+    if (phoneErr)   phoneErr.style.display = 'none';
+    if (phoneInput) phoneInput.style.borderColor = '';
+  }
+
+  if (!block || !lot || !phase || !street) {
+    if (!hasError) showToast("Please complete your delivery address.");
+    hasError = true;
+  }
+
+  if (hasError) return;
 
   localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
   localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
