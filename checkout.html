@@ -72,8 +72,48 @@
   .empty a { color: var(--accent); font-weight: 500; text-decoration: none; }
 
   @media (max-width: 480px) {
-    .summary-table th:nth-child(3),
-    .summary-table td:nth-child(3) { display: none; }
+    .summary-table {
+      border: 0;
+    }
+    .summary-table thead {
+      display: none;
+    }
+    .summary-table tr {
+      display: block;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .summary-table td {
+      display: block;
+      text-align: left;
+      border: none;
+      padding: 12px;
+      position: relative;
+      white-space: normal;
+    }
+    .summary-table td + td {
+      border-top: 1px solid var(--line);
+    }
+    .summary-table td::before {
+      content: attr(data-label);
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .summary-table tfoot,
+    .summary-table tfoot td {
+      display: block;
+      width: 100%;
+    }
+    .summary-table tfoot td {
+      padding: 12px;
+    }
   }
 </style>
 </head>
@@ -191,10 +231,10 @@ function init() {
     if (!p) return '';
     const lineTotal = p.price * qty;
     return `<tr>
-      <td>${p.name}<br><span style="font-size:11px;color:var(--muted)">${p.unit}</span></td>
-      <td>${qty}</td>
-      <td>${STORE.currency}${p.price.toFixed(2)}</td>
-      <td>${STORE.currency}${lineTotal.toFixed(2)}</td>
+      <td data-label="Item">${p.name}<br><span style="font-size:11px;color:var(--muted)">${p.unit}</span></td>
+      <td data-label="Qty">${qty}</td>
+      <td data-label="Price">${STORE.currency}${p.price.toFixed(2)}</td>
+      <td data-label="Total">${STORE.currency}${lineTotal.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
