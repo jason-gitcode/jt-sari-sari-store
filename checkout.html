@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Summary — Valle Verde Sari-Sari</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --ink: #1a1a1a; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --accent-dark: #1d4ed8;
+    --ok: #16a34a; --soft: #f9fafb; --radius: 10px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, select, textarea { font: inherit; color: inherit; }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid var(--line); }
+  .nav { max-width: 640px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .back-btn { font-size: 14px; color: var(--accent); font-weight: 500; text-decoration: none; flex-shrink: 0; }
+  .back-btn:hover { color: var(--accent-dark); }
+  .nav-title { font-size: 16px; font-weight: 600; }
+
+  /* Layout */
+  .container { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; }
+  .section { margin-bottom: 20px; }
+  .section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+
+  /* Order summary table */
+  .summary-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .summary-table th { padding: 9px 12px; background: var(--soft); color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); text-align: left; }
+  .summary-table th:nth-child(n+2) { text-align: right; }
+  .summary-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .summary-table td:nth-child(n+2) { text-align: right; white-space: nowrap; }
+  .summary-table tbody tr:last-child td { border-bottom: none; }
+  .summary-table tfoot td { background: var(--soft); border-top: 2px solid var(--line); font-weight: 700; font-size: 14px; padding: 10px 12px; }
+  .summary-table tfoot td:last-child { color: var(--accent); }
+
+  /* Form fields */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 14px; outline: none; background: #fff;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .address-grid .sub-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
+
+  /* Payment */
+  .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pay-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px; text-align: center; transition: all .15s; }
+  .pay-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
+  .pay-info { margin-top: 10px; padding: 10px; background: var(--soft); border-radius: 8px; font-size: 13px; color: var(--muted); display: none; }
+  .pay-info.show { display: block; }
+  .pay-info strong { color: var(--ink); }
+
+  /* Send button */
+  .send-btn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; font-size: 16px; transition: background .15s; margin-top: 4px; }
+  .send-btn:hover { background: var(--accent-dark); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 300; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 16px; color: var(--muted); }
+  .empty a { color: var(--accent); font-weight: 500; text-decoration: none; }
+
+  @media (max-width: 480px) {
+    .summary-table th:nth-child(3),
+    .summary-table td:nth-child(3) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a href="index.html" class="back-btn">← Back</a>
+    <span class="nav-title">Order Summary</span>
+  </div>
+</header>
+
+<div class="container" id="main"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE = {
+  name: "Valle Verde Sari-Sari",
+  messengerUsername: "jbtubilag",
+  gcashName: "Jason Tubilag",
+  gcashNumber: "09184067841",
+  currency: "₱"
+};
+
+const DEFAULT_PRODUCTS = [
+  { id: 1,  name: "Bigas (Rice) — 1kg",      price: 60,  unit: "per kilo"   },
+  { id: 3,  name: "Sardinas (Sardines)",      price: 28,  unit: "155g can"   },
+  { id: 4,  name: "Corned Beef",              price: 45,  unit: "150g can"   },
+  { id: 7,  name: "Pancit Canton",            price: 15,  unit: "per pack"   },
+  { id: 8,  name: "Lucky Me Beef",            price: 12,  unit: "per pack"   },
+  { id: 10, name: "Piattos",                  price: 30,  unit: "per pack"   },
+  { id: 14, name: "Coke 1.5L",               price: 75,  unit: "per bottle" },
+  { id: 15, name: "Nescafé 3-in-1",          price: 8,   unit: "per sachet" },
+  { id: 18, name: "Cooking Oil — 1L",         price: 110, unit: "per bottle" },
+  { id: 23, name: "Eggs",                     price: 9,   unit: "per piece"  },
+  { id: 30, name: "Ballpen Pack (5 pcs)",      price: 45,  unit: "per pack"   },
+  { id: 31, name: "Ruled Notebook",           price: 28,  unit: "per pc"     },
+  { id: 32, name: "Mechanical Pencil",        price: 18,  unit: "per pc"     },
+  { id: 33, name: "Highlighter Set",          price: 75,  unit: "per set"    },
+  { id: 34, name: "Eraser",                   price: 7,   unit: "per pc"     },
+  { id: 35, name: "Pencil Case",              price: 120, unit: "per pc"     },
+  { id: 36, name: "Glue Stick",               price: 22,  unit: "per pc"     },
+  { id: 37, name: "Scissors",                 price: 55,  unit: "per pc"     },
+  { id: 38, name: "Ruler (30cm)",             price: 15,  unit: "per pc"     },
+  { id: 39, name: "Colored Pencil Set",       price: 95,  unit: "per set"    },
+  { id: 40, name: "Folders (Pack of 10)",     price: 25,  unit: "per pack"   },
+  { id: 41, name: "Binding Tape",             price: 15,  unit: "per roll"   },
+  { id: 42, name: "Stapler",                  price: 85,  unit: "per pc"     },
+  { id: 43, name: "Staples (Box)",            price: 20,  unit: "per box"    },
+  { id: 44, name: "Correction Tape",         price: 30,  unit: "per pc"     },
+  { id: 45, name: "Index Cards",              price: 40,  unit: "per pack"   },
+  { id: 46, name: "Water-based Markers",      price: 65,  unit: "per set"    },
+  { id: 47, name: "Bond Paper (500 sheets)",  price: 180, unit: "per pack"   },
+  { id: 48, name: "Carbon Paper",             price: 35,  unit: "per pad"    },
+  { id: 49, name: "Compass",                  price: 70,  unit: "per pc"     },
+  { id: 50, name: "Jasmine Rice — 2kg",       price: 125, unit: "per bag"    },
+  { id: 51, name: "Brown Sugar — 500g",       price: 35,  unit: "per pack"   },
+  { id: 52, name: "Iodized Salt — 1kg",       price: 20,  unit: "per pack"   },
+  { id: 53, name: "Fresh Garlic",             price: 50,  unit: "per kilo"   },
+  { id: 54, name: "Fresh Onion",              price: 40,  unit: "per kilo"   },
+  { id: 55, name: "Soy Sauce — 1L",           price: 45,  unit: "per bottle" },
+  { id: 56, name: "Vinegar — 1L",             price: 35,  unit: "per bottle" },
+  { id: 57, name: "Tomato Sauce",             price: 25,  unit: "per can"    },
+  { id: 58, name: "Condensed Milk",           price: 28,  unit: "per can"    },
+  { id: 59, name: "Evaporated Milk — 400ml",  price: 32,  unit: "per can"    },
+  { id: 60, name: "Cheese (Luncheon)",        price: 60,  unit: "per can"    },
+  { id: 61, name: "Hotdog (Canned)",          price: 32,  unit: "per can"    },
+  { id: 62, name: "Luncheon Meat",            price: 55,  unit: "per can"    },
+  { id: 63, name: "Tuna Flakes (Canned)",     price: 48,  unit: "per can"    },
+  { id: 64, name: "Instant Ramen Pack",       price: 8,   unit: "per pack"   },
+  { id: 65, name: "Mami Noodles",             price: 10,  unit: "per pack"   },
+  { id: 66, name: "Crackers Pack",            price: 22,  unit: "per pack"   },
+  { id: 67, name: "Sliced Bread",             price: 35,  unit: "per loaf"   },
+  { id: 68, name: "Butter (Unsalted)",        price: 80,  unit: "per carton" },
+  { id: 69, name: "Coffee Mix — 1kg",         price: 120, unit: "per pack"   }
+];
+
+// Load products from localStorage or use defaults
+let PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+if (PRODUCTS.length === 0) {
+  PRODUCTS = DEFAULT_PRODUCTS;
+}
+
+let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
+Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+
+let payMethod = 'cod';
+
+function cartTotal() {
+  return Object.entries(cart).reduce((sum, [id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    return p ? sum + p.price * qty : sum;
+  }, 0);
+}
+
+function init() {
+  const main = document.getElementById('main');
+
+  if (Object.keys(cart).length === 0) {
+    main.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px; margin-bottom:12px;">🛒</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px;">Your cart is empty</div>
+        <a href="index.html">← Back to store</a>
+      </div>`;
+    return;
+  }
+
+  const savedCustomer = JSON.parse(localStorage.getItem('sariCustomer') || 'null');
+  const savedAddress  = JSON.parse(localStorage.getItem('sariAddress')  || 'null');
+
+  const itemRows = Object.entries(cart).map(([id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    if (!p) return '';
+    const lineTotal = p.price * qty;
+    return `<tr>
+      <td>${p.name}<br><span style="font-size:11px;color:var(--muted)">${p.unit}</span></td>
+      <td>${qty}</td>
+      <td>${STORE.currency}${p.price.toFixed(2)}</td>
+      <td>${STORE.currency}${lineTotal.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const sel = (n, val) => n == val ? 'selected' : '';
+
+  main.innerHTML = `
+    <div class="section">
+      <div class="section-label">Items</div>
+      <div class="summary-card">
+        <table class="summary-table">
+          <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">Grand Total</td>
+              <td>${STORE.currency}${cartTotal().toFixed(2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Your Details</div>
+      <div class="field">
+        <label for="cust-name">Name</label>
+        <input type="text" id="cust-name" placeholder="Juan dela Cruz" value="${savedCustomer?.name || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-phone">Mobile number</label>
+        <input type="tel" id="cust-phone" placeholder="0917-123-4567" value="${savedCustomer?.phone || ''}" />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Delivery Address</div>
+      <div class="field">
+        <div class="address-grid">
+          <div>
+            <span class="sub-label">Block</span>
+            <select id="cust-block">
+              <option value="">Select</option>
+              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.block, n)}>${n}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <span class="sub-label">Lot</span>
+            <select id="cust-lot">
+              <option value="">Select</option>
+              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.lot, n)}>${n}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <span class="sub-label">Phase</span>
+            <select id="cust-phase">
+              <option value="">Select</option>
+              ${[1,2,3,4].map(n => `<option ${sel(savedAddress?.phase, n)}>${n}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <span class="sub-label">Street</span>
+            <select id="cust-street">
+              <option value="">Select</option>
+              ${['A','B','C','D','E'].map(s => `<option ${sel(savedAddress?.street, s)}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div>
+          <span class="sub-label">Subdivision</span>
+          <input type="text" value="Valle Verde" readonly style="background:var(--soft);color:var(--muted);cursor:default;" />
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Payment Method</div>
+      <div class="field">
+        <div class="pay-options">
+          <button type="button" class="pay-opt active" data-pay="cod" onclick="pickPay('cod')">💵 Cash on Delivery</button>
+          <button type="button" class="pay-opt" data-pay="gcash" onclick="pickPay('gcash')">📱 GCash</button>
+        </div>
+        <div class="pay-info show" id="pay-info-cod">
+          <strong>Cash on Delivery</strong><br>
+          Please prepare exact amount or small bills. Pay upon delivery.
+        </div>
+        <div class="pay-info" id="pay-info-gcash">
+          <strong>GCash</strong><br>
+          Send to: <strong>${STORE.gcashName}</strong><br>
+          Number: <strong id="gcash-number">${STORE.gcashNumber}</strong>
+          <button onclick="copyGcashNumber()" id="copy-btn"
+            style="margin-left:6px;padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;vertical-align:middle;">
+            Copy
+          </button><br>
+          Send screenshot via Messenger after sending order.
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+      <div class="field">
+        <textarea id="cust-notes" placeholder="e.g., No onions please, leave at gate, etc."></textarea>
+      </div>
+    </div>
+
+    <button class="send-btn" onclick="sendOrder()">Send Order via Messenger</button>
+  `;
+}
+
+function pickPay(method) {
+  payMethod = method;
+  document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
+  document.querySelectorAll('.pay-info').forEach(el => el.classList.remove('show'));
+  document.getElementById('pay-info-' + method).classList.add('show');
+}
+
+function buildOrderText() {
+  const name   = document.getElementById('cust-name').value.trim();
+  const phone  = document.getElementById('cust-phone').value.trim();
+  const block  = document.getElementById('cust-block').value;
+  const lot    = document.getElementById('cust-lot').value;
+  const phase  = document.getElementById('cust-phase').value;
+  const street = document.getElementById('cust-street').value;
+  const notes  = document.getElementById('cust-notes').value.trim();
+  const address = `Block ${block}, Lot ${lot}, Phase ${phase}, Street ${street}, Valle Verde`;
+
+  const lines = [];
+  lines.push(`🛒 NEW ORDER from ${STORE.name}`);
+  lines.push('');
+  lines.push(`Customer: ${name}`);
+  lines.push(`Phone: ${phone}`);
+  lines.push(`Address: ${address}`);
+  lines.push('');
+  lines.push('--- Items ---');
+  Object.entries(cart).forEach(([id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    if (p) lines.push(`${qty}× ${p.name} — ${STORE.currency}${(p.price * qty).toFixed(2)}`);
+  });
+  lines.push('');
+  lines.push(`TOTAL: ${STORE.currency}${cartTotal().toFixed(2)}`);
+  lines.push(`Payment: ${payMethod === 'cod' ? 'Cash on Delivery' : 'GCash'}`);
+  if (notes) { lines.push(''); lines.push(`Notes: ${notes}`); }
+  return lines.join('\n');
+}
+
+function sendOrder() {
+  const name   = document.getElementById('cust-name').value.trim();
+  const phone  = document.getElementById('cust-phone').value.trim();
+  const block  = document.getElementById('cust-block').value;
+  const lot    = document.getElementById('cust-lot').value;
+  const phase  = document.getElementById('cust-phase').value;
+  const street = document.getElementById('cust-street').value;
+
+  if (!name || !phone) { showToast("Please fill in your name and phone number."); return; }
+  if (!block || !lot || !phase || !street) { showToast("Please complete your delivery address."); return; }
+
+  localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
+  localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
+
+  const text = buildOrderText();
+  const encoded = encodeURIComponent(text);
+  const url = `https://m.me/${STORE.messengerUsername}?text=${encoded}`;
+  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+  window.open(url, '_blank');
+  showToast("Order copied! Paste it in Messenger.");
+}
+
+function copyGcashNumber() {
+  const number = document.getElementById('gcash-number').textContent;
+  navigator.clipboard.writeText(number).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.style.borderColor = 'var(--ok)';
+    btn.style.color = 'var(--ok)';
+    setTimeout(() => { btn.textContent = 'Copy'; btn.style.borderColor = 'var(--line)'; btn.style.color = ''; }, 2000);
+  });
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+init();
+</script>
+</body>
+</html>

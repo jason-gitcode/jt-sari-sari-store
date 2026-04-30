@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Valle Verde Sari-Sari</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #2563eb;
+      --accent-dark: #1d4ed8;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --soft: #f9fafb;
+      --radius: 10px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background: var(--soft);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    input, select, textarea { font: inherit; color: inherit; }
+
+    /* ---------- LOGIN SCREEN ---------- */
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .login-screen.hidden { display: none; }
+    .login-box {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 32px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.1);
+    }
+    .login-box h1 { font-size: 20px; margin-bottom: 12px; }
+    .login-box p { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+    .field input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .login-btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 16px;
+      transition: background .15s;
+    }
+    .login-btn:hover { background: var(--accent-dark); }
+    .login-error { color: #dc2626; font-size: 13px; margin-top: 12px; }
+
+    /* ---------- ADMIN LAYOUT ---------- */
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 18px; }
+    .logout-btn {
+      padding: 8px 14px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 13px;
+      transition: background .15s;
+    }
+    .logout-btn:hover { background: var(--line); }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px 16px; }
+
+    /* ---------- TABS ---------- */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .tab-btn:hover { color: var(--ink); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .search-bar input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+    }
+    .search-bar input:focus { border-color: var(--accent); }
+
+    /* ---------- PRODUCTS LIST ---------- */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .product-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .product-card h3 { font-size: 15px; font-weight: 600; }
+    .product-meta { font-size: 13px; color: var(--muted); }
+    .product-badge {
+      display: inline-block;
+      background: var(--soft);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      width: fit-content;
+    }
+    .product-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .product-actions button {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 12px;
+      transition: all .15s;
+    }
+    .product-actions .edit-btn {
+      background: #eff6ff;
+      color: var(--accent);
+    }
+    .product-actions .edit-btn:hover { background: #dbeafe; }
+    .product-actions .delete-btn {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    .product-actions .delete-btn:hover { background: #fecaca; }
+
+    /* ---------- FORM ---------- */
+    .form-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .form-card h2 { font-size: 16px; margin-bottom: 16px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .form-grid.full { grid-template-columns: 1fr; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+    .variant-item {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .variant-item input { font-size: 13px; }
+    .variant-item .remove-btn {
+      color: #dc2626;
+      font-size: 18px;
+      padding: 4px 8px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .form-actions button {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background .15s;
+    }
+    .save-btn {
+      background: var(--ok);
+      color: #fff;
+    }
+    .save-btn:hover { background: #15803d; }
+    .cancel-btn {
+      background: var(--line);
+      color: var(--muted);
+    }
+    .cancel-btn:hover { background: #d1d5db; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+    }
+    .empty-state div { font-size: 48px; margin-bottom: 12px; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--ink);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity .2s, transform .2s;
+      z-index: 300;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { background: var(--ok); }
+    .toast.error { background: #dc2626; }
+
+    @media (max-width: 600px) {
+      .products-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .variant-item { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ADMIN LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <h1>🔐 Admin Access</h1>
+    <p>Enter password to manage products</p>
+    <div class="field">
+      <input type="password" id="password-input" placeholder="Password" />
+    </div>
+    <button class="login-btn" onclick="login()">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="admin-area" style="display:none;">
+  <header>
+    <h1>📦 Product Management</h1>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="products" onclick="switchTab('products')">All Products</button>
+      <button class="tab-btn" data-tab="add" onclick="switchTab('add')">Add New Product</button>
+    </div>
+
+    <!-- TAB: PRODUCTS LIST -->
+    <div class="tab-panel active" id="products-tab">
+      <div class="search-bar">
+        <input type="search" id="product-search" placeholder="Search products by name, category, or description" oninput="setSearchTerm(this.value)" />
+      </div>
+      <div class="products-grid" id="products-list"></div>
+    </div>
+
+    <!-- TAB: ADD/EDIT PRODUCT -->
+    <div class="tab-panel" id="add-tab">
+      <form class="form-card" onsubmit="saveProduct(event)">
+        <h2 id="form-title">Add New Product</h2>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Product ID (auto-assigned)</label>
+            <input type="number" id="product-id" readonly style="background: var(--soft); color: var(--muted);" />
+          </div>
+          <div class="field">
+            <label>Product Name *</label>
+            <input type="text" id="product-name" placeholder="e.g., Bigas (Rice) — 1kg" required />
+          </div>
+        </div>
+
+        <div class="field form-grid full">
+          <label>Description</label>
+          <textarea id="product-description" placeholder="Add product description (optional)"></textarea>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Category *</label>
+            <select id="product-category" required>
+              <option value="">Select Category</option>
+              <option value="Rice & Grains">Rice & Grains</option>
+              <option value="Canned Goods">Canned Goods</option>
+              <option value="Noodles">Noodles</option>
+              <option value="Snacks">Snacks</option>
+              <option value="Beverages">Beverages</option>
+              <option value="Cooking Essentials">Cooking Essentials</option>
+              <option value="School Supplies">School Supplies</option>
+              <option value="Household">Household</option>
+              <option value="Personal Care">Personal Care</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Price (₱) *</label>
+            <input type="number" id="product-price" step="0.01" placeholder="0.00" required />
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Unit/Measurement *</label>
+            <input type="text" id="product-unit" placeholder="e.g., per kilo, per pack, per pc" required />
+          </div>
+          <div class="field">
+            <label>Stock Quantity</label>
+            <input type="number" id="product-stock" step="1" placeholder="Leave blank for unlimited" />
+          </div>
+        </div>
+
+        <div class="field form-grid full">
+          <label>Emoji / Icon</label>
+          <input type="text" id="product-emoji" placeholder="e.g., 🌾 (paste emoji)" />
+          <small>Paste an emoji or leave blank</small>
+        </div>
+
+        <!-- VARIANTS -->
+        <div class="field form-grid full">
+          <label>Product Variants (e.g., different sizes)</label>
+          <small>Add different options customers can choose from</small>
+          <div id="variants-list" style="margin-top: 8px;"></div>
+          <button type="button" onclick="addVariantField()" style="margin-top: 8px; padding: 8px 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; width: fit-content;">+ Add Variant</button>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="save-btn">Save Product</button>
+          <button type="button" class="cancel-btn" onclick="resetForm()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_PASSWORD = "admin123"; // Change this to your password
+
+const DEFAULT_PRODUCTS = [
+  { id: 1,  name: "Bigas (Rice) — 1kg",      category: "Rice & Grains",      price: 60,  unit: "per kilo",   emoji: "🌾" },
+  { id: 3,  name: "Sardinas (Sardines)",      category: "Canned Goods",       price: 28,  unit: "155g can",   emoji: "🐟" },
+  { id: 4,  name: "Corned Beef",              category: "Canned Goods",       price: 45,  unit: "150g can",   emoji: "🥫" },
+  { id: 7,  name: "Pancit Canton",            category: "Noodles",            price: 15,  unit: "per pack",   emoji: "🍜" },
+  { id: 8,  name: "Lucky Me Beef",            category: "Noodles",            price: 12,  unit: "per pack",   emoji: "🍲" },
+  { id: 10, name: "Piattos",                  category: "Snacks",             price: 30,  unit: "per pack",   emoji: "🥔" },
+  { id: 14, name: "Coke 1.5L",               category: "Beverages",          price: 75,  unit: "per bottle", emoji: "🥤" },
+  { id: 15, name: "Nescafé 3-in-1",          category: "Beverages",          price: 8,   unit: "per sachet", emoji: "☕" },
+  { id: 18, name: "Cooking Oil — 1L",         category: "Cooking Essentials", price: 110, unit: "per bottle", emoji: "🫒" },
+  { id: 23, name: "Eggs",                     category: "Cooking Essentials", price: 9,   unit: "per piece",  emoji: "🥚" },
+  { id: 30, name: "Ballpen Pack (5 pcs)",      category: "School Supplies", price: 45,  unit: "per pack", emoji: "🖊️" },
+  { id: 31, name: "Ruled Notebook",           category: "School Supplies", price: 28,  unit: "per pc",   emoji: "📓" },
+  { id: 32, name: "Mechanical Pencil",        category: "School Supplies", price: 18,  unit: "per pc",   emoji: "✏️" },
+  { id: 33, name: "Highlighter Set",          category: "School Supplies", price: 75,  unit: "per set",  emoji: "🖍️" },
+  { id: 34, name: "Eraser",                   category: "School Supplies", price: 7,   unit: "per pc",   emoji: "🧽" },
+  { id: 35, name: "Pencil Case",              category: "School Supplies", price: 120, unit: "per pc",   emoji: "✒️" },
+  { id: 36, name: "Glue Stick",               category: "School Supplies", price: 22,  unit: "per pc",   emoji: "🧴" },
+  { id: 37, name: "Scissors",                 category: "School Supplies", price: 55,  unit: "per pc",   emoji: "✂️" },
+  { id: 38, name: "Ruler (30cm)",             category: "School Supplies", price: 15,  unit: "per pc",   emoji: "📏" },
+  { id: 39, name: "Colored Pencil Set",       category: "School Supplies", price: 95,  unit: "per set",  emoji: "🎨" },
+  { id: 40, name: "Folders (Pack of 10)",     category: "School Supplies", price: 25,  unit: "per pack", emoji: "📁" },
+  { id: 41, name: "Binding Tape",             category: "School Supplies", price: 15,  unit: "per roll", emoji: "📎" },
+  { id: 42, name: "Stapler",                  category: "School Supplies", price: 85,  unit: "per pc",   emoji: "📌" },
+  { id: 43, name: "Staples (Box)",            category: "School Supplies", price: 20,  unit: "per box",  emoji: "📍" },
+  { id: 44, name: "Correction Tape",         category: "School Supplies", price: 30,  unit: "per pc",   emoji: "🔴" },
+  { id: 45, name: "Index Cards",              category: "School Supplies", price: 40,  unit: "per pack", emoji: "🗑️" },
+  { id: 46, name: "Water-based Markers",      category: "School Supplies", price: 65,  unit: "per set",  emoji: "🖌️" },
+  { id: 47, name: "Bond Paper (500 sheets)",  category: "School Supplies", price: 180, unit: "per pack", emoji: "📄" },
+  { id: 48, name: "Carbon Paper",             category: "School Supplies", price: 35,  unit: "per pad",  emoji: "📋" },
+  { id: 49, name: "Compass",                  category: "School Supplies", price: 70,  unit: "per pc",   emoji: "🧭" },
+  { id: 50, name: "Jasmine Rice — 2kg",       category: "Rice & Grains",      price: 125, unit: "per bag",   emoji: "🌾" },
+  { id: 51, name: "Brown Sugar — 500g",       category: "Cooking Essentials", price: 35,  unit: "per pack",  emoji: "🟤" },
+  { id: 52, name: "Iodized Salt — 1kg",       category: "Cooking Essentials", price: 20,  unit: "per pack",  emoji: "🧂" },
+  { id: 53, name: "Fresh Garlic",             category: "Cooking Essentials", price: 50,  unit: "per kilo",  emoji: "🧄" },
+  { id: 54, name: "Fresh Onion",              category: "Cooking Essentials", price: 40,  unit: "per kilo",  emoji: "🧅" },
+  { id: 55, name: "Soy Sauce — 1L",           category: "Cooking Essentials", price: 45,  unit: "per bottle", emoji: "🍶" },
+  { id: 56, name: "Vinegar — 1L",             category: "Cooking Essentials", price: 35,  unit: "per bottle", emoji: "🍯" },
+  { id: 57, name: "Tomato Sauce",             category: "Canned Goods",       price: 25,  unit: "per can",    emoji: "🍅" },
+  { id: 58, name: "Condensed Milk",           category: "Beverages",          price: 28,  unit: "per can",    emoji: "🥛" },
+  { id: 59, name: "Evaporated Milk — 400ml",  category: "Beverages",          price: 32,  unit: "per can",    emoji: "🥛" },
+  { id: 60, name: "Cheese (Luncheon)",        category: "Canned Goods",       price: 60,  unit: "per can",    emoji: "🧀" },
+  { id: 61, name: "Hotdog (Canned)",          category: "Canned Goods",       price: 32,  unit: "per can",    emoji: "🌭" },
+  { id: 62, name: "Luncheon Meat",            category: "Canned Goods",       price: 55,  unit: "per can",    emoji: "🍖" },
+  { id: 63, name: "Tuna Flakes (Canned)",     category: "Canned Goods",       price: 48,  unit: "per can",    emoji: "🐟" },
+  { id: 64, name: "Instant Ramen Pack",       category: "Noodles",            price: 8,   unit: "per pack",   emoji: "🍜" },
+  { id: 65, name: "Mami Noodles",             category: "Noodles",            price: 10,  unit: "per pack",   emoji: "🍲" },
+  { id: 66, name: "Crackers Pack",            category: "Snacks",             price: 22,  unit: "per pack",   emoji: "🥣" },
+  { id: 67, name: "Sliced Bread",             category: "Household",          price: 35,  unit: "per loaf",   emoji: "🍞" },
+  { id: 68, name: "Butter (Unsalted)",        category: "Cooking Essentials", price: 80,  unit: "per carton", emoji: "🧈" },
+  { id: 69, name: "Coffee Mix — 1kg",         category: "Beverages",          price: 120, unit: "per pack",   emoji: "☕" }
+];
+
+let products = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+let isLoggedIn = localStorage.getItem('sariAdminLoggedIn') === 'true';
+let editingProductId = null;
+let variantCount = 0;
+let searchTerm = '';
+
+// Initialize with defaults if empty
+function initDefaultProducts() {
+  if (products.length === 0) {
+    products = DEFAULT_PRODUCTS;
+    saveProducts();
+  }
+}
+
+// ---------- AUTH ----------
+function login() {
+  const pwd = document.getElementById('password-input').value;
+  if (pwd === ADMIN_PASSWORD) {
+    localStorage.setItem('sariAdminLoggedIn', 'true');
+    isLoggedIn = true;
+    showAdmin();
+  } else {
+    document.getElementById('login-error').textContent = 'Incorrect password';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('sariAdminLoggedIn');
+  isLoggedIn = false;
+  showLogin();
+  resetForm();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('admin-area').style.display = 'none';
+}
+
+function showAdmin() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-area').style.display = 'block';
+  initDefaultProducts();
+  renderProducts();
+}
+
+// ---------- TABS ----------
+function switchTab(tab, reset = true) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+  const button = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+  if (button) {
+    button.classList.add('active');
+  }
+  document.getElementById(tab + '-tab').classList.add('active');
+
+  if (tab === 'add' && reset) {
+    resetForm();
+  }
+}
+
+// ---------- PRODUCTS ----------
+function setSearchTerm(value) {
+  searchTerm = value.trim().toLowerCase();
+  renderProducts();
+}
+
+function renderProducts() {
+  let filtered = products;
+  if (searchTerm) {
+    filtered = products.filter(p => {
+      const text = `${p.name} ${p.category} ${p.description || ''}`.toLowerCase();
+      return text.includes(searchTerm);
+    });
+  }
+
+  if (filtered.length === 0) {
+    document.getElementById('products-list').innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <div>🔍</div>
+        <div>No products match "${searchTerm}"</div>
+        <p style="margin-top: 8px; font-size: 13px;">Try a different name, category, or keyword.</p>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('products-list').innerHTML = filtered.map(p => `
+    <div class="product-card">
+      <div style="font-size: 32px;">${p.emoji || '📦'}</div>
+      <h3>${p.name}</h3>
+      <div class="product-meta">
+        <div><strong>₱${parseFloat(p.price).toFixed(2)}</strong> · ${p.unit}</div>
+        <div style="margin-top: 4px; color: var(--muted);">${p.category}</div>
+        ${p.stock ? `<div style="margin-top: 4px; color: var(--warn);">Stock: ${p.stock}</div>` : ''}
+      </div>
+      ${p.description ? `<div style="font-size: 13px; margin-top: 8px; color: var(--muted);">${p.description}</div>` : ''}
+      ${p.variants && p.variants.length > 0 ? `
+        <div style="background: var(--soft); padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 12px;">
+          <strong>Variants:</strong> ${p.variants.map(v => `${v.name} (₱${parseFloat(v.price || 0).toFixed(2)})`).join(', ')}
+        </div>
+      ` : ''}
+      <div class="product-actions">
+        <button type="button" class="edit-btn" onclick="editProduct(${p.id})">Edit</button>
+        <button type="button" class="delete-btn" onclick="deleteProduct(${p.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+
+  editingProductId = id;
+  document.getElementById('form-title').textContent = 'Edit Product';
+  document.getElementById('product-id').value = p.id;
+  document.getElementById('product-name').value = p.name;
+  document.getElementById('product-description').value = p.description || '';
+  document.getElementById('product-category').value = p.category;
+  document.getElementById('product-price').value = p.price;
+  document.getElementById('product-unit').value = p.unit;
+  document.getElementById('product-stock').value = p.stock || '';
+  document.getElementById('product-emoji').value = p.emoji || '';
+
+  // Populate variants
+  variantCount = 0;
+  document.getElementById('variants-list').innerHTML = '';
+  if (p.variants && p.variants.length > 0) {
+    p.variants.forEach(v => {
+      addVariantField(v.name, v.price);
+    });
+  }
+
+  switchTab('add', false);
+}
+
+function deleteProduct(id) {
+  if (confirm('Delete this product? This cannot be undone.')) {
+    products = products.filter(p => p.id !== id);
+    saveProducts();
+    renderProducts();
+    showToast('Product deleted', 'success');
+  }
+}
+
+function saveProduct(e) {
+  e.preventDefault();
+
+  const formData = {
+    name: document.getElementById('product-name').value,
+    description: document.getElementById('product-description').value,
+    category: document.getElementById('product-category').value,
+    price: parseFloat(document.getElementById('product-price').value),
+    unit: document.getElementById('product-unit').value,
+    stock: document.getElementById('product-stock').value ? parseInt(document.getElementById('product-stock').value) : null,
+    emoji: document.getElementById('product-emoji').value || '📦',
+    variants: []
+  };
+
+  // Collect variants
+  document.querySelectorAll('[data-variant-name]').forEach(field => {
+    const idx = field.dataset.variantIndex;
+    const name = field.value;
+    const priceField = document.querySelector(`[data-variant-price="${idx}"]`);
+    const price = priceField ? parseFloat(priceField.value) || 0 : 0;
+    if (name) {
+      formData.variants.push({ name, price });
+    }
+  });
+
+  if (editingProductId) {
+    // Update existing
+    const idx = products.findIndex(p => p.id === editingProductId);
+    if (idx >= 0) {
+      formData.id = editingProductId;
+      products[idx] = formData;
+    }
+  } else {
+    // Add new
+    formData.id = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+    products.push(formData);
+  }
+
+  saveProducts();
+  renderProducts();
+  resetForm();
+  switchTab('products');
+  showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
+}
+
+function resetForm() {
+  document.getElementById('form-title').textContent = 'Add New Product';
+  document.querySelector('form').reset();
+  document.getElementById('product-id').value = '';
+  document.getElementById('variants-list').innerHTML = '';
+  variantCount = 0;
+  editingProductId = null;
+}
+
+function addVariantField(name = '', price = '') {
+  const idx = variantCount++;
+  const html = `
+    <div class="variant-item">
+      <input type="text" data-variant-name data-variant-index="${idx}" placeholder="Variant name (e.g., Large)" value="${name}" />
+      <input type="number" data-variant-price="${idx}" step="0.01" placeholder="Price" value="${price}" />
+      <button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>
+    </div>
+  `;
+  document.getElementById('variants-list').innerHTML += html;
+}
+
+// ---------- STORAGE ----------
+function saveProducts() {
+  localStorage.setItem('sariProducts', JSON.stringify(products));
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('success', 'error');
+  t.classList.add('show', type);
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ---------- INIT ----------
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('password-input') === document.activeElement) {
+    login();
+  }
+});
+
+if (isLoggedIn) {
+  initDefaultProducts();
+  showAdmin();
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>
