@@ -195,7 +195,7 @@
   .cart-items { flex: 1; overflow-y: auto; padding: 8px; }
   .cart-empty { text-align: center; color: var(--muted); padding: 40px 16px; }
   .cart-row {
-    display: flex; gap: 10px; padding: 10px;
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px;
     border-bottom: 1px solid var(--line);
   }
   .cart-thumb {
@@ -211,6 +211,11 @@
     display: flex; align-items: center; gap: 6px;
     margin-top: 6px;
   }
+  .cart-actions {
+    display: flex; flex-direction: column; align-items: flex-end;
+    justify-content: space-between;
+    min-width: 72px;
+  }
   .qty button {
     width: 24px; height: 24px; border-radius: 6px;
     border: 1px solid var(--line);
@@ -225,11 +230,10 @@
   }
   .remove-x:hover { color: #dc2626; }
 
-  .drawer-foot { border-top: 1px solid var(--line); padding: 16px; background: #fff; }
+  .drawer-foot { border-top: 1px solid var(--line); padding: 16px; background: #fff; display: grid; gap: 10px; }
   .totals { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
   .totals.grand { font-size: 16px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
   .checkout-btn {
-    margin-top: 12px;
     width: 100%; padding: 12px;
     background: var(--accent); color: #fff;
     border-radius: var(--radius);
@@ -406,6 +410,7 @@
     <div class="totals"><span>Subtotal</span><span id="subtotal">₱0.00</span></div>
     <div class="totals"><span>Delivery</span><span id="delivery-fee">Free</span></div>
     <div class="totals grand"><span>Total</span><span id="grand-total">₱0.00</span></div>
+    <button class="btn-secondary" id="remove-all-btn" onclick="removeAll()">Remove All</button>
     <button class="checkout-btn" id="checkout-btn" onclick="window.location.href='checkout.html'" disabled>Checkout</button>
   </div>
 </aside>
@@ -711,6 +716,12 @@ function removeFromCart(id) {
   saveCart();
   renderCart();
 }
+function removeAll() {
+  cart = {};
+  saveCart();
+  renderCart();
+  showToast('Removed all items');
+}
 function cartTotal() {
   return Object.entries(cart).reduce((sum, [id, qty]) => {
     const p = PRODUCTS.find(x => x.id == id);
@@ -745,7 +756,7 @@ function renderCart() {
               <button onclick="changeQty(${p.id}, 1)">+</button>
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <div class="cart-actions">
             <button class="remove-x" onclick="removeFromCart(${p.id})" title="Remove">×</button>
             <div class="cart-line-total">${STORE.currency}${lineTotal}</div>
           </div>
