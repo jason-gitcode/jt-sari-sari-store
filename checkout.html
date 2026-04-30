@@ -30,18 +30,16 @@
   /* Order summary */
   .summary-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
   .summary-list { width: 100%; margin: 0; padding: 0; list-style: none; font-size: 13px; }
-  .order-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .order-item { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
   .order-item:last-child { border-bottom: none; }
-  .order-item__name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-  .order-item__qty { font-weight: 700; color: var(--ink); min-width: 32px; }
-  .order-item__desc { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .order-item__unit { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .order-item__qty { font-weight: 700; color: var(--ink); width: 34px; min-width: 34px; }
+  .order-item__desc { display: inline-block; width: 100%; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .order-item__price { font-weight: 700; color: var(--ink); white-space: nowrap; text-align: right; }
   .summary-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px; background: var(--soft); font-weight: 700; font-size: 15px; }
   .summary-total__amount { color: var(--accent); }
   @media (max-width: 480px) {
     .order-item { padding: 10px 12px; gap: 8px; }
-    .order-item__qty, .order-item__desc, .order-item__unit { font-size: 11px; }
+    .order-item__qty, .order-item__desc { font-size: 11px; }
     .order-item__price { font-size: 13px; }
     .summary-total { padding: 12px; font-size: 14px; }
   }
@@ -85,7 +83,7 @@
 
 <header>
   <div class="nav">
-    <a href="index.html" class="back-btn">← Back</a>
+    <a href="index.html#cart" class="back-btn">← Back</a>
     <span class="nav-title">Order Summary</span>
   </div>
 </header>
@@ -194,13 +192,11 @@ function init() {
     const p = PRODUCTS.find(x => x.id == id);
     if (!p) return '';
     const lineTotal = p.price * qty;
-    return `<div class="order-item">
-      <div class="order-item__name">
-        <span class="order-item__qty">${qty}x</span>
-        <span class="order-item__desc">${p.name}</span>
-        ${p.unit ? `<span class="order-item__unit">${p.unit}</span>` : ''}
-      </div>
-      <div class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</div>
+    const name = p.name.length > 26 ? p.name.slice(0, 26).trimEnd() + '…' : p.name;
+    return `<div class="order-item" title="${p.name}">
+      <span class="order-item__qty">${qty}x</span>
+      <span class="order-item__desc">${name}</span>
+      <span class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</span>
     </div>`;
   }).join('');
 

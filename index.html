@@ -205,7 +205,8 @@
     flex-shrink: 0;
   }
   .cart-info { flex: 1; min-width: 0; }
-  .cart-info .name { font-size: 14px; font-weight: 500; }
+  .cart-info .name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .cart-info .name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
   .cart-info .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .qty {
     display: flex; align-items: center; gap: 6px;
@@ -749,7 +750,10 @@ function renderCart() {
         <div class="cart-row">
           <div class="cart-thumb">${p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : p.emoji}</div>
           <div class="cart-info">
-            <div class="name">${p.name}</div>
+            <div class="name-row">
+              <div class="name">${p.name.length > 30 ? p.name.slice(0, 30) + '…' : p.name}</div>
+              <div class="cart-line-total">${STORE.currency}${lineTotal}</div>
+            </div>
             <div class="meta">${STORE.currency}${p.price.toFixed(2)} · ${p.unit}</div>
             <div class="qty">
               <button onclick="changeQty(${p.id}, -1)">−</button>
@@ -757,10 +761,7 @@ function renderCart() {
               <button onclick="changeQty(${p.id}, 1)">+</button>
             </div>
           </div>
-          <div class="cart-actions">
-            <button class="remove-x" onclick="removeFromCart(${p.id})" title="Remove">×</button>
-            <div class="cart-line-total">${STORE.currency}${lineTotal}</div>
-          </div>
+          <button class="remove-x" onclick="removeFromCart(${p.id})" title="Remove">×</button>
         </div>
       `;
     }).join('');
@@ -791,6 +792,9 @@ function showToast(msg) {
 }
 
 // ---------- GO ----------
+if (window.location.hash === '#cart') {
+  openCart();
+}
 init();
 </script>
 </body>
