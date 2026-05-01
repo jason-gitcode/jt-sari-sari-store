@@ -291,21 +291,28 @@
     .toast.success { background: var(--ok); }
     .toast.error { background: #dc2626; }
 
-    /* ---------- ADMIN CATEGORY CHIPS ---------- */
-    .admin-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .chip-group { display: inline-flex; align-items: stretch; }
-    .admin-chip {
-      padding: 6px 12px; border-radius: 6px;
-      background: var(--soft); border: 1px solid var(--line);
-      font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s;
+    /* ---------- ADMIN CATEGORY SIDEBAR ---------- */
+    .products-layout { display: flex; gap: 20px; align-items: flex-start; }
+    .products-main { flex: 1; min-width: 0; }
+    .admin-cats {
+      display: flex; flex-direction: column; gap: 8px;
+      width: 180px; flex-shrink: 0; padding: 4px 0;
     }
-    .admin-chip.with-del { border-radius: 6px 0 0 6px; }
+    .chip-group { display: flex; align-items: stretch; width: 100%; }
+    .admin-chip {
+      flex: 1; padding: 10px 14px;
+      background: var(--soft); border: 1px solid var(--line); border-left: none;
+      font-size: 13px; cursor: pointer; white-space: nowrap; text-align: left;
+      transition: all .15s; border-radius: 0 8px 8px 0; overflow: hidden; text-overflow: ellipsis;
+    }
+    .admin-chip:not(.with-del) { border-radius: 8px; border-left: 1px solid var(--line); }
     .admin-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-    .admin-chip:hover:not(.active) { border-color: var(--ink); }
+    .admin-chip:hover:not(.active) { border-color: var(--ink); background: var(--soft); }
+    .admin-chip.active:hover { background: var(--ink); }
     .chip-del {
-      padding: 0 7px; font-size: 15px; line-height: 1;
-      background: #fef2f2; border: 1px solid #fecaca; border-left: none;
-      border-radius: 0 6px 6px 0; color: #dc2626; cursor: pointer; transition: background .15s;
+      flex-shrink: 0; padding: 0 8px; font-size: 14px; line-height: 1;
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 8px 0 0 8px; color: #dc2626; cursor: pointer; transition: background .15s;
     }
     .chip-del:hover { background: #fee2e2; }
 
@@ -333,6 +340,13 @@
       .products-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
       .variant-item { grid-template-columns: 1fr 1fr; }
+      .products-layout { flex-direction: column; }
+      .admin-cats {
+        width: 100%; flex-direction: row; overflow-x: auto;
+        flex-wrap: nowrap; padding: 4px 0 6px; gap: 6px;
+      }
+      .chip-group { width: auto; flex-shrink: 0; }
+      .admin-chip { flex: initial; text-align: center; }
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -368,11 +382,15 @@
 
     <!-- TAB: PRODUCTS LIST -->
     <div class="tab-panel active" id="products-tab">
-      <div class="admin-cats" id="admin-cats"></div>
-      <div class="search-bar">
-        <input type="search" id="product-search" placeholder="Search products by name, category, or description" oninput="setSearchTerm(this.value)" />
+      <div class="products-layout">
+        <div class="admin-cats" id="admin-cats"></div>
+        <div class="products-main">
+          <div class="search-bar">
+            <input type="search" id="product-search" placeholder="Search products by name, category, or description" oninput="setSearchTerm(this.value)" />
+          </div>
+          <div class="products-grid" id="products-list"></div>
+        </div>
       </div>
-      <div class="products-grid" id="products-list"></div>
     </div>
 
     <!-- TAB: ADD/EDIT PRODUCT -->
@@ -681,8 +699,8 @@ function renderAdminCategories() {
       return `<button class="admin-chip ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>`;
     }
     return `<span class="chip-group">
-      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>
       <button class="chip-del" onclick="deleteCategory('${safeC}')" title="Delete category">×</button>
+      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>
     </span>`;
   }).join('');
   updateCategorySelect();
