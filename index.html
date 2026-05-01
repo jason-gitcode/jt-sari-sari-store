@@ -741,14 +741,11 @@ function clearSearch() {
 // ---------- CATEGORIES ----------
 function renderCategories() {
   const wrap = document.getElementById('categories');
-  // Merge hardcoded order with any custom categories from loaded products
-  const cats = ['All', ...new Set([
-    ...CATEGORIES.filter(c => c !== 'All'),
-    ...PRODUCTS.map(p => p.category).filter(Boolean)
-  ])];
-  // If active category no longer exists, fall back to All
-  if (activeCategory !== 'All' && !cats.includes(activeCategory)) activeCategory = 'All';
-  wrap.innerHTML = cats.map(cat =>
+  // Mirror admin exactly: categories derived from products in product-id order
+  const cats = new Set(['All']);
+  PRODUCTS.forEach(p => { if (p.category) cats.add(p.category); });
+  if (activeCategory !== 'All' && ![...cats].includes(activeCategory)) activeCategory = 'All';
+  wrap.innerHTML = [...cats].map(cat =>
     `<button class="chip ${cat === activeCategory ? 'active' : ''}" onclick="pickCategory('${cat.replace(/'/g, "\\'")}')">${cat}</button>`
   ).join('');
 }
