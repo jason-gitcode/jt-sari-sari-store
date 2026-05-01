@@ -361,6 +361,8 @@
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
   }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -580,11 +582,18 @@ const DEFAULT_PRODUCTS = [
   { id: 69, name: "Coffee Mix — 1kg",         category: "Beverages",          price: 120, unit: "per pack",   emoji: "☕" },
 ];
 
-// Load products from localStorage, or use defaults if not yet customized
-let PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
-if (PRODUCTS.length === 0) {
-  PRODUCTS = DEFAULT_PRODUCTS;
-}
+// Firebase — products sync across devices via Firestore
+const firebaseConfig = {
+  apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let PRODUCTS = [];
 
 /* ============================================================
    🚫  Below this line is the app logic — no need to edit
@@ -609,8 +618,7 @@ function prevGallerySlide() { galleryIndex = (galleryIndex - 1 + galleryImages.l
 function goToGallerySlide(i) { galleryIndex = i; renderGallerySlide(); }
 
 // ---------- STATE ----------
-let cart = JSON.parse(localStorage.getItem('sariCart') || '{}'); // { productId: qty }
-Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
 let activeCategory = "All";
 let searchTerm = "";
 
@@ -633,8 +641,8 @@ function init() {
   document.title = STORE.name;
 
   renderCategories();
-  renderProducts();
   renderCart();
+  document.getElementById('products').innerHTML = '<div class="empty">Loading products…</div>';
 
   document.getElementById('search-input').addEventListener('input', (e) => {
     searchTerm = e.target.value.toLowerCase();
@@ -863,6 +871,22 @@ if (window.location.hash === '#cart') {
   history.replaceState(null, '', window.location.pathname);
 }
 init();
+
+// Load products from Firestore — real-time sync across devices
+db.collection('products').onSnapshot(snapshot => {
+  PRODUCTS = snapshot.docs.map(doc => doc.data());
+  PRODUCTS.sort((a, b) => a.id - b.id);
+  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  saveCart();
+  renderProducts();
+  renderCart();
+}, () => {
+  // Firestore unavailable — fall back to local data
+  PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+  if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
+  renderProducts();
+  renderCart();
+});
 </script>
 </body>
 </html>

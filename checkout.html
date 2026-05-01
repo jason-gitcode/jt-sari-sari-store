@@ -78,6 +78,8 @@
   .empty a { color: var(--accent); font-weight: 500; text-decoration: none; }
 
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -154,14 +156,19 @@ const DEFAULT_PRODUCTS = [
   { id: 69, name: "Coffee Mix — 1kg",         price: 120, unit: "per pack"   }
 ];
 
-// Load products from localStorage or use defaults
-let PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
-if (PRODUCTS.length === 0) {
-  PRODUCTS = DEFAULT_PRODUCTS;
-}
-
+// Firebase — load products from Firestore
+const firebaseConfig = {
+  apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let PRODUCTS = [];
 let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
-Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
 
 let payMethod = 'cod';
 
@@ -424,7 +431,22 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-init();
+// Load products from Firestore, then render
+db.collection('products').get().then(snapshot => {
+  if (!snapshot.empty) {
+    PRODUCTS = snapshot.docs.map(doc => doc.data());
+    PRODUCTS.sort((a, b) => a.id - b.id);
+  } else {
+    PRODUCTS = DEFAULT_PRODUCTS;
+  }
+  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  init();
+}).catch(() => {
+  PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+  if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
+  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  init();
+});
 </script>
 </body>
 </html>

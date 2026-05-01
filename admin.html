@@ -297,6 +297,8 @@
       .variant-item { grid-template-columns: 1fr 1fr; }
     }
   </style>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -421,6 +423,17 @@
 <script>
 const ADMIN_PASSWORD = "admin123"; // Change this to your password
 
+const firebaseConfig = {
+  apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const DEFAULT_PRODUCTS = [
   { id: 1,  name: "Bigas (Rice) — 1kg",      category: "Rice & Grains",      price: 60,  unit: "per kilo",   emoji: "🌾" },
   { id: 3,  name: "Sardinas (Sardines)",      category: "Canned Goods",       price: 28,  unit: "155g can",   emoji: "🐟" },
@@ -474,18 +487,25 @@ const DEFAULT_PRODUCTS = [
   { id: 69, name: "Coffee Mix — 1kg",         category: "Beverages",          price: 120, unit: "per pack",   emoji: "☕" }
 ];
 
-let products = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+let products = [];
 let isLoggedIn = localStorage.getItem('sariAdminLoggedIn') === 'true';
 let editingProductId = null;
 let variantCount = 0;
 let searchTerm = '';
 let currentImages = [];
+let unsubscribeProducts = null;
 
-// Initialize with defaults if empty
-function initDefaultProducts() {
-  if (products.length === 0) {
-    products = DEFAULT_PRODUCTS;
-    saveProducts();
+async function seedDefaultProducts() {
+  const local = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+  const source = local.length > 0 ? local : DEFAULT_PRODUCTS;
+  const batch = db.batch();
+  source.forEach(p => { batch.set(db.collection('products').doc(String(p.id)), p); });
+  try {
+    await batch.commit();
+    showToast('Products synced to cloud!', 'success');
+  } catch (err) {
+    console.error('Seed error:', err);
+    showToast('Error syncing products', 'error');
   }
 }
 
@@ -504,7 +524,7 @@ function compressImage(file, callback) {
   reader.onload = e => {
     const img = new Image();
     img.onload = () => {
-      const max = 800;
+      const max = 400;
       let w = img.width, h = img.height;
       if (w > max || h > max) {
         if (w > h) { h = Math.round(h * max / w); w = max; }
@@ -513,7 +533,7 @@ function compressImage(file, callback) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      callback(canvas.toDataURL('image/jpeg', 0.75));
+      callback(canvas.toDataURL('image/jpeg', 0.6));
     };
     img.src = e.target.result;
   };
@@ -554,6 +574,7 @@ function login() {
 }
 
 function logout() {
+  if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
   localStorage.removeItem('sariAdminLoggedIn');
   isLoggedIn = false;
   showLogin();
@@ -568,8 +589,23 @@ function showLogin() {
 function showAdmin() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'block';
-  initDefaultProducts();
-  renderProducts();
+  subscribeToProducts();
+}
+
+function subscribeToProducts() {
+  if (unsubscribeProducts) unsubscribeProducts();
+  unsubscribeProducts = db.collection('products').onSnapshot(snapshot => {
+    products = snapshot.docs.map(doc => doc.data());
+    products.sort((a, b) => a.id - b.id);
+    if (products.length === 0) {
+      seedDefaultProducts();
+    } else {
+      renderProducts();
+    }
+  }, err => {
+    console.error('Firestore error:', err);
+    showToast('Error connecting to database', 'error');
+  });
 }
 
 // ---------- TABS ----------
@@ -666,16 +702,18 @@ function editProduct(id) {
   switchTab('add', false);
 }
 
-function deleteProduct(id) {
-  if (confirm('Delete this product? This cannot be undone.')) {
-    products = products.filter(p => p.id !== id);
-    saveProducts();
-    renderProducts();
+async function deleteProduct(id) {
+  if (!confirm('Delete this product? This cannot be undone.')) return;
+  try {
+    await db.collection('products').doc(String(id)).delete();
     showToast('Product deleted', 'success');
+  } catch (err) {
+    console.error('Delete error:', err);
+    showToast('Error deleting product', 'error');
   }
 }
 
-function saveProduct(e) {
+async function saveProduct(e) {
   e.preventDefault();
 
   const formData = {
@@ -690,35 +728,25 @@ function saveProduct(e) {
     variants: []
   };
 
-  // Collect variants
   document.querySelectorAll('[data-variant-name]').forEach(field => {
     const idx = field.dataset.variantIndex;
     const name = field.value;
     const priceField = document.querySelector(`[data-variant-price="${idx}"]`);
     const price = priceField ? parseFloat(priceField.value) || 0 : 0;
-    if (name) {
-      formData.variants.push({ name, price });
-    }
+    if (name) formData.variants.push({ name, price });
   });
 
-  if (editingProductId) {
-    // Update existing
-    const idx = products.findIndex(p => p.id === editingProductId);
-    if (idx >= 0) {
-      formData.id = editingProductId;
-      products[idx] = formData;
-    }
-  } else {
-    // Add new
-    formData.id = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
-    products.push(formData);
-  }
+  formData.id = editingProductId || (products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1);
 
-  saveProducts();
-  renderProducts();
-  resetForm();
-  switchTab('products');
-  showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
+  try {
+    await db.collection('products').doc(String(formData.id)).set(formData);
+    showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
+    resetForm();
+    switchTab('products');
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast('Error saving product', 'error');
+  }
 }
 
 function resetForm() {
@@ -744,10 +772,7 @@ function addVariantField(name = '', price = '') {
   document.getElementById('variants-list').innerHTML += html;
 }
 
-// ---------- STORAGE ----------
-function saveProducts() {
-  localStorage.setItem('sariProducts', JSON.stringify(products));
-}
+// Products are saved directly to Firestore via saveProduct() / deleteProduct()
 
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
@@ -765,7 +790,6 @@ window.addEventListener('keydown', (e) => {
 });
 
 if (isLoggedIn) {
-  initDefaultProducts();
   showAdmin();
 } else {
   showLogin();
