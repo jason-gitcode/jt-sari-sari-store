@@ -182,10 +182,10 @@
   }
   .drawer.show { transform: translateX(0); }
   .drawer-head {
-    padding: 16px; border-bottom: 1px solid var(--line);
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .drawer-head h2 { font-size: 17px; }
+  .drawer-head h2 { font-size: 16px; font-weight: 600; }
   .close-btn {
     width: 30px; height: 30px;
     border-radius: 6px; font-size: 22px;
@@ -263,6 +263,7 @@
     padding: 16px; border-bottom: 1px solid var(--line);
     display: flex; align-items: center; justify-content: space-between;
   }
+  .modal-head h2 { flex: 1; min-width: 0; overflow: hidden; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
   .modal-body { padding: 16px; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
