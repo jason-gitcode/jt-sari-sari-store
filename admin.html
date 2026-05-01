@@ -293,13 +293,21 @@
 
     /* ---------- ADMIN CATEGORY CHIPS ---------- */
     .admin-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip-group { display: inline-flex; align-items: stretch; }
     .admin-chip {
       padding: 6px 12px; border-radius: 6px;
       background: var(--soft); border: 1px solid var(--line);
       font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s;
     }
+    .admin-chip.with-del { border-radius: 6px 0 0 6px; }
     .admin-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
     .admin-chip:hover:not(.active) { border-color: var(--ink); }
+    .chip-del {
+      padding: 0 7px; font-size: 15px; line-height: 1;
+      background: #fef2f2; border: 1px solid #fecaca; border-left: none;
+      border-radius: 0 6px 6px 0; color: #dc2626; cursor: pointer; transition: background .15s;
+    }
+    .chip-del:hover { background: #fee2e2; }
 
     /* ---------- AVAILABILITY ROW ---------- */
     .product-card { position: relative; }
@@ -666,9 +674,17 @@ function renderAdminCategories() {
   products.forEach(p => { if (p.category) cats.add(p.category); });
   const wrap = document.getElementById('admin-cats');
   if (!wrap) return;
-  wrap.innerHTML = [...cats].map(c =>
-    `<button class="admin-chip ${c === adminActiveCategory ? 'active' : ''}" onclick="pickAdminCategory('${c.replace(/'/g, "\\'")}')">${c}</button>`
-  ).join('');
+  wrap.innerHTML = [...cats].map(c => {
+    const active = c === adminActiveCategory ? 'active' : '';
+    const safeC = c.replace(/'/g, "\\'");
+    if (c === 'All') {
+      return `<button class="admin-chip ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>`;
+    }
+    return `<span class="chip-group">
+      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>
+      <button class="chip-del" onclick="deleteCategory('${safeC}')" title="Delete category">×</button>
+    </span>`;
+  }).join('');
   updateCategorySelect();
 }
 
@@ -676,6 +692,21 @@ function pickAdminCategory(cat) {
   adminActiveCategory = cat;
   renderAdminCategories();
   renderProducts();
+}
+
+function deleteCategory(cat) {
+  const tagged = products.filter(p => p.category === cat);
+  if (tagged.length > 0) {
+    showToast(
+      `Cannot delete "${cat}" — ${tagged.length} product${tagged.length > 1 ? 's are' : ' is'} still tagged to it. Reassign or delete them first.`,
+      'error'
+    );
+    return;
+  }
+  if (adminActiveCategory === cat) adminActiveCategory = 'All';
+  renderAdminCategories();
+  renderProducts();
+  showToast(`Category "${cat}" removed.`, 'success');
 }
 
 function updateCategorySelect(selectedValue = '') {
