@@ -293,13 +293,6 @@ function init() {
       <div class="field">
         <div class="address-grid">
           <div>
-            <span class="sub-label">Block</span>
-            <select id="cust-block">
-              <option value="">Select</option>
-              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.block, n)}>${n}</option>`).join('')}
-            </select>
-          </div>
-          <div>
             <span class="sub-label">Lot</span>
             <select id="cust-lot">
               <option value="">Select</option>
@@ -307,10 +300,10 @@ function init() {
             </select>
           </div>
           <div>
-            <span class="sub-label">Phase</span>
-            <select id="cust-phase">
+            <span class="sub-label">Block</span>
+            <select id="cust-block">
               <option value="">Select</option>
-              ${[1,2,3,4].map(n => `<option ${sel(savedAddress?.phase, n)}>${n}</option>`).join('')}
+              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.block, n)}>${n}</option>`).join('')}
             </select>
           </div>
           <div>
@@ -318,6 +311,13 @@ function init() {
             <select id="cust-street">
               <option value="">Select</option>
               ${['A','B','C','D','E'].map(s => `<option ${sel(savedAddress?.street, s)}>${s}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <span class="sub-label">Phase</span>
+            <select id="cust-phase">
+              <option value="">Select</option>
+              ${[1,2,3,4].map(n => `<option ${sel(savedAddress?.phase, n)}>${n}</option>`).join('')}
             </select>
           </div>
         </div>
