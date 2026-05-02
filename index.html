@@ -712,7 +712,7 @@ function showProductDetail(id) {
   }
   document.getElementById('modal-product-price').textContent = STORE.currency + p.price.toFixed(2);
   document.getElementById('modal-product-unit').textContent = p.unit;
-  document.getElementById('modal-product-description').textContent = p.description || 'No description available';
+  document.getElementById('modal-product-description').textContent = p.description || '';
 
   // Handle variants
   const variantDiv = document.getElementById('modal-variants');
