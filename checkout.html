@@ -438,19 +438,55 @@ async function placeOrder() {
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
+  const orderRef = db.collection('orders').doc();
+  let stockErrorMsg = null;
+
   try {
-    const ref = await db.collection('orders').add(orderData);
-    const shortId = ref.id.slice(-6).toUpperCase();
+    await db.runTransaction(async (transaction) => {
+      // Read all stock-tracked products first (reads must precede writes in a transaction)
+      const trackedItems = items.filter(item => {
+        const p = PRODUCTS.find(x => x.id == item.productId);
+        return p && p.stock !== null && p.stock !== undefined;
+      });
+      const productRefs = trackedItems.map(item => db.collection('products').doc(item.productId));
+      const snaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+
+      // Validate stock for each tracked item
+      for (let i = 0; i < trackedItems.length; i++) {
+        const snap = snaps[i];
+        const item = trackedItems[i];
+        const data = snap.data();
+        if (!snap.exists || data.available === false || data.stock === 0) {
+          stockErrorMsg = `"${item.productName}" is sold out.`;
+          throw new Error(stockErrorMsg);
+        }
+        if (data.stock < item.qty) {
+          stockErrorMsg = `Only ${data.stock} of "${item.productName}" left in stock.`;
+          throw new Error(stockErrorMsg);
+        }
+      }
+
+      // All checks passed — write order and deduct stock atomically
+      transaction.set(orderRef, orderData);
+      for (let i = 0; i < trackedItems.length; i++) {
+        const newStock = snaps[i].data().stock - trackedItems[i].qty;
+        const upd = { stock: newStock };
+        if (newStock === 0) upd.available = false;
+        transaction.update(productRefs[i], upd);
+      }
+    });
+
+    const shortId = orderRef.id.slice(-6).toUpperCase();
     sendDiscordNotification(orderData, shortId).catch(() => {});
     localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
     localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
     localStorage.removeItem('sariCart');
-    showOrderConfirmation(ref.id, payMethod);
+    showOrderConfirmation(orderRef.id, payMethod);
   } catch (err) {
     console.error('Order error:', err);
     btn.disabled = false;
     btn.textContent = 'Place Order';
-    showToast('Failed to place order. Please try again.');
+    showToast(stockErrorMsg || 'Failed to place order. Please try again.');
   }
 }
 

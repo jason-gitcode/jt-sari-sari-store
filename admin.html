@@ -914,7 +914,7 @@ function renderOrders() {
       </div>`).join('');
     const actionsHtml = o.status === 'pending' ? `
       <div class="order-actions-row">
-        <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm &amp; Deduct Stock</button>
+        <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm Order</button>
         <button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>
       </div>` :
       o.status === 'confirmed' ? `
@@ -943,25 +943,12 @@ function renderOrders() {
 }
 
 async function confirmOrder(orderId) {
-  const order = orders.find(o => o.orderId === orderId);
-  if (!order) return;
   try {
-    const batch = db.batch();
-    batch.update(db.collection('orders').doc(orderId), {
+    await db.collection('orders').doc(orderId).update({
       status: 'confirmed',
       confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    for (const item of (order.items || [])) {
-      const product = products.find(p => String(p.id) === String(item.productId));
-      if (product && product.stock !== null && product.stock !== undefined) {
-        const newStock = Math.max(0, product.stock - item.qty);
-        const upd = { stock: newStock };
-        if (newStock === 0) upd.available = false;
-        batch.update(db.collection('products').doc(String(item.productId)), upd);
-      }
-    }
-    await batch.commit();
-    showToast('Order confirmed — stock updated', 'success');
+    showToast('Order confirmed', 'success');
   } catch (err) {
     console.error('Confirm order error:', err);
     showToast('Error confirming order', 'error');
@@ -969,12 +956,25 @@ async function confirmOrder(orderId) {
 }
 
 async function cancelOrder(orderId) {
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order) return;
   try {
-    await db.collection('orders').doc(orderId).update({
+    const batch = db.batch();
+    batch.update(db.collection('orders').doc(orderId), {
       status: 'cancelled',
       cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    showToast('Order cancelled', 'success');
+    for (const item of (order.items || [])) {
+      const product = products.find(p => String(p.id) === String(item.productId));
+      if (product && product.stock !== null && product.stock !== undefined) {
+        const newStock = product.stock + item.qty;
+        const upd = { stock: newStock };
+        if (product.stock === 0 && newStock > 0) upd.available = true;
+        batch.update(db.collection('products').doc(String(item.productId)), upd);
+      }
+    }
+    await batch.commit();
+    showToast('Order cancelled — stock restored', 'success');
   } catch (err) {
     console.error('Cancel order error:', err);
     showToast('Error cancelling order', 'error');
