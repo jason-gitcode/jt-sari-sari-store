@@ -807,6 +807,9 @@ function showAdmin() {
   document.getElementById('admin-area').style.display = 'flex';
   subscribeToProducts();
   subscribeToOrders();
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 }
 
 function subscribeToProducts() {
@@ -829,13 +832,32 @@ function subscribeToProducts() {
 // ---------- ORDERS ----------
 function subscribeToOrders() {
   if (unsubscribeOrders) unsubscribeOrders();
+  let isFirstLoad = true;
   unsubscribeOrders = db.collection('orders')
     .orderBy('createdAt', 'desc')
     .onSnapshot(snapshot => {
       orders = snapshot.docs.map(doc => ({ ...doc.data(), orderId: doc.id }));
       renderOrders();
       updateOrderBadge();
+      if (!isFirstLoad) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added' && change.doc.data().status === 'pending') {
+            notifyNewOrder(change.doc.data(), change.doc.id);
+          }
+        });
+      }
+      isFirstLoad = false;
     }, err => console.error('Orders listener error:', err));
+}
+
+function notifyNewOrder(order, orderId) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const shortId = orderId.slice(-6).toUpperCase();
+  const items = (order.items || []).map(i => `${i.qty}× ${i.productName}`).join(', ');
+  new Notification(`🛒 New Order #${shortId}`, {
+    body: `${order.customer?.name} · ₱${parseFloat(order.total).toFixed(2)}\n${items}`,
+    tag: orderId,
+  });
 }
 
 function updateOrderBadge() {

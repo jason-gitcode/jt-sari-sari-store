@@ -114,6 +114,37 @@ const STORE = {
   currency: "₱"
 };
 
+// ---------- DISCORD NOTIFICATIONS ----------
+const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1500127416901959761/oOa7M12ubSvN_KDDO1uNX7nTPVBSYc_h56t0MSC4BDPGrKL3Adov0B8G5cBcw7n3DDpt';
+
+async function sendDiscordNotification(order, shortId) {
+  const addr = order.address
+    ? `Block ${order.address.block}, Lot ${order.address.lot}, Phase ${order.address.phase}, St. ${order.address.street}, Valle Verde`
+    : '—';
+  const itemLines = (order.items || [])
+    .map(i => `  ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}`)
+    .join('\n');
+  const lines = [
+    `🛒 **New Order #${shortId}**`,
+    ``,
+    `👤 ${order.customer.name} · ${order.customer.phone}`,
+    `📍 ${addr}`,
+    ``,
+    itemLines,
+    ``,
+    `💰 **Total: ₱${parseFloat(order.total).toFixed(2)}**`,
+    `💳 ${order.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery'}`,
+  ];
+  if (order.notes) lines.push(`📝 Notes: ${order.notes}`);
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: lines.join('\n') })
+    });
+  } catch (e) { console.error('Discord notification error:', e); }
+}
+
 const DEFAULT_PRODUCTS = [
   { id: 1,  name: "Bigas (Rice) — 1kg",      price: 60,  unit: "per kilo"   },
   { id: 3,  name: "Sardinas (Sardines)",      price: 28,  unit: "155g can"   },
@@ -395,6 +426,8 @@ async function placeOrder() {
 
   try {
     const ref = await db.collection('orders').add(orderData);
+    const shortId = ref.id.slice(-6).toUpperCase();
+    sendDiscordNotification(orderData, shortId).catch(() => {});
     localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
     localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
     localStorage.removeItem('sariCart');
