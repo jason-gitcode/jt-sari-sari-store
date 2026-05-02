@@ -110,6 +110,7 @@
     .tabs {
       display: flex;
       gap: 8px;
+      align-items: flex-end;
       margin-bottom: 20px;
       border-bottom: 1px solid var(--line);
       flex-shrink: 0;
@@ -155,54 +156,124 @@
 
     /* ---------- PRODUCTS LIST ---------- */
     .products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
       margin-bottom: 20px;
     }
 
-    .product-card {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    /* ---------- PRODUCT TABLE ---------- */
+    .pt-row {
+      display: grid;
+      grid-template-columns: 36px 56px 1fr 80px 100px 64px 60px;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
     }
-    .product-card h3 { font-size: 15px; font-weight: 600; }
-    .product-meta { font-size: 13px; color: var(--muted); }
-    .product-badge {
-      display: inline-block;
+    .pt-head {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
       background: var(--soft);
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      width: fit-content;
+      position: sticky; top: 0; z-index: 1;
     }
-    .product-actions {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
+    .pt-data:last-child { border-bottom: none; }
+    .pt-data:hover { background: #fafafa; }
+    .pt-cell { display: flex; align-items: center; }
+    .pt-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+    .pt-name-col { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .pt-pname { font-size: 14px; font-weight: 500; line-height: 1.3; }
+    .pt-pmeta { font-size: 12px; color: var(--muted); }
+    .pt-stock { font-size: 13px; }
+    .pt-price-col { font-size: 13px; font-weight: 600; }
+    .pt-edit-col .edit-btn {
+      padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      background: #eff6ff; color: var(--accent); border: 1px solid #bfdbfe;
+      transition: background .15s; white-space: nowrap;
     }
-    .product-actions button {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 12px;
-      transition: all .15s;
+    .pt-edit-col .edit-btn:hover { background: #dbeafe; }
+    .pt-avail-col { justify-content: center; }
+
+    /* ---------- DELETE SELECTED BUTTON ---------- */
+    .delete-sel-btn {
+      margin-left: auto;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 0;
+      padding: 0; padding-right: 12px;
+      border-radius: 999px;
+      font-size: 13px; font-weight: 700;
+      background: #c0392b; color: #fff;
+      border: none;
+      transition: background .15s;
+      white-space: nowrap; overflow: hidden;
+      height: 30px;
     }
-    .product-actions .edit-btn {
-      background: #eff6ff;
-      color: var(--accent);
+    .delete-sel-btn .del-icon {
+      display: grid; place-items: center;
+      width: 30px; height: 30px;
+      background: rgba(0,0,0,.22);
+      border-radius: 999px 0 0 999px;
+      font-size: 13px; flex-shrink: 0;
+      margin-right: 8px;
     }
-    .product-actions .edit-btn:hover { background: #dbeafe; }
-    .product-actions .delete-btn {
-      background: #fee2e2;
-      color: #dc2626;
+    .delete-sel-btn:hover:not(:disabled) { background: #a93226; }
+    .delete-sel-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ---------- PRODUCT FORM MODAL ---------- */
+    .product-form-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 150;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
     }
-    .product-actions .delete-btn:hover { background: #fecaca; }
+    .product-form-overlay.show { opacity: 1; pointer-events: auto; }
+    .product-form-modal {
+      background: #fff;
+      border-radius: var(--radius);
+      width: 100%; max-width: 720px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,.2);
+      transform: scale(0.97); transition: transform .2s;
+    }
+    .product-form-overlay.show .product-form-modal { transform: scale(1); }
+    .product-form-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; background: #fff; z-index: 1;
+    }
+    .product-form-header h2 { font-size: 17px; font-weight: 600; }
+    .product-form-body { padding: 20px 24px 24px; }
+
+    /* ---------- CONFIRM MODAL ---------- */
+    .confirm-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .confirm-overlay.show { opacity: 1; pointer-events: auto; }
+    .confirm-box {
+      background: #fff; border-radius: var(--radius);
+      padding: 24px; width: 100%; max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.15);
+      transform: scale(0.95); transition: transform .2s;
+    }
+    .confirm-overlay.show .confirm-box { transform: scale(1); }
+    .confirm-box h3 { font-size: 17px; margin-bottom: 8px; }
+    .confirm-box p { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+    .confirm-box ul { padding-left: 20px; margin-bottom: 20px; font-size: 14px; max-height: 200px; overflow-y: auto; }
+    .confirm-box ul li { margin-bottom: 4px; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .confirm-cancel { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; background: var(--soft); border: 1px solid var(--line); transition: background .15s; }
+    .confirm-cancel:hover { background: var(--line); }
+    .confirm-delete-btn { padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; background: #dc2626; color: #fff; transition: background .15s; }
+    .confirm-delete-btn:hover { background: #b91c1c; }
 
     /* ---------- FORM ---------- */
     .form-card {
@@ -308,7 +379,7 @@
     .products-layout { flex: 1; min-height: 0; display: flex; gap: 20px; overflow: hidden; }
     .products-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
     .search-bar { flex-shrink: 0; }
-    .products-grid { flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding-bottom: 20px; margin-bottom: 0; }
+    .products-grid { flex: 1; min-height: 0; overflow-y: auto; margin-bottom: 0; }
     .admin-cats {
       display: flex; flex-direction: column; gap: 8px;
       width: 180px; flex-shrink: 0; padding: 4px 0;
@@ -332,17 +403,7 @@
     }
     .chip-del:hover { background: #fee2e2; }
 
-    /* ---------- AVAILABILITY ROW ---------- */
-    .product-card { position: relative; }
-    .avail-row {
-      position: absolute; top: 0; left: 0; right: 0;
-      padding: 7px 12px;
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--soft); border-bottom: 1px solid var(--line);
-      border-radius: var(--radius) var(--radius) 0 0;
-    }
-    .avail-label { font-size: 11px; font-weight: 600; color: var(--muted); }
-    .avail-label.ok { color: var(--ok); }
+    /* ---------- TOGGLE SWITCH WRAPPER ---------- */
 
     /* ---------- TOGGLE SWITCH ---------- */
     .toggle-sw { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
@@ -353,7 +414,8 @@
     .toggle-sw input:checked + .toggle-sl::before { transform: translateX(16px); }
 
     @media (max-width: 600px) {
-      .products-grid { grid-template-columns: 1fr; }
+      .pt-row { grid-template-columns: 36px 44px 1fr 60px 60px; }
+      .pt-stock, .pt-edit-col { display: none; }
       .form-grid { grid-template-columns: 1fr; }
       .variant-item { grid-template-columns: 1fr 1fr; }
       .products-layout { flex-direction: column; overflow-y: auto; }
@@ -396,7 +458,10 @@
   <div class="container">
     <div class="tabs">
       <button class="tab-btn active" data-tab="products" onclick="switchTab('products')">All Products</button>
-      <button class="tab-btn" data-tab="add" onclick="switchTab('add')">Add New Product</button>
+      <button class="tab-btn" onclick="openAddModal()">Add New Product</button>
+      <button class="delete-sel-btn" id="delete-sel-btn" onclick="deleteSelected()" disabled>
+        <span class="del-icon">🗑️</span><span id="delete-sel-label">Delete</span>
+      </button>
     </div>
 
     <!-- TAB: PRODUCTS LIST -->
@@ -412,82 +477,96 @@
       </div>
     </div>
 
-    <!-- TAB: ADD/EDIT PRODUCT -->
-    <div class="tab-panel" id="add-tab">
-      <form class="form-card" onsubmit="saveProduct(event)">
-        <h2 id="form-title">Add New Product</h2>
+  </div>
+</div>
 
-        <div class="form-grid">
-          <div class="field">
-            <label>Product ID (auto-assigned)</label>
-            <input type="number" id="product-id" readonly style="background: var(--soft); color: var(--muted);" />
-          </div>
-          <div class="field">
-            <label>Product Name *</label>
-            <input type="text" id="product-name" placeholder="e.g., Bigas (Rice) — 1kg" required />
-          </div>
-        </div>
-
-        <div class="field form-grid full">
-          <label>Description</label>
-          <textarea id="product-description" placeholder="Add product description (optional)"></textarea>
-        </div>
-
-        <div class="form-grid">
-          <div class="field">
-            <label>Category *</label>
-            <select id="product-category" onchange="handleCategoryChange(this.value)">
-              <option value="">Select Category</option>
-            </select>
-            <input type="text" id="custom-category-input" placeholder="Type new category name (e.g., Fresh Bread)"
-              style="display:none; margin-top:6px; width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; outline:none;" />
-          </div>
-          <div class="field">
-            <label>Price (₱) *</label>
-            <input type="number" id="product-price" step="0.01" placeholder="0.00" required />
-          </div>
-        </div>
-
-        <div class="form-grid">
-          <div class="field">
-            <label>Unit/Measurement *</label>
-            <input type="text" id="product-unit" placeholder="e.g., per kilo, per pack, per pc" required />
-          </div>
-          <div class="field">
-            <label>Stock Quantity</label>
-            <input type="number" id="product-stock" step="1" placeholder="Leave blank for unlimited" />
-          </div>
-        </div>
-
-        <div class="field form-grid full">
-          <label>Product Photos <span style="font-weight:400; color:var(--muted);">(max 5)</span></label>
-          <small>First photo appears on the product card. Supports JPG, PNG, WEBP.</small>
-          <div id="photo-previews" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
-          <label id="photo-upload-label" style="margin-top:8px; padding:9px 14px; background:var(--soft); border:1px dashed var(--line); border-radius:8px; cursor:pointer; font-size:13px; display:inline-block; width:fit-content;">
-            + Add Photo
-            <input type="file" id="product-photos" accept="image/*" multiple style="display:none;" onchange="handlePhotoUpload(event)" />
-          </label>
-          <span id="photo-count-msg" style="font-size:12px; color:var(--muted); margin-top:4px; display:block;"></span>
-        </div>
-
-        <!-- VARIANTS -->
-        <div class="field form-grid full">
-          <label>Product Variants (e.g., different sizes)</label>
-          <small>Add different options customers can choose from</small>
-          <div id="variants-list" style="margin-top: 8px;"></div>
-          <button type="button" onclick="addVariantField()" style="margin-top: 8px; padding: 8px 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; width: fit-content;">+ Add Variant</button>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="save-btn">Save Product</button>
-          <button type="button" class="cancel-btn" onclick="resetForm()">Cancel</button>
-        </div>
-      </form>
+<!-- PRODUCT ADD/EDIT MODAL -->
+<div class="product-form-overlay" id="product-form-overlay">
+  <div class="product-form-modal">
+    <div class="product-form-header">
+      <h2 id="form-title">Add New Product</h2>
+      <button type="button" class="close-btn" onclick="closeProductModal()">×</button>
     </div>
+    <form class="product-form-body" id="product-form" onsubmit="saveProduct(event)">
+      <input type="hidden" id="product-id" />
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Product Name *</label>
+          <input type="text" id="product-name" placeholder="e.g., Bigas (Rice) — 1kg" required />
+        </div>
+        <div class="field">
+          <label>Price (₱) *</label>
+          <input type="number" id="product-price" step="0.01" placeholder="0.00" required />
+        </div>
+      </div>
+
+      <div class="field form-grid full">
+        <label>Description</label>
+        <textarea id="product-description" placeholder="Add product description (optional)"></textarea>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Category *</label>
+          <select id="product-category" onchange="handleCategoryChange(this.value)">
+            <option value="">Select Category</option>
+          </select>
+          <input type="text" id="custom-category-input" placeholder="Type new category name (e.g., Fresh Bread)"
+            style="display:none; margin-top:6px; width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; outline:none;" />
+        </div>
+        <div class="field">
+          <label>Unit/Measurement *</label>
+          <input type="text" id="product-unit" placeholder="e.g., per kilo, per pack, per pc" required />
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Stock Quantity</label>
+          <input type="number" id="product-stock" step="1" placeholder="Leave blank for unlimited" />
+        </div>
+      </div>
+
+      <div class="field form-grid full">
+        <label>Product Photos <span style="font-weight:400; color:var(--muted);">(max 5)</span></label>
+        <small>First photo appears on the product card. Supports JPG, PNG, WEBP.</small>
+        <div id="photo-previews" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"></div>
+        <label id="photo-upload-label" style="margin-top:8px; padding:9px 14px; background:var(--soft); border:1px dashed var(--line); border-radius:8px; cursor:pointer; font-size:13px; display:inline-block; width:fit-content;">
+          + Add Photo
+          <input type="file" id="product-photos" accept="image/*" multiple style="display:none;" onchange="handlePhotoUpload(event)" />
+        </label>
+        <span id="photo-count-msg" style="font-size:12px; color:var(--muted); margin-top:4px; display:block;"></span>
+      </div>
+
+      <div class="field form-grid full">
+        <label>Product Variants <span style="font-weight:400; color:var(--muted);">(e.g., different sizes)</span></label>
+        <small>Add different options customers can choose from</small>
+        <div id="variants-list" style="margin-top: 8px;"></div>
+        <button type="button" onclick="addVariantField()" style="margin-top: 8px; padding: 8px 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; width: fit-content;">+ Add Variant</button>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="save-btn">Save Product</button>
+        <button type="button" class="cancel-btn" onclick="closeProductModal()">Cancel</button>
+      </div>
+    </form>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="confirm-overlay" id="confirm-modal">
+  <div class="confirm-box">
+    <h3>🗑️ Delete Products</h3>
+    <p>The following products will be permanently deleted. This cannot be undone.</p>
+    <ul id="confirm-product-list"></ul>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" onclick="closeConfirmModal()">Cancel</button>
+      <button class="confirm-delete-btn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const ADMIN_PASSWORD = "admin123"; // Change this to your password
@@ -789,48 +868,112 @@ function renderProducts() {
     });
   }
 
+  const list = document.getElementById('products-list');
+
   if (filtered.length === 0) {
-    document.getElementById('products-list').innerHTML = `
-      <div class="empty-state" style="grid-column: 1 / -1;">
+    list.innerHTML = `
+      <div class="empty-state">
         <div>${searchTerm ? '🔍' : '📦'}</div>
         <div>${searchTerm ? `No products match "${searchTerm}"` : 'No products in this category'}</div>
         <p style="margin-top: 8px; font-size: 13px;">Try a different name, category, or keyword.</p>
       </div>`;
+    updateDeleteBtn();
     return;
   }
 
-  document.getElementById('products-list').innerHTML = filtered.map(p => {
-    const available = p.available !== false;
-    return `
-    <div class="product-card" style="padding-top: 42px;">
-      <div class="avail-row">
-        <span class="avail-label ${available ? 'ok' : ''}">${available ? '● Available' : '○ Out of stock'}</span>
-        <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
-          <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
-          <span class="toggle-sl"></span>
-        </label>
-      </div>
-      <div style="width:64px;height:64px;border-radius:8px;overflow:hidden;background:var(--soft);display:grid;place-items:center;font-size:32px;">
-        ${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;">` : p.emoji || '📦'}
-      </div>
-      <h3>${p.name}</h3>
-      <div class="product-meta">
-        <div><strong>₱${parseFloat(p.price).toFixed(2)}</strong> · ${p.unit}</div>
-        <div style="margin-top: 4px; color: var(--muted);">${p.category}</div>
-        ${p.stock ? `<div style="margin-top: 4px; color: var(--warn);">Stock: ${p.stock}</div>` : ''}
-      </div>
-      ${p.description ? `<div style="font-size: 13px; margin-top: 8px; color: var(--muted);">${p.description}</div>` : ''}
-      ${p.variants && p.variants.length > 0 ? `
-        <div style="background: var(--soft); padding: 8px; border-radius: 6px; margin-top: 8px; font-size: 12px;">
-          <strong>Variants:</strong> ${p.variants.map(v => `${v.name} (₱${parseFloat(v.price || 0).toFixed(2)})`).join(', ')}
-        </div>
-      ` : ''}
-      <div class="product-actions">
-        <button type="button" class="edit-btn" onclick="editProduct(${p.id})">Edit</button>
-        <button type="button" class="delete-btn" onclick="deleteProduct(${p.id})">Delete</button>
-      </div>
+  list.innerHTML = `
+    <div class="pt-row pt-head">
+      <div class="pt-cell pt-check"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)" /></div>
+      <div class="pt-cell"></div>
+      <div class="pt-cell">Product</div>
+      <div class="pt-cell">Stock</div>
+      <div class="pt-cell">Price</div>
+      <div class="pt-cell"></div>
+      <div class="pt-cell">Available</div>
     </div>
-  `;}).join('');
+    ${filtered.map(p => {
+      const available = p.available !== false;
+      const stock = p.stock ? p.stock : '—';
+      const thumb = p.images && p.images.length > 0
+        ? `<img src="${p.images[0]}" alt="${p.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
+        : `<div style="width:44px;height:44px;border-radius:6px;background:var(--soft);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
+      return `
+        <div class="pt-row pt-data">
+          <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
+          <div class="pt-cell">${thumb}</div>
+          <div class="pt-cell pt-name-col">
+            <div class="pt-pname">${p.name}</div>
+            <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
+          </div>
+          <div class="pt-cell pt-stock">${stock}</div>
+          <div class="pt-cell pt-price-col">₱${parseFloat(p.price).toFixed(2)}</div>
+          <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
+          <div class="pt-cell pt-avail-col">
+            <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
+              <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
+              <span class="toggle-sl"></span>
+            </label>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+  updateDeleteBtn();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
+  updateDeleteBtn();
+}
+
+function updateDeleteBtn() {
+  const selected = document.querySelectorAll('.row-check:checked');
+  const btn = document.getElementById('delete-sel-btn');
+  const lbl = document.getElementById('delete-sel-label');
+  if (btn) {
+    btn.disabled = selected.length === 0;
+    if (lbl) lbl.textContent = selected.length > 0 ? `Delete (${selected.length})` : 'Delete';
+  }
+  const all = document.querySelectorAll('.row-check');
+  const selAll = document.getElementById('select-all');
+  if (selAll && all.length > 0) {
+    selAll.checked = selected.length === all.length;
+    selAll.indeterminate = selected.length > 0 && selected.length < all.length;
+  }
+}
+
+function deleteSelected() {
+  const checked = [...document.querySelectorAll('.row-check:checked')];
+  if (checked.length === 0) return;
+  const ids = checked.map(cb => parseInt(cb.dataset.id));
+  const toDelete = ids.map(id => products.find(p => p.id === id)).filter(Boolean);
+  document.getElementById('confirm-product-list').innerHTML = toDelete.map(p => `<li>${p.name}</li>`).join('');
+  document.getElementById('confirm-modal').classList.add('show');
+  window._pendingDeleteIds = ids;
+}
+
+async function confirmDelete() {
+  const ids = window._pendingDeleteIds || [];
+  closeConfirmModal();
+  let errors = 0;
+  for (const id of ids) {
+    try {
+      await db.collection('products').doc(String(id)).delete();
+    } catch (err) {
+      console.error('Delete error:', err);
+      errors++;
+    }
+  }
+  if (errors > 0) {
+    showToast(`${errors} product(s) failed to delete`, 'error');
+  } else {
+    showToast(`${ids.length} product${ids.length > 1 ? 's' : ''} deleted`, 'success');
+  }
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').classList.remove('show');
+  window._pendingDeleteIds = [];
 }
 
 function editProduct(id) {
@@ -859,19 +1002,9 @@ function editProduct(id) {
     });
   }
 
-  switchTab('add', false);
+  showProductFormModal();
 }
 
-async function deleteProduct(id) {
-  if (!confirm('Delete this product? This cannot be undone.')) return;
-  try {
-    await db.collection('products').doc(String(id)).delete();
-    showToast('Product deleted', 'success');
-  } catch (err) {
-    console.error('Delete error:', err);
-    showToast('Error deleting product', 'error');
-  }
-}
 
 async function saveProduct(e) {
   e.preventDefault();
@@ -909,17 +1042,30 @@ async function saveProduct(e) {
   try {
     await db.collection('products').doc(String(formData.id)).set(formData);
     showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
-    resetForm();
-    switchTab('products');
+    closeProductModal();
   } catch (err) {
     console.error('Save error:', err);
     showToast('Error saving product', 'error');
   }
 }
 
+function openAddModal() {
+  resetForm();
+  showProductFormModal();
+}
+
+function showProductFormModal() {
+  document.getElementById('product-form-overlay').classList.add('show');
+}
+
+function closeProductModal() {
+  document.getElementById('product-form-overlay').classList.remove('show');
+  resetForm();
+}
+
 function resetForm() {
   document.getElementById('form-title').textContent = 'Add New Product';
-  document.querySelector('form').reset();
+  document.getElementById('product-form').reset();
   document.getElementById('product-id').value = '';
   document.getElementById('variants-list').innerHTML = '';
   const customInp = document.getElementById('custom-category-input');
@@ -957,6 +1103,10 @@ function showToast(msg, type = 'success') {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && document.getElementById('password-input') === document.activeElement) {
     login();
+  }
+  if (e.key === 'Escape') {
+    closeProductModal();
+    closeConfirmModal();
   }
 });
 
