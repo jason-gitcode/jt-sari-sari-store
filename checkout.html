@@ -55,10 +55,29 @@
     border: 1px solid var(--line); border-radius: 8px;
     font-size: 14px; outline: none; background: #fff;
   }
+  .field select {
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px;
+  }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
   .field textarea { resize: vertical; min-height: 60px; }
-  .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .address-grid .full { grid-column: 1 / -1; }
   .sub-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
+  .csel { position: relative; }
+  .csel-btn { width: 100%; padding: 9px 32px 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; text-align: left; cursor: pointer; color: var(--ink); -webkit-appearance: none; appearance: none; background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  .csel-btn:focus { border-color: var(--accent); outline: none; }
+  .csel-btn .placeholder { color: #9ca3af; }
+  .csel-arrow { display: none; }
+  .csel-drop { display: none; position: absolute; z-index: 200; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); overflow: hidden; }
+  .csel-search { width: 100%; padding: 8px 12px; border: none; border-bottom: 1px solid var(--line); font-size: 14px; outline: none; font-family: inherit; }
+  .csel-list { max-height: 180px; overflow-y: auto; }
+  .csel-opt { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--line); }
+  .csel-opt:last-child { border-bottom: none; }
+  .csel-opt:hover { background: var(--soft); }
+  .csel-empty { padding: 10px 12px; font-size: 13px; color: var(--muted); }
 
   /* Payment */
   .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -227,6 +246,18 @@ function cartTotal() {
 }
 function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
 
+const STREETS = [
+  'Basil Street', 'Carribean Street', 'Castleton Avenue', 'Celadon Street',
+  'Charleston Street', 'Chartreuse Street', 'Citrine Street', 'Emerald Street',
+  'Fern Street', 'Forest Street', 'Glade Street', 'Granite Street',
+  'Herlequin Street', 'Honey Dew Street', 'Irish Street', 'Jade Street',
+  'Kelly Avenue', 'Laurel Street', 'Lime Street', 'Martle Street',
+  'Mint Street', 'Moss Street', 'Olive Street', 'Parakeet Street',
+  'Pearl Street', 'Phanton Street', 'Pickle Street', 'Pistacho Street',
+  'Reseda Street', 'Rifle Street', 'Shamrock Street', 'Spring Street',
+  'Vine Street', 'Viridian Avenue'
+];
+
 function init() {
   const main = document.getElementById('main');
 
@@ -292,28 +323,42 @@ function init() {
       <div class="section-label">Delivery Address</div>
       <div class="field">
         <div class="address-grid">
-          <div>
+          <div class="full">
             <span class="sub-label">Lot</span>
-            <select id="cust-lot">
-              <option value="">Select</option>
-              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.lot, n)}>${n}</option>`).join('')}
-            </select>
+            <div class="csel" id="lot-wrap">
+              <button type="button" class="csel-btn" onclick="toggleCsel('lot')" id="lot-btn">
+                <span id="lot-label" class="${savedAddress?.lot ? '' : 'placeholder'}">${savedAddress?.lot || 'Select'}</span>
+                <span class="csel-arrow">▾</span>
+              </button>
+              <div class="csel-drop" id="lot-drop">
+                <input class="csel-search" placeholder="Search lot…" oninput="filterCsel('lot', this.value)" />
+                <div class="csel-list" id="lot-list"></div>
+              </div>
+            </div>
+            <input type="hidden" id="cust-lot" value="${savedAddress?.lot || ''}" />
           </div>
-          <div>
+          <div class="full">
             <span class="sub-label">Block</span>
             <select id="cust-block">
               <option value="">Select</option>
-              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${sel(savedAddress?.block, n)}>${n}</option>`).join('')}
+              ${Array.from({length: 18}, (_, i) => `<option ${sel(savedAddress?.block, i+1)}>${i+1}</option>`).join('')}
             </select>
           </div>
-          <div>
+          <div class="full">
             <span class="sub-label">Street</span>
-            <select id="cust-street">
-              <option value="">Select</option>
-              ${['A','B','C','D','E'].map(s => `<option ${sel(savedAddress?.street, s)}>${s}</option>`).join('')}
-            </select>
+            <div class="csel" id="street-wrap">
+              <button type="button" class="csel-btn" onclick="toggleCsel('street')" id="street-btn">
+                <span id="street-label" class="${savedAddress?.street ? '' : 'placeholder'}">${savedAddress?.street || 'Select'}</span>
+                <span class="csel-arrow">▾</span>
+              </button>
+              <div class="csel-drop" id="street-drop">
+                <input class="csel-search" placeholder="Search street…" oninput="filterCsel('street', this.value)" />
+                <div class="csel-list" id="street-list"></div>
+              </div>
+            </div>
+            <input type="hidden" id="cust-street" value="${savedAddress?.street || ''}" />
           </div>
-          <div>
+          <div class="full">
             <span class="sub-label">Phase</span>
             <select id="cust-phase">
               <option value="">Select</option>
@@ -376,6 +421,58 @@ function init() {
   });
 }
 
+const CSEL_DATA = {
+  lot:    Array.from({length: 84}, (_, i) => String(i + 1)),
+  street: STREETS
+};
+
+function toggleCsel(name) {
+  const drop = document.getElementById(`${name}-drop`);
+  if (!drop) return;
+  const isOpen = drop.style.display === 'block';
+  // close all
+  ['lot', 'street'].forEach(n => {
+    const d = document.getElementById(`${n}-drop`);
+    if (d) d.style.display = 'none';
+  });
+  if (!isOpen) {
+    drop.style.display = 'block';
+    const search = drop.querySelector('.csel-search');
+    if (search) { search.value = ''; search.focus(); }
+    renderCselList(name, CSEL_DATA[name]);
+  }
+}
+
+function filterCsel(name, q) {
+  const all = CSEL_DATA[name];
+  renderCselList(name, q ? all.filter(o => o.toLowerCase().includes(q.toLowerCase())) : all);
+}
+
+function renderCselList(name, list) {
+  const container = document.getElementById(`${name}-list`);
+  if (!container) return;
+  container.innerHTML = list.length
+    ? list.map(o => `<div class="csel-opt" onclick="pickCsel('${name}','${o.replace(/'/g,"\\'")}')"> ${o}</div>`).join('')
+    : `<div class="csel-empty">No results</div>`;
+}
+
+function pickCsel(name, value) {
+  const hid   = document.getElementById(`cust-${name}`);
+  const label = document.getElementById(`${name}-label`);
+  const drop  = document.getElementById(`${name}-drop`);
+  if (hid)   hid.value = value;
+  if (label) { label.textContent = value; label.classList.remove('placeholder'); }
+  if (drop)  drop.style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  ['lot', 'street'].forEach(name => {
+    const wrap = document.getElementById(`${name}-wrap`);
+    const drop = document.getElementById(`${name}-drop`);
+    if (wrap && drop && !wrap.contains(e.target)) drop.style.display = 'none';
+  });
+});
+
 function pickPay(method) {
   payMethod = method;
   document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
@@ -387,9 +484,9 @@ async function placeOrder() {
   const name   = document.getElementById('cust-name').value.trim();
   const phone  = document.getElementById('cust-phone').value.trim();
   const block  = document.getElementById('cust-block').value;
-  const lot    = document.getElementById('cust-lot').value;
+  const lot    = document.getElementById('cust-lot').value.trim();
   const phase  = document.getElementById('cust-phase').value;
-  const street = document.getElementById('cust-street').value;
+  const street = document.getElementById('cust-street').value.trim();
 
   let hasError = false;
 
@@ -408,8 +505,21 @@ async function placeOrder() {
     if (phoneInput) phoneInput.style.borderColor = '';
   }
 
-  if (!block || !lot || !phase || !street) {
-    if (!hasError) showToast("Please complete your delivery address.");
+  const lotNum = parseInt(lot);
+  if (!lot || isNaN(lotNum) || lotNum < 1 || lotNum > 84) {
+    if (!hasError) showToast("Please enter a valid lot number (1–84).");
+    hasError = true;
+  }
+  if (!block) {
+    if (!hasError) showToast("Please select a block.");
+    hasError = true;
+  }
+  if (!street || !STREETS.includes(street)) {
+    if (!hasError) showToast("Please select a valid street.");
+    hasError = true;
+  }
+  if (!phase) {
+    if (!hasError) showToast("Please select a phase.");
     hasError = true;
   }
 
