@@ -297,14 +297,7 @@ function init() {
           Please prepare exact amount or small bills. Pay upon delivery.
         </div>
         <div class="pay-info" id="pay-info-gcash">
-          <strong>GCash</strong><br>
-          Send to: <strong>${STORE.gcashName}</strong><br>
-          Number: <strong id="gcash-number">${STORE.gcashNumber}</strong>
-          <button onclick="copyGcashNumber()" id="copy-btn"
-            style="margin-left:6px;padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;vertical-align:middle;">
-            Copy
-          </button><br>
-          Send screenshot via Messenger after sending order.
+          <strong>GCash selected</strong> — payment details will be shown after you place your order.
         </div>
       </div>
     </div>
@@ -420,11 +413,16 @@ function showOrderConfirmation(orderId, payment) {
     <div class="confirm-gcash-box">
       <h3>📱 GCash Payment Required</h3>
       <p>Send payment to:</p>
-      <p><strong>${STORE.gcashName}</strong></p>
-      <p><strong>${STORE.gcashNumber}</strong>
-        <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="margin-left:6px;padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+      <p style="margin-top:6px;"><strong>${STORE.gcashName}</strong></p>
+      <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+        <strong>${STORE.gcashNumber}</strong>
+        <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
       </p>
-      <p style="margin-top:10px;font-size:13px;color:var(--muted);">Send the GCash screenshot via Messenger after payment so we can confirm your order.</p>
+      <p style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        <span>Order No. <strong>#${shortId}</strong></span>
+        <button onclick="navigator.clipboard.writeText('#${shortId}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+      </p>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted);">When sending payment in the GCash app, include the Order No. in the message.</p>
     </div>
   ` : '';
 
