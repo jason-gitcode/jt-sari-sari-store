@@ -169,6 +169,7 @@
   .add-btn:hover { background: var(--accent-dark); }
   .add-btn.in-cart { background: var(--ok); font-size: 14px; font-weight: 700; }
   .add-btn.in-cart:hover { background: #15803d; }
+  .add-btn.in-cart:disabled { background: var(--ok); opacity: 0.5; cursor: not-allowed; }
   .empty {
     text-align: center; color: var(--muted);
     padding: 40px 16px; grid-column: 1 / -1;
@@ -731,9 +732,14 @@ function closeProductModal() {
 
 function addFromModal() {
   const id = parseInt(document.getElementById('modal-product-id').value);
+  const p = PRODUCTS.find(x => x.id == id);
+  if (p && p.stock !== null && p.stock !== undefined) {
+    if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  }
   cart[id] = (cart[id] || 0) + 1;
   saveCart();
   renderCart();
+  renderProducts();
   closeProductModal();
   showToast("Added to cart");
 }
@@ -780,6 +786,8 @@ function renderProducts() {
   grid.innerHTML = list.map(p => {
     const ok = p.available !== false;
     const cartQty = cart[p.id] || 0;
+    const atMax = ok && p.stock !== null && p.stock !== undefined && p.stock > 0 && cartQty >= p.stock;
+    const btnDisabled = !ok || atMax;
     return `
     <div class="card" onclick="showProductDetail(${p.id})">
       <div class="thumb">
@@ -793,7 +801,7 @@ function renderProducts() {
         ${(p.stock !== null && p.stock !== undefined) ? `<div style="font-size:12px;color:${p.stock === 0 ? '#dc2626' : 'var(--warn)'};">Stock: ${p.stock}</div>` : ''}
         <div class="card-bottom">
           <div class="price">${STORE.currency}${p.price.toFixed(2)}</div>
-          <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${ok ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${!ok ? 'disabled' : ''} title="${ok ? 'Add to cart' : 'Out of stock'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
+          <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
         </div>
       </div>
     </div>
@@ -804,6 +812,10 @@ function renderProducts() {
 function saveCart() { localStorage.setItem('sariCart', JSON.stringify(cart)); }
 
 function addToCart(id) {
+  const p = PRODUCTS.find(x => x.id == id);
+  if (p && p.stock !== null && p.stock !== undefined) {
+    if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  }
   cart[id] = (cart[id] || 0) + 1;
   saveCart();
   renderCart();
@@ -811,6 +823,12 @@ function addToCart(id) {
   showToast("Added to cart");
 }
 function changeQty(id, delta) {
+  if (delta > 0) {
+    const p = PRODUCTS.find(x => x.id == id);
+    if (p && p.stock !== null && p.stock !== undefined) {
+      if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+    }
+  }
   cart[id] = (cart[id] || 0) + delta;
   if (cart[id] <= 0) delete cart[id];
   saveCart();
@@ -864,7 +882,7 @@ function renderCart() {
             <div class="qty">
               <button onclick="changeQty(${p.id}, -1)">−</button>
               <span>${qty}</span>
-              <button onclick="changeQty(${p.id}, 1)">+</button>
+              <button onclick="changeQty(${p.id}, 1)" ${p.stock !== null && p.stock !== undefined && qty >= p.stock ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>+</button>
             </div>
           </div>
           <button class="remove-x" onclick="removeFromCart(${p.id})" title="Remove">×</button>
