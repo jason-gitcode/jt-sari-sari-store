@@ -444,6 +444,10 @@
     .btn-confirm-order:hover { background: #15803d; }
     .btn-cancel-order { padding: 8px 14px; background: #fff; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--muted); transition: background .15s; }
     .btn-cancel-order:hover { background: var(--line); }
+    .btn-refund-order { padding: 8px 14px; background: #fff; border: 1px solid #fca5a5; border-radius: 6px; font-size: 13px; cursor: pointer; color: #dc2626; transition: background .15s; }
+    .btn-refund-order:hover { background: #fef2f2; }
+    .order-card.refunded { border-left: 4px solid #f87171; opacity: 0.65; }
+    .order-status-badge.refunded { background: #fee2e2; color: #991b1b; }
 
     /* ---------- ORDER BADGE ---------- */
     .order-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; background: #ef4444; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 5px; line-height: 1; vertical-align: middle; }
@@ -531,6 +535,7 @@
         <button class="orders-filter-btn"        data-filter="pending"   onclick="setOrdersFilter('pending')">Pending</button>
         <button class="orders-filter-btn"        data-filter="confirmed" onclick="setOrdersFilter('confirmed')">Confirmed</button>
         <button class="orders-filter-btn"        data-filter="cancelled" onclick="setOrdersFilter('cancelled')">Cancelled</button>
+        <button class="orders-filter-btn"        data-filter="refunded"  onclick="setOrdersFilter('refunded')">Refunded</button>
       </div>
       <div class="orders-list" id="orders-list"></div>
     </div>
@@ -911,6 +916,10 @@ function renderOrders() {
       <div class="order-actions-row">
         <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm &amp; Deduct Stock</button>
         <button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>
+      </div>` :
+      o.status === 'confirmed' ? `
+      <div class="order-actions-row">
+        <button class="btn-refund-order" onclick="refundAndRestock('${o.orderId}')">↩ Refund &amp; Restock</button>
       </div>` : '';
 
     return `
@@ -969,6 +978,32 @@ async function cancelOrder(orderId) {
   } catch (err) {
     console.error('Cancel order error:', err);
     showToast('Error cancelling order', 'error');
+  }
+}
+
+async function refundAndRestock(orderId) {
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order) return;
+  try {
+    const batch = db.batch();
+    batch.update(db.collection('orders').doc(orderId), {
+      status: 'refunded',
+      refundedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    for (const item of (order.items || [])) {
+      const product = products.find(p => String(p.id) === String(item.productId));
+      if (product && product.stock !== null && product.stock !== undefined) {
+        const newStock = product.stock + item.qty;
+        const upd = { stock: newStock };
+        if (product.stock === 0 && newStock > 0) upd.available = true;
+        batch.update(db.collection('products').doc(String(item.productId)), upd);
+      }
+    }
+    await batch.commit();
+    showToast('Order refunded — stock restored', 'success');
+  } catch (err) {
+    console.error('Refund order error:', err);
+    showToast('Error processing refund', 'error');
   }
 }
 
