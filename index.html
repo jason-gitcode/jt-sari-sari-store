@@ -870,6 +870,7 @@ function cartTotal() {
     return p ? sum + p.price * qty : sum;
   }, 0);
 }
+function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
 function cartCount() {
   return Object.values(cart).reduce((a, b) => a + b, 0);
 }
@@ -907,8 +908,10 @@ function renderCart() {
     }).join('');
   }
   const total = cartTotal();
+  const fee = deliveryFee();
   document.getElementById('subtotal').textContent = STORE.currency + total.toFixed(2);
-  document.getElementById('grand-total').textContent = STORE.currency + total.toFixed(2);
+  document.getElementById('delivery-fee').textContent = fee === 0 ? 'Free' : STORE.currency + fee.toFixed(2);
+  document.getElementById('grand-total').textContent = STORE.currency + (total + fee).toFixed(2);
   document.getElementById('checkout-btn').disabled = (ids.length === 0);
 }
 

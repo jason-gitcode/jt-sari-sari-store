@@ -35,7 +35,10 @@
   .order-item__qty { font-weight: 700; color: var(--ink); width: 34px; min-width: 34px; }
   .order-item__desc { display: inline-block; width: 100%; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .order-item__price { font-weight: 700; color: var(--ink); white-space: nowrap; text-align: right; }
-  .summary-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px; background: var(--soft); font-weight: 700; font-size: 15px; }
+  .summary-fee-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  .summary-fee-row span:last-child { font-weight: 600; color: var(--ink); }
+  .summary-fee-row .free { color: var(--ok); }
+  .summary-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px; background: var(--soft); font-weight: 700; font-size: 15px; border-top: 1px solid var(--line); }
   .summary-total__amount { color: var(--accent); }
   @media (max-width: 480px) {
     .order-item { padding: 10px 12px; gap: 8px; }
@@ -132,6 +135,8 @@ async function sendDiscordNotification(order, shortId) {
     ``,
     itemLines,
     ``,
+    `🧾 Subtotal: ₱${parseFloat(order.subtotal || order.total).toFixed(2)}`,
+    `🛵 Delivery: ${(order.deliveryFee || 0) === 0 ? 'Free' : '₱' + parseFloat(order.deliveryFee).toFixed(2)}`,
     `💰 **Total: ₱${parseFloat(order.total).toFixed(2)}**`,
     `💳 ${order.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery'}`,
   ];
@@ -220,6 +225,7 @@ function cartTotal() {
     return p ? sum + p.price * qty : sum;
   }, 0);
 }
+function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
 
 function init() {
   const main = document.getElementById('main');
@@ -251,14 +257,20 @@ function init() {
 
   const sel = (n, val) => n == val ? 'selected' : '';
 
+  const subtotal = cartTotal();
+  const fee = deliveryFee();
+  const grandTotal = subtotal + fee;
+
   main.innerHTML = `
     <div class="section">
       <div class="section-label">Items</div>
       <div class="summary-card">
         <div class="summary-list">${itemRows}</div>
+        <div class="summary-fee-row"><span>Subtotal</span><span>${STORE.currency}${subtotal.toFixed(2)}</span></div>
+        <div class="summary-fee-row"><span>Delivery</span><span class="${fee === 0 ? 'free' : ''}">${fee === 0 ? '✓ Free' : STORE.currency + fee.toFixed(2)}</span></div>
         <div class="summary-total">
           <span>Grand Total</span>
-          <span class="summary-total__amount">${STORE.currency}${cartTotal().toFixed(2)}</span>
+          <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
         </div>
       </div>
     </div>
@@ -420,7 +432,9 @@ async function placeOrder() {
     payment: payMethod,
     notes: document.getElementById('cust-notes').value.trim(),
     items,
-    total: cartTotal(),
+    subtotal: cartTotal(),
+    deliveryFee: deliveryFee(),
+    total: cartTotal() + deliveryFee(),
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
