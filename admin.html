@@ -135,6 +135,7 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    #orders-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #add-tab.active { display: block; flex: 1; overflow-y: auto; }
 
     .search-bar {
@@ -413,6 +414,51 @@
     .toggle-sw input:checked + .toggle-sl { background: var(--ok); }
     .toggle-sw input:checked + .toggle-sl::before { transform: translateX(16px); }
 
+    /* ---------- ORDERS TAB ---------- */
+    .orders-filter { display: flex; gap: 6px; flex-shrink: 0; margin-bottom: 12px; flex-wrap: wrap; }
+    .orders-filter-btn { padding: 5px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: var(--soft); cursor: pointer; transition: all .15s; }
+    .orders-filter-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .orders-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px; }
+    .order-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .order-card.pending  { border-left: 4px solid var(--warn); }
+    .order-card.confirmed { border-left: 4px solid var(--ok); }
+    .order-card.cancelled { border-left: 4px solid #d1d5db; opacity: 0.65; }
+    .order-card-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--soft); border-bottom: 1px solid var(--line); }
+    .order-id-label { font-size: 13px; font-weight: 700; font-family: monospace; letter-spacing: 0.04em; }
+    .order-status-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .order-status-badge.pending   { background: #fef3c7; color: #92400e; }
+    .order-status-badge.confirmed { background: #dcfce7; color: #166534; }
+    .order-status-badge.cancelled { background: #f3f4f6; color: #6b7280; }
+    .order-time-label { font-size: 12px; color: var(--muted); margin-left: auto; }
+    .order-card-body { padding: 12px 14px; }
+    .order-cust { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .order-addr { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .order-items-list { font-size: 13px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
+    .order-item-row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+    .order-item-row:last-child { border-bottom: none; }
+    .order-total-row { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; }
+    .order-pay-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .order-notes-label { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 6px; }
+    .order-actions-row { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--soft); }
+    .btn-confirm-order { flex: 1; padding: 8px; background: var(--ok); color: #fff; border-radius: 6px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: background .15s; }
+    .btn-confirm-order:hover { background: #15803d; }
+    .btn-cancel-order { padding: 8px 14px; background: #fff; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--muted); transition: background .15s; }
+    .btn-cancel-order:hover { background: var(--line); }
+
+    /* ---------- ORDER BADGE ---------- */
+    .order-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; background: #ef4444; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 5px; line-height: 1; vertical-align: middle; }
+
+    /* ---------- LOW STOCK HIGHLIGHT ---------- */
+    .pt-data.low-stock   { background: #fffbeb; }
+    .pt-data.out-of-stock { background: #fef2f2; }
+    .pt-data.low-stock   .pt-stock-val { color: #d97706; font-weight: 700; }
+    .pt-data.out-of-stock .pt-stock-val { color: #dc2626; font-weight: 700; }
+
+    /* ---------- STOCK ADJUSTMENT ---------- */
+    .stock-adj { display: flex; align-items: center; gap: 4px; }
+    .stock-btn { width: 20px; height: 20px; border-radius: 4px; font-size: 14px; line-height: 1; background: var(--soft); border: 1px solid var(--line); display: grid; place-items: center; cursor: pointer; flex-shrink: 0; padding: 0; }
+    .stock-btn:hover { background: var(--line); }
+
     @media (max-width: 600px) {
       .pt-row { grid-template-columns: 36px 44px 1fr 60px 60px; }
       .pt-stock, .pt-edit-col { display: none; }
@@ -458,6 +504,7 @@
   <div class="container">
     <div class="tabs">
       <button class="tab-btn active" data-tab="products" onclick="switchTab('products')">All Products</button>
+      <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">Orders<span class="order-badge" id="order-badge" style="display:none;"></span></button>
       <button class="tab-btn" onclick="openAddModal()">Add New Product</button>
       <button class="delete-sel-btn" id="delete-sel-btn" onclick="deleteSelected()" disabled>
         <span class="del-icon">🗑️</span><span id="delete-sel-label">Delete</span>
@@ -475,6 +522,17 @@
           <div class="products-grid" id="products-list"></div>
         </div>
       </div>
+    </div>
+
+    <!-- TAB: ORDERS -->
+    <div class="tab-panel" id="orders-tab">
+      <div class="orders-filter">
+        <button class="orders-filter-btn active" data-filter="all"       onclick="setOrdersFilter('all')">All</button>
+        <button class="orders-filter-btn"        data-filter="pending"   onclick="setOrdersFilter('pending')">Pending</button>
+        <button class="orders-filter-btn"        data-filter="confirmed" onclick="setOrdersFilter('confirmed')">Confirmed</button>
+        <button class="orders-filter-btn"        data-filter="cancelled" onclick="setOrdersFilter('cancelled')">Cancelled</button>
+      </div>
+      <div class="orders-list" id="orders-list"></div>
     </div>
 
   </div>
@@ -641,13 +699,16 @@ const DEFAULT_PRODUCTS = [
 ];
 
 let products = [];
+let orders = [];
 let isLoggedIn = localStorage.getItem('sariAdminLoggedIn') === 'true';
 let editingProductId = null;
 let variantCount = 0;
 let searchTerm = '';
 let currentImages = [];
 let unsubscribeProducts = null;
+let unsubscribeOrders = null;
 let adminActiveCategory = 'All';
+let ordersFilter = 'all';
 
 async function seedDefaultProducts() {
   const local = JSON.parse(localStorage.getItem('sariProducts') || '[]');
@@ -729,6 +790,7 @@ function login() {
 
 function logout() {
   if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
+  if (unsubscribeOrders)   { unsubscribeOrders();   unsubscribeOrders   = null; }
   localStorage.removeItem('sariAdminLoggedIn');
   isLoggedIn = false;
   showLogin();
@@ -744,6 +806,7 @@ function showAdmin() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'flex';
   subscribeToProducts();
+  subscribeToOrders();
 }
 
 function subscribeToProducts() {
@@ -761,6 +824,145 @@ function subscribeToProducts() {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
   });
+}
+
+// ---------- ORDERS ----------
+function subscribeToOrders() {
+  if (unsubscribeOrders) unsubscribeOrders();
+  unsubscribeOrders = db.collection('orders')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snapshot => {
+      orders = snapshot.docs.map(doc => ({ ...doc.data(), orderId: doc.id }));
+      renderOrders();
+      updateOrderBadge();
+    }, err => console.error('Orders listener error:', err));
+}
+
+function updateOrderBadge() {
+  const pending = orders.filter(o => o.status === 'pending').length;
+  const badge = document.getElementById('order-badge');
+  if (!badge) return;
+  badge.style.display = pending > 0 ? 'inline-flex' : 'none';
+  badge.textContent = pending;
+}
+
+function setOrdersFilter(filter) {
+  ordersFilter = filter;
+  document.querySelectorAll('.orders-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  renderOrders();
+}
+
+function formatOrderTime(ts) {
+  if (!ts || !ts.toDate) return '';
+  const date = ts.toDate();
+  const diffMins = Math.floor((Date.now() - date) / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+}
+
+function renderOrders() {
+  const list = document.getElementById('orders-list');
+  if (!list) return;
+
+  const filtered = ordersFilter === 'all' ? orders : orders.filter(o => o.status === ordersFilter);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div>📋</div><div>No ${ordersFilter === 'all' ? '' : ordersFilter + ' '}orders yet</div></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(o => {
+    const shortId  = o.orderId.slice(-6).toUpperCase();
+    const addr     = o.address ? `Block ${o.address.block}, Lot ${o.address.lot}, Phase ${o.address.phase}, St. ${o.address.street}, Valle Verde` : '—';
+    const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
+    const itemsHtml = (o.items || []).map(item => `
+      <div class="order-item-row">
+        <span>${item.qty}× ${item.productName}</span>
+        <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
+      </div>`).join('');
+    const actionsHtml = o.status === 'pending' ? `
+      <div class="order-actions-row">
+        <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm &amp; Deduct Stock</button>
+        <button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>
+      </div>` : '';
+
+    return `
+      <div class="order-card ${o.status}">
+        <div class="order-card-header">
+          <span class="order-id-label">#${shortId}</span>
+          <span class="order-status-badge ${o.status}">${o.status}</span>
+          <span class="order-time-label">${formatOrderTime(o.createdAt)}</span>
+        </div>
+        <div class="order-card-body">
+          <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}</div>
+          <div class="order-addr">${addr}</div>
+          <div class="order-items-list">${itemsHtml}</div>
+          <div class="order-total-row"><span>Total</span><span>₱${parseFloat(o.total).toFixed(2)}</span></div>
+          <div class="order-pay-label">${payLabel}</div>
+          ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
+        </div>
+        ${actionsHtml}
+      </div>`;
+  }).join('');
+}
+
+async function confirmOrder(orderId) {
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order) return;
+  try {
+    const batch = db.batch();
+    batch.update(db.collection('orders').doc(orderId), {
+      status: 'confirmed',
+      confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    for (const item of (order.items || [])) {
+      const product = products.find(p => String(p.id) === String(item.productId));
+      if (product && product.stock !== null && product.stock !== undefined) {
+        const newStock = Math.max(0, product.stock - item.qty);
+        const upd = { stock: newStock };
+        if (newStock === 0) upd.available = false;
+        batch.update(db.collection('products').doc(String(item.productId)), upd);
+      }
+    }
+    await batch.commit();
+    showToast('Order confirmed — stock updated', 'success');
+  } catch (err) {
+    console.error('Confirm order error:', err);
+    showToast('Error confirming order', 'error');
+  }
+}
+
+async function cancelOrder(orderId) {
+  try {
+    await db.collection('orders').doc(orderId).update({
+      status: 'cancelled',
+      cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Order cancelled', 'success');
+  } catch (err) {
+    console.error('Cancel order error:', err);
+    showToast('Error cancelling order', 'error');
+  }
+}
+
+async function adjustStock(id, delta) {
+  const product = products.find(p => p.id === id);
+  if (!product || product.stock === null || product.stock === undefined) return;
+  const newStock = Math.max(0, product.stock + delta);
+  const upd = { stock: newStock };
+  if (newStock === 0) upd.available = false;
+  else if (product.stock === 0 && newStock > 0) upd.available = true;
+  try {
+    await db.collection('products').doc(String(id)).update(upd);
+  } catch (err) {
+    console.error('Adjust stock error:', err);
+    showToast('Error updating stock', 'error');
+  }
 }
 
 // ---------- TABS ----------
@@ -892,20 +1094,30 @@ function renderProducts() {
       <div class="pt-cell">Available</div>
     </div>
     ${filtered.map(p => {
-      const available = p.available !== false;
-      const stock = p.stock ? p.stock : '—';
+      const available  = p.available !== false;
+      const stockNum   = (p.stock !== null && p.stock !== undefined) ? p.stock : null;
+      const isLowStock = stockNum !== null && stockNum > 0 && stockNum <= 5;
+      const isOutOf    = stockNum !== null && stockNum === 0;
+      const stockClass = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
+      const stockCell  = stockNum !== null
+        ? `<div class="stock-adj">
+             <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
+             <span class="pt-stock-val">${stockNum}</span>
+             <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
+           </div>`
+        : `<span class="pt-stock-val">—</span>`;
       const thumb = p.images && p.images.length > 0
         ? `<img src="${p.images[0]}" alt="${p.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
         : `<div style="width:44px;height:44px;border-radius:6px;background:var(--soft);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
       return `
-        <div class="pt-row pt-data">
+        <div class="pt-row pt-data ${stockClass}">
           <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
           <div class="pt-cell">${thumb}</div>
           <div class="pt-cell pt-name-col">
             <div class="pt-pname">${p.name}</div>
             <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
           </div>
-          <div class="pt-cell pt-stock">${stock}</div>
+          <div class="pt-cell pt-stock">${stockCell}</div>
           <div class="pt-cell pt-price-col">₱${parseFloat(p.price).toFixed(2)}</div>
           <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
           <div class="pt-cell pt-avail-col">

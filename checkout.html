@@ -77,6 +77,17 @@
   .empty { text-align: center; padding: 60px 16px; color: var(--muted); }
   .empty a { color: var(--accent); font-weight: 500; text-decoration: none; }
 
+  /* Order confirmation screen */
+  .confirm-screen { text-align: center; padding: 48px 16px; }
+  .confirm-icon { font-size: 72px; margin-bottom: 16px; line-height: 1; }
+  .confirm-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .confirm-order-num { font-size: 13px; color: var(--muted); margin-bottom: 16px; font-family: monospace; letter-spacing: 0.1em; }
+  .confirm-gcash-box { background: var(--soft); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; text-align: left; margin: 16px auto; max-width: 360px; font-size: 14px; }
+  .confirm-gcash-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .confirm-gcash-box p { margin-top: 6px; }
+  .confirm-back { display: inline-block; margin-top: 24px; padding: 12px 28px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; text-decoration: none; font-size: 15px; transition: background .15s; }
+  .confirm-back:hover { background: var(--accent-dark); }
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -305,7 +316,7 @@ function init() {
       </div>
     </div>
 
-    <button class="send-btn" onclick="sendOrder()">Send Order via Messenger</button>
+    <button class="send-btn" id="place-order-btn" onclick="placeOrder()">Place Order</button>
   `;
 
   // Attach real-time phone validation after HTML is rendered
@@ -336,36 +347,7 @@ function pickPay(method) {
   document.getElementById('pay-info-' + method).classList.add('show');
 }
 
-function buildOrderText() {
-  const name   = document.getElementById('cust-name').value.trim();
-  const phone  = document.getElementById('cust-phone').value.trim();
-  const block  = document.getElementById('cust-block').value;
-  const lot    = document.getElementById('cust-lot').value;
-  const phase  = document.getElementById('cust-phase').value;
-  const street = document.getElementById('cust-street').value;
-  const notes  = document.getElementById('cust-notes').value.trim();
-  const address = `Block ${block}, Lot ${lot}, Phase ${phase}, Street ${street}, Valle Verde`;
-
-  const lines = [];
-  lines.push(`🛒 NEW ORDER from ${STORE.name}`);
-  lines.push('');
-  lines.push(`Customer: ${name}`);
-  lines.push(`Phone: ${phone}`);
-  lines.push(`Address: ${address}`);
-  lines.push('');
-  lines.push('--- Items ---');
-  Object.entries(cart).forEach(([id, qty]) => {
-    const p = PRODUCTS.find(x => x.id == id);
-    if (p) lines.push(`${qty}× ${p.name} — ${STORE.currency}${(p.price * qty).toFixed(2)}`);
-  });
-  lines.push('');
-  lines.push(`TOTAL: ${STORE.currency}${cartTotal().toFixed(2)}`);
-  lines.push(`Payment: ${payMethod === 'cod' ? 'Cash on Delivery' : 'GCash'}`);
-  if (notes) { lines.push(''); lines.push(`Notes: ${notes}`); }
-  return lines.join('\n');
-}
-
-function sendOrder() {
+async function placeOrder() {
   const name   = document.getElementById('cust-name').value.trim();
   const phone  = document.getElementById('cust-phone').value.trim();
   const block  = document.getElementById('cust-block').value;
@@ -375,10 +357,7 @@ function sendOrder() {
 
   let hasError = false;
 
-  if (!name) {
-    showToast("Please fill in your name.");
-    hasError = true;
-  }
+  if (!name) { showToast("Please fill in your name."); hasError = true; }
 
   const phoneErr   = document.getElementById('phone-error');
   const phoneInput = document.getElementById('cust-phone');
@@ -400,15 +379,65 @@ function sendOrder() {
 
   if (hasError) return;
 
-  localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
-  localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
+  const btn = document.getElementById('place-order-btn');
+  btn.disabled = true;
+  btn.textContent = 'Placing order…';
 
-  const text = buildOrderText();
-  const encoded = encodeURIComponent(text);
-  const url = `https://m.me/${STORE.messengerUsername}?text=${encoded}`;
-  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
-  window.open(url, '_blank');
-  showToast("Order copied! Paste it in Messenger.");
+  const items = Object.entries(cart).map(([id, qty]) => {
+    const p = PRODUCTS.find(x => x.id == id);
+    if (!p) return null;
+    return { productId: String(id), productName: p.name, qty, price: p.price, lineTotal: p.price * qty };
+  }).filter(Boolean);
+
+  const orderData = {
+    status: 'pending',
+    customer: { name, phone },
+    address: { block, lot, phase, street },
+    payment: payMethod,
+    notes: document.getElementById('cust-notes').value.trim(),
+    items,
+    total: cartTotal(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try {
+    const ref = await db.collection('orders').add(orderData);
+    localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
+    localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
+    localStorage.removeItem('sariCart');
+    showOrderConfirmation(ref.id, payMethod);
+  } catch (err) {
+    console.error('Order error:', err);
+    btn.disabled = false;
+    btn.textContent = 'Place Order';
+    showToast('Failed to place order. Please try again.');
+  }
+}
+
+function showOrderConfirmation(orderId, payment) {
+  const shortId = orderId.slice(-6).toUpperCase();
+  const gcashHtml = payment === 'gcash' ? `
+    <div class="confirm-gcash-box">
+      <h3>📱 GCash Payment Required</h3>
+      <p>Send payment to:</p>
+      <p><strong>${STORE.gcashName}</strong></p>
+      <p><strong>${STORE.gcashNumber}</strong>
+        <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="margin-left:6px;padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+      </p>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted);">Send the GCash screenshot via Messenger after payment so we can confirm your order.</p>
+    </div>
+  ` : '';
+
+  document.getElementById('main').innerHTML = `
+    <div class="confirm-screen">
+      <div class="confirm-icon">✅</div>
+      <div class="confirm-title">Order Placed!</div>
+      <div class="confirm-order-num">Order #${shortId}</div>
+      <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
+      ${gcashHtml}
+      <a href="index.html" class="confirm-back">Continue Shopping</a>
+    </div>
+  `;
 }
 
 function copyGcashNumber() {
