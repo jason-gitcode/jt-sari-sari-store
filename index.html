@@ -73,19 +73,31 @@
     font-size: 12px; font-weight: 600;
   }
 
-  /* ---------- INFO BAR ---------- */
+  /* ---------- INFO BAR / TICKER ---------- */
   .info-bar {
     flex-shrink: 0;
     background: var(--soft);
     border-bottom: 1px solid var(--line);
     font-size: 13px; color: var(--muted);
+    overflow: hidden;
+    padding: 8px 0;
   }
-  .info-inner {
-    max-width: 1100px; margin: 0 auto;
-    padding: 8px 16px;
-    display: flex; gap: 16px; flex-wrap: wrap;
+  .ticker-track {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: ticker 22s linear infinite;
   }
-  .info-inner span strong { color: var(--ink); font-weight: 600; }
+  .ticker-track:hover { animation-play-state: paused; }
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 48px;
+  }
+  .ticker-item strong { color: var(--ink); font-weight: 600; }
+  .ticker-sep { color: var(--line); font-size: 16px; user-select: none; }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
 
   /* ---------- CATEGORIES ---------- */
   .container {
@@ -402,11 +414,21 @@
 </header>
 
 <div class="info-bar">
-  <div class="info-inner">
-    <span>📍 <strong id="store-address">Valle Verde Subdivision</strong></span>
-    <span>🕐 <strong id="store-hours">Open 6am–9pm daily</strong></span>
-    <span>🛵 <strong id="store-delivery">Free delivery within Valle Verde</strong></span>
-    <span style="display:none;">🕒 Delivery Time: <strong id="store-delivery-times">6am · 9am · 12pm · 3pm · 6pm · 9pm</strong></span>
+  <!-- ticker-track is duplicated so the loop is seamless -->
+  <div class="ticker-track">
+    <span class="ticker-item">📍 <strong>Valle Verde Subdivision</strong></span>
+    <span class="ticker-sep">|</span>
+    <span class="ticker-item">🕐 <strong>Open 6am–9pm daily</strong></span>
+    <span class="ticker-sep">|</span>
+    <span class="ticker-item">🛵 <strong>Free delivery on orders ₱200+ within Valle Verde</strong></span>
+    <span class="ticker-sep">|</span>
+    <!-- duplicate for seamless loop -->
+    <span class="ticker-item">📍 <strong>Valle Verde Subdivision</strong></span>
+    <span class="ticker-sep">|</span>
+    <span class="ticker-item">🕐 <strong>Open 6am–9pm daily</strong></span>
+    <span class="ticker-sep">|</span>
+    <span class="ticker-item">🛵 <strong>Free delivery on orders ₱200+ within Valle Verde</strong></span>
+    <span class="ticker-sep">|</span>
   </div>
 </div>
 
@@ -485,7 +507,7 @@ const STORE = {
   tagline: "",
   address: "Valle Verde Subdivision",
   hours: "Open 6am–9pm daily",
-  delivery: "Free delivery within Valle Verde",
+  delivery: "Free delivery on orders ₱200+ within Valle Verde",
 
   // Your Facebook page username (the part after facebook.com/)
   // Example: if your page is facebook.com/AlingNenasStore, put "AlingNenasStore"
@@ -638,13 +660,9 @@ let searchTerm = "";
 // ---------- INIT ----------
 function init() {
 
-  // Apply store config to header / info bar
+  // Apply store config to header
   document.getElementById('store-name').textContent = STORE.name;
   document.getElementById('store-tag').textContent = STORE.tagline;
-  document.getElementById('store-address').textContent = STORE.address;
-  document.getElementById('store-hours').textContent = STORE.hours;
-  document.getElementById('store-delivery').textContent = STORE.delivery;
-  document.getElementById('store-delivery-times').textContent = STORE.deliveryTimes;
   document.title = STORE.name;
 
   renderCategories();
