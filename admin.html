@@ -391,8 +391,10 @@
       flex: 1; padding: 10px 14px;
       background: var(--soft); border: 1px solid var(--line); border-left: none;
       font-size: 13px; cursor: pointer; white-space: nowrap; text-align: left;
-      transition: all .15s; border-radius: 0 8px 8px 0; overflow: hidden; text-overflow: ellipsis;
+      transition: all .15s; border-radius: 0 8px 8px 0;
+      display: flex; align-items: center; overflow: hidden;
     }
+    .admin-chip .chip-label { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
     .admin-chip:not(.with-del) { border-radius: 8px; border-left: 1px solid var(--line); flex: none; width: 100%; }
     .admin-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
     .admin-chip:hover:not(.active) { border-color: var(--ink); background: var(--soft); }
@@ -403,6 +405,12 @@
       border-radius: 8px 0 0 8px; color: #dc2626; cursor: pointer; transition: background .15s;
     }
     .chip-del:hover { background: #fee2e2; }
+    .chip-count {
+      display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600;
+      background: rgba(0,0,0,.1); color: inherit; border-radius: 10px;
+      padding: 0 6px; line-height: 18px; vertical-align: middle; flex-shrink: 0;
+    }
+    .admin-chip.active .chip-count { background: rgba(255,255,255,.25); color: #fff; }
 
     /* ---------- TOGGLE SWITCH WRAPPER ---------- */
 
@@ -1052,12 +1060,14 @@ function renderAdminCategories() {
   wrap.innerHTML = [...cats].map(c => {
     const active = c === adminActiveCategory ? 'active' : '';
     const safeC = c.replace(/'/g, "\\'");
+    const count = c === 'All' ? products.length : products.filter(p => p.category === c).length;
+    const badge = `<span class="chip-count">${count}</span>`;
     if (c === 'All') {
-      return `<button class="admin-chip ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>`;
+      return `<button class="admin-chip ${active}" onclick="pickAdminCategory('${safeC}')"><span class="chip-label">${c}</span>${badge}</button>`;
     }
     return `<span class="chip-group">
       <button class="chip-del" onclick="deleteCategory('${safeC}')" title="Delete category">×</button>
-      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')">${c}</button>
+      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')"><span class="chip-label">${c}</span>${badge}</button>
     </span>`;
   }).join('');
   updateCategorySelect();
