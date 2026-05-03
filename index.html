@@ -795,6 +795,11 @@ function renderProducts() {
       return text.includes(searchTerm);
     });
   }
+  list.sort((a, b) => {
+    const aOos = a.available === false || a.stock === 0;
+    const bOos = b.available === false || b.stock === 0;
+    return aOos - bOos;
+  });
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty">No products found.</div>`;
     return;
