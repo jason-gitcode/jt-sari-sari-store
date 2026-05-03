@@ -444,7 +444,8 @@
     .order-items-list { font-size: 13px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
     .order-item-row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--line); }
     .order-item-row:last-child { border-bottom: none; }
-    .order-total-row { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; }
+    .order-subtotal-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+    .order-total-row { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px; }
     .order-pay-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
     .order-notes-label { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 6px; }
     .order-actions-row { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--soft); }
@@ -941,6 +942,9 @@ function renderOrders() {
           <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}</div>
           <div class="order-addr">${addr}</div>
           <div class="order-items-list">${itemsHtml}</div>
+          ${(o.subtotal != null && o.deliveryFee != null) ? `
+          <div class="order-subtotal-row"><span>Subtotal</span><span>₱${parseFloat(o.subtotal).toFixed(2)}</span></div>
+          <div class="order-subtotal-row"><span>Delivery Fee</span><span>${parseFloat(o.deliveryFee) === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + parseFloat(o.deliveryFee).toFixed(2)}</span></div>` : ''}
           <div class="order-total-row"><span>Total</span><span>₱${parseFloat(o.total).toFixed(2)}</span></div>
           <div class="order-pay-label">${payLabel}</div>
           ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
