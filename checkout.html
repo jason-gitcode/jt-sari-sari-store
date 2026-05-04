@@ -83,6 +83,7 @@
   .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .pay-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px; text-align: center; transition: all .15s; }
   .pay-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
+  .pay-opt.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
   .pay-info { margin-top: 10px; padding: 10px; background: var(--soft); border-radius: 8px; font-size: 13px; color: var(--muted); display: none; }
   .pay-info.show { display: block; }
   .pay-info strong { color: var(--ink); }
@@ -395,6 +396,9 @@ function init() {
         <div class="pay-info" id="pay-info-gcash">
           <strong>GCash selected</strong> — payment details will be shown after you place your order.
         </div>
+        <div id="cod-restricted-note" style="display:none;margin-top:8px;font-size:12px;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;">
+          Cash on Delivery is not available for orders ₱200 and above. Please use GCash.
+        </div>
       </div>
     </div>
 
@@ -486,6 +490,21 @@ function pickPay(method) {
   document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
   document.querySelectorAll('.pay-info').forEach(el => el.classList.remove('show'));
   document.getElementById('pay-info-' + method).classList.add('show');
+}
+
+function updatePaymentOptions() {
+  const total = cartTotal();
+  const codBtn = document.querySelector('[data-pay="cod"]');
+  const note   = document.getElementById('cod-restricted-note');
+  if (!codBtn) return;
+  if (total >= 200) {
+    codBtn.classList.add('disabled');
+    if (note) note.style.display = 'block';
+    if (payMethod === 'cod') pickPay('gcash');
+  } else {
+    codBtn.classList.remove('disabled');
+    if (note) note.style.display = 'none';
+  }
 }
 
 async function placeOrder() {
@@ -702,12 +721,12 @@ db.collection('products').get().then(snapshot => {
     PRODUCTS = DEFAULT_PRODUCTS;
   }
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init();
+  init(); updatePaymentOptions();
 }).catch(() => {
   PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
   if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init();
+  init(); updatePaymentOptions();
 });
 </script>
 </body>
