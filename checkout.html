@@ -450,7 +450,7 @@ function toggleCsel(name) {
   if (!isOpen) {
     drop.style.display = 'block';
     const search = drop.querySelector('.csel-search');
-    if (search) { search.value = ''; search.focus(); }
+    if (search) { search.value = ''; if (!('ontouchstart' in window)) search.focus(); }
     renderCselList(name, CSEL_DATA[name]);
   }
 }
