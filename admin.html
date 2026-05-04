@@ -312,15 +312,24 @@
       padding: 12px;
       margin-bottom: 8px;
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: 2fr auto 1fr auto;
       gap: 8px;
       align-items: end;
     }
     .variant-item input { font-size: 13px; }
-    .variant-item .remove-btn {
-      color: #dc2626;
-      font-size: 18px;
-      padding: 4px 8px;
+    .variant-item .remove-btn { color: #dc2626; font-size: 18px; padding: 4px 8px; }
+    .vstock-ctrl {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .vstock-ctrl button {
+      width: 28px; height: 28px; border-radius: 6px; font-size: 16px; line-height: 1;
+      background: #fff; border: 1px solid var(--line); cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; color: var(--ink);
+    }
+    .vstock-ctrl button:hover { border-color: var(--ink); background: var(--soft); }
+    .vstock-ctrl span {
+      min-width: 28px; text-align: center; font-size: 14px; font-weight: 700;
+      color: var(--warn);
     }
 
     .form-actions {
@@ -476,7 +485,11 @@
       .pt-row { grid-template-columns: 36px 44px 1fr 60px 60px; }
       .pt-stock, .pt-edit-col { display: none; }
       .form-grid { grid-template-columns: 1fr; }
-      .variant-item { grid-template-columns: 1fr 1fr; }
+      .variant-item { grid-template-columns: 1fr auto; }
+      .variant-item input[data-variant-name] { grid-column: 1; }
+      .variant-item .vstock-ctrl { grid-column: 1; }
+      .variant-item input[data-variant-price] { grid-column: 1; }
+      .variant-item .remove-btn { grid-column: 2; grid-row: 1; }
       .products-layout { flex-direction: column; overflow-y: auto; }
       .admin-cats {
         width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden;
@@ -1165,18 +1178,23 @@ function renderProducts() {
       <div class="pt-cell">Available</div>
     </div>
     ${filtered.map(p => {
-      const available  = p.available !== false;
-      const stockNum   = (p.stock !== null && p.stock !== undefined) ? p.stock : null;
-      const isLowStock = stockNum !== null && stockNum > 0 && stockNum <= 5;
-      const isOutOf    = stockNum !== null && stockNum === 0;
-      const stockClass = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
-      const stockCell  = stockNum !== null
-        ? `<div class="stock-adj">
-             <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
-             <span class="pt-stock-val">${stockNum}</span>
-             <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
-           </div>`
-        : `<span class="pt-stock-val">—</span>`;
+      const available   = p.available !== false;
+      const hasVariants = p.variants && p.variants.length > 0;
+      const stockNum    = hasVariants
+        ? p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
+        : (p.stock !== null && p.stock !== undefined ? p.stock : null);
+      const isLowStock  = stockNum !== null && stockNum > 0 && stockNum <= 5;
+      const isOutOf     = stockNum !== null && stockNum === 0;
+      const stockClass  = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
+      const stockCell   = hasVariants
+        ? `<span class="pt-stock-val">${stockNum}</span>`
+        : stockNum !== null
+          ? `<div class="stock-adj">
+               <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
+               <span class="pt-stock-val">${stockNum}</span>
+               <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
+             </div>`
+          : `<span class="pt-stock-val">—</span>`;
       const thumb = p.images && p.images.length > 0
         ? `<img src="${p.images[0]}" alt="${p.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
         : `<div style="width:44px;height:44px;border-radius:6px;background:var(--soft);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
@@ -1281,7 +1299,7 @@ function editProduct(id) {
   document.getElementById('variants-list').innerHTML = '';
   if (p.variants && p.variants.length > 0) {
     p.variants.forEach(v => {
-      addVariantField(v.name, v.price);
+      addVariantField(v.name, v.price, v.stock || 0);
     });
   }
 
@@ -1316,8 +1334,10 @@ async function saveProduct(e) {
     const idx = field.dataset.variantIndex;
     const name = field.value;
     const priceField = document.querySelector(`[data-variant-price="${idx}"]`);
+    const stockField = document.querySelector(`[data-variant-stock="${idx}"]`);
     const price = priceField ? parseFloat(priceField.value) || 0 : 0;
-    if (name) formData.variants.push({ name, price });
+    const stock = stockField ? parseInt(stockField.value) || 0 : 0;
+    if (name) formData.variants.push({ name, price, stock });
   });
 
   formData.id = editingProductId || (products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1);
@@ -1360,13 +1380,29 @@ function resetForm() {
   renderPhotoPreviews();
 }
 
-function addVariantField(name = '', price = '') {
+function adjVStock(btn, delta) {
+  const ctrl = btn.parentElement;
+  const input = ctrl.querySelector('input[type=hidden]');
+  const span = ctrl.querySelector('span');
+  const newVal = Math.max(0, parseInt(input.value || 0) + delta);
+  input.value = newVal;
+  span.textContent = newVal;
+}
+
+function addVariantField(name = '', price = '', stock = 0) {
   const idx = variantCount++;
+  const s = parseInt(stock) || 0;
   const html = `
     <div class="variant-item">
-      <input type="text" data-variant-name data-variant-index="${idx}" placeholder="Variant name (e.g., Large)" value="${name}" />
+      <input type="text" data-variant-name data-variant-index="${idx}" placeholder="Size / Name (e.g. Large)" value="${name}" />
+      <div class="vstock-ctrl">
+        <button type="button" onclick="adjVStock(this,-1)">−</button>
+        <span>${s}</span>
+        <button type="button" onclick="adjVStock(this,1)">+</button>
+        <input type="hidden" data-variant-stock="${idx}" value="${s}">
+      </div>
       <input type="number" data-variant-price="${idx}" step="0.01" placeholder="Price" value="${price}" />
-      <button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>
+      <button type="button" class="remove-btn" onclick="this.closest('.variant-item').remove()">×</button>
     </div>
   `;
   const div = document.createElement('div');

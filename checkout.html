@@ -541,10 +541,11 @@ async function placeOrder() {
     const [idStr, vPart] = key.split('_v');
     const p = PRODUCTS.find(x => x.id == idStr);
     if (!p) return null;
-    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const variantIdx = vPart !== undefined ? parseInt(vPart) : null;
+    const variant = variantIdx !== null && p.variants ? p.variants[variantIdx] : null;
     const price = variant ? parseFloat(variant.price || p.price) : p.price;
     const productName = p.name + (variant ? ` (${variant.name})` : '');
-    return { productId: idStr, productName, qty, price, lineTotal: price * qty };
+    return { productId: idStr, productName, qty, price, lineTotal: price * qty, variantIdx };
   }).filter(Boolean);
 
   const orderData = {
@@ -565,36 +566,65 @@ async function placeOrder() {
 
   try {
     await db.runTransaction(async (transaction) => {
-      // Read all stock-tracked products first (reads must precede writes in a transaction)
-      const trackedItems = items.filter(item => {
-        const p = PRODUCTS.find(x => x.id == item.productId);
-        return p && p.stock !== null && p.stock !== undefined;
+      // Group items by productId (one Firestore read per product, not per cart line)
+      const productGroups = {};
+      items.forEach(item => {
+        if (!productGroups[item.productId]) productGroups[item.productId] = [];
+        productGroups[item.productId].push(item);
       });
-      const productRefs = trackedItems.map(item => db.collection('products').doc(item.productId));
+      const productIds = Object.keys(productGroups);
+      const productRefs = productIds.map(pid => db.collection('products').doc(pid));
       const snaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
-      // Validate stock for each tracked item
-      for (let i = 0; i < trackedItems.length; i++) {
-        const snap = snaps[i];
-        const item = trackedItems[i];
-        const data = snap.data();
-        if (!snap.exists || data.available === false || data.stock === 0) {
-          stockErrorMsg = `"${item.productName}" is sold out.`;
-          throw new Error(stockErrorMsg);
-        }
-        if (data.stock < item.qty) {
-          stockErrorMsg = `Only ${data.stock} of "${item.productName}" left in stock.`;
-          throw new Error(stockErrorMsg);
+      // Validate stock — reads must all complete before any writes
+      for (let i = 0; i < productIds.length; i++) {
+        const data = snaps[i].data();
+        for (const item of productGroups[productIds[i]]) {
+          if (item.variantIdx !== null) {
+            // Variant product — check per-variant stock
+            const vStock = data.variants?.[item.variantIdx]?.stock ?? null;
+            if (vStock !== null) {
+              if (vStock === 0) { stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg); }
+              if (vStock < item.qty) { stockErrorMsg = `Only ${vStock} of "${item.productName}" left in stock.`; throw new Error(stockErrorMsg); }
+            }
+          } else {
+            // Non-variant product — check product-level stock
+            if (!snaps[i].exists || data.available === false || data.stock === 0) {
+              stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg);
+            }
+            if (data.stock !== null && data.stock !== undefined && data.stock < item.qty) {
+              stockErrorMsg = `Only ${data.stock} of "${item.productName}" left in stock.`; throw new Error(stockErrorMsg);
+            }
+          }
         }
       }
 
       // All checks passed — write order and deduct stock atomically
       transaction.set(orderRef, orderData);
-      for (let i = 0; i < trackedItems.length; i++) {
-        const newStock = snaps[i].data().stock - trackedItems[i].qty;
-        const upd = { stock: newStock };
-        if (newStock === 0) upd.available = false;
-        transaction.update(productRefs[i], upd);
+      for (let i = 0; i < productIds.length; i++) {
+        const data = snaps[i].data();
+        const pid = productIds[i];
+        const upd = {};
+        const variantItems = productGroups[pid].filter(it => it.variantIdx !== null);
+        const plainItems   = productGroups[pid].filter(it => it.variantIdx === null);
+
+        if (variantItems.length > 0) {
+          const newVariants = (data.variants || []).map((v, idx) => {
+            const item = variantItems.find(it => it.variantIdx === idx);
+            if (!item || v.stock === null || v.stock === undefined) return v;
+            return { ...v, stock: Math.max(0, v.stock - item.qty) };
+          });
+          upd.variants = newVariants;
+          // Mark unavailable only when every variant is depleted
+          if (newVariants.every(v => (v.stock ?? 0) === 0)) upd.available = false;
+        }
+        if (plainItems.length > 0 && data.stock !== null && data.stock !== undefined) {
+          const totalQty = plainItems.reduce((s, it) => s + it.qty, 0);
+          const newStock = Math.max(0, data.stock - totalQty);
+          upd.stock = newStock;
+          if (newStock === 0) upd.available = false;
+        }
+        if (Object.keys(upd).length > 0) transaction.update(productRefs[i], upd);
       }
     });
 

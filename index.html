@@ -664,9 +664,15 @@ function showProductDetail(id) {
   const variantSelect = document.getElementById('variant-select');
   if (p.variants && p.variants.length > 0) {
     variantDiv.style.display = 'block';
-    variantSelect.innerHTML = '<option value="">Select one</option>' + p.variants.map((v, i) => 
-      `<option value="${i}">${v.name} (${STORE.currency}${parseFloat(v.price || 0).toFixed(2)})</option>`
-    ).join('');
+    variantSelect.innerHTML = '<option value="">Select one</option>' + p.variants.map((v, i) => {
+      const vStock = v.stock ?? null;
+      const inCart = cart[`${p.id}_v${i}`] || 0;
+      const oos    = vStock !== null && vStock === 0;
+      const atMax  = vStock !== null && inCart >= vStock && vStock > 0;
+      const disabled = oos || atMax;
+      const suffix = oos ? ' — Out of Stock' : atMax ? ` — Max (${vStock})` : '';
+      return `<option value="${i}" ${disabled ? 'disabled' : ''}>${v.name} (${STORE.currency}${parseFloat(v.price || 0).toFixed(2)})${suffix}</option>`;
+    }).join('');
   } else {
     variantDiv.style.display = 'none';
     variantSelect.innerHTML = '<option value="">Select one</option>';
@@ -699,12 +705,17 @@ function addFromModal() {
   if (p.variants && p.variants.length > 0) {
     const sel = document.getElementById('variant-select');
     if (!sel.value) { showToast('Please select a size first'); return; }
-    key = `${id}_v${sel.value}`;
+    const vIdx = parseInt(sel.value);
+    key = `${id}_v${vIdx}`;
+    const vStock = p.variants[vIdx]?.stock ?? null;
+    if (vStock !== null && (cart[key] || 0) >= vStock) {
+      showToast(`Only ${vStock} in stock`); return;
+    }
   } else {
     key = String(id);
-  }
-  if (p.stock !== null && p.stock !== undefined) {
-    if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+    if (p.stock !== null && p.stock !== undefined) {
+      if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+    }
   }
   cart[key] = (cart[key] || 0) + 1;
   saveCart(); renderCart(); renderProducts();
@@ -747,19 +758,26 @@ function renderProducts() {
       return text.includes(searchTerm);
     });
   }
-  list.sort((a, b) => {
-    const aOos = a.available === false || a.stock === 0;
-    const bOos = b.available === false || b.stock === 0;
-    return aOos - bOos;
-  });
+  const isOos = p => {
+    if (p.available === false) return true;
+    if (p.variants && p.variants.length > 0) return p.variants.every(v => (v.stock ?? 0) === 0);
+    return p.stock === 0;
+  };
+  list.sort((a, b) => isOos(a) - isOos(b));
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty">No products found.</div>`;
     return;
   }
   grid.innerHTML = list.map(p => {
-    const ok = p.available !== false;
+    const ok = p.available !== false && !isOos(p);
     const cartQty = productCartQty(p.id);
-    const atMax = ok && p.stock !== null && p.stock !== undefined && p.stock > 0 && cartQty >= p.stock;
+    const displayStock = (() => {
+      if (p.variants && p.variants.length > 0) {
+        return p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+      }
+      return p.stock;
+    })();
+    const atMax = ok && displayStock !== null && displayStock !== undefined && displayStock > 0 && cartQty >= displayStock;
     const btnDisabled = !ok || atMax;
     return `
     <div class="card" onclick="showProductDetail(${p.id})">
@@ -771,7 +789,7 @@ function renderProducts() {
         <div class="card-name">${p.name}</div>
         <div class="card-unit">${p.unit}</div>
         ${p.description ? `<div style="font-size:12px;color:var(--muted);margin:4px 0;">${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</div>` : ''}
-        ${(p.stock !== null && p.stock !== undefined) ? `<div style="font-size:12px;color:${p.stock === 0 ? '#dc2626' : 'var(--warn)'};">Stock: ${p.stock}</div>` : ''}
+        ${(displayStock !== null && displayStock !== undefined) ? `<div style="font-size:12px;color:${displayStock === 0 ? '#dc2626' : 'var(--warn)'};">Stock: ${displayStock}</div>` : ''}
         <div class="card-bottom">
           <div class="price">${STORE.currency}${p.price.toFixed(2)}</div>
           <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
@@ -795,11 +813,16 @@ function openSizePicker(id) {
   document.getElementById('size-picker-name').textContent = p.name;
   const allQty = productCartQty(id);
   document.getElementById('size-picker-options').innerHTML = p.variants.map((v, i) => {
-    const atMax = p.stock !== null && p.stock !== undefined && p.stock > 0 && allQty >= p.stock;
-    return `<button onclick="addWithVariant(${id},${i})" ${atMax ? 'disabled' : ''}
+    const vStock = v.stock ?? null;
+    const vCartQty = cart[`${id}_v${i}`] || 0;
+    const oos = vStock !== null && vStock === 0;
+    const atMax = !oos && vStock !== null && vCartQty >= vStock;
+    const disabled = oos || atMax;
+    const maxLabel = atMax ? ` <span style="font-size:11px;color:#dc2626;font-weight:400;">Max ${vStock}</span>` : '';
+    return `<button onclick="addWithVariant(${id},${i})" ${disabled ? 'disabled' : ''}
       style="padding:10px 16px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;
-      cursor:pointer;background:var(--soft);text-align:left;${atMax ? 'opacity:0.45;cursor:not-allowed;' : ''}">
-      <span style="display:block;font-weight:500;">${v.name}</span>
+      cursor:pointer;background:var(--soft);text-align:left;${disabled ? 'opacity:0.35;cursor:not-allowed;filter:grayscale(1);' : ''}">
+      <span style="display:block;font-weight:500;">${v.name}${maxLabel}</span>
       <span style="display:block;font-size:12px;color:var(--accent);font-weight:700;margin-top:2px;">${STORE.currency}${parseFloat(v.price || p.price).toFixed(2)}</span>
     </button>`;
   }).join('');
@@ -813,9 +836,10 @@ function closeSizePicker() {
 function addWithVariant(id, variantIdx) {
   const p = PRODUCTS.find(x => x.id == id);
   if (!p) return;
-  const allQty = productCartQty(id);
-  if (p.stock !== null && p.stock !== undefined && allQty >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  const variant = p.variants[variantIdx];
+  const vStock = variant?.stock ?? null;
   const key = `${id}_v${variantIdx}`;
+  if (vStock !== null && (cart[key] || 0) >= vStock) { showToast(`Only ${vStock} in stock`); return; }
   cart[key] = (cart[key] || 0) + 1;
   saveCart(); renderCart(); renderProducts();
   closeSizePicker();
@@ -833,10 +857,16 @@ function addToCart(id) {
   showToast("Added to cart");
 }
 function changeQty(key, delta) {
-  const id = parseInt(key.split('_v')[0]);
-  const p = PRODUCTS.find(x => x.id == id);
-  if (delta > 0 && p && p.stock !== null && p.stock !== undefined) {
-    if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  const [idStr, vPart] = key.split('_v');
+  const p = PRODUCTS.find(x => x.id == idStr);
+  if (delta > 0 && p) {
+    if (vPart !== undefined && p.variants) {
+      const variant = p.variants[parseInt(vPart)];
+      const vStock = variant?.stock ?? null;
+      if (vStock !== null && (cart[key] || 0) >= vStock) { showToast(`Only ${vStock} in stock`); return; }
+    } else if (p.stock !== null && p.stock !== undefined) {
+      if (productCartQty(p.id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+    }
   }
   cart[key] = (cart[key] || 0) + delta;
   if (cart[key] <= 0) delete cart[key];
