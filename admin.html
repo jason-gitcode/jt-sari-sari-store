@@ -1369,7 +1369,9 @@ function addVariantField(name = '', price = '') {
       <button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>
     </div>
   `;
-  document.getElementById('variants-list').innerHTML += html;
+  const div = document.createElement('div');
+  div.innerHTML = html.trim();
+  document.getElementById('variants-list').appendChild(div.firstChild);
 }
 
 // Products are saved directly to Firestore via saveProduct() / deleteProduct()
