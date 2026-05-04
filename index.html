@@ -763,7 +763,10 @@ function renderProducts() {
     if (p.variants && p.variants.length > 0) return p.variants.every(v => (v.stock ?? 0) === 0);
     return p.stock === 0;
   };
-  list.sort((a, b) => isOos(a) - isOos(b));
+  const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+  const inStock = shuffle(list.filter(p => !isOos(p)));
+  const oos     = shuffle(list.filter(p =>  isOos(p)));
+  list = [...inStock, ...oos];
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty">No products found.</div>`;
     return;
