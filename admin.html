@@ -81,29 +81,32 @@
       flex-shrink: 0;
       background: #fff;
       border-bottom: 1px solid var(--line);
-      padding: 16px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 8px;
     }
-    header h1 { font-size: 18px; }
+    header h1 { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .logout-btn {
-      padding: 8px 14px;
+      padding: 6px 12px;
       background: var(--soft);
       border: 1px solid var(--line);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       transition: background .15s;
+      white-space: nowrap;
     }
     .logout-btn:hover { background: var(--line); }
     .rain-mode-btn {
-      padding: 8px 14px;
+      padding: 6px 10px;
       background: var(--soft);
       border: 1px solid var(--line);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
       transition: all .15s;
+      white-space: nowrap;
     }
     .rain-mode-btn.active {
       background: #bfdbfe;
@@ -554,8 +557,10 @@
 <div id="admin-area" style="display:none;">
   <header>
     <h1>📦 Product Management</h1>
-    <button class="rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
-    <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="header-actions">
+      <button class="rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
   </header>
 
   <div class="container">
