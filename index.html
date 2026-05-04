@@ -55,6 +55,25 @@
   .info-bar.rain-mode { background: #eff6ff; border-bottom-color: #bfdbfe; }
   .rain-ticker-item { color: #1e40af; }
   .rain-ticker-item strong { color: #1e40af; }
+  .rain-cloud {
+    position: absolute;
+    background: rgba(255,255,255,0.55);
+    border-radius: 50px;
+    pointer-events: none;
+    animation: cloud-drift ease-in-out infinite;
+  }
+  .rain-cloud::before, .rain-cloud::after {
+    content: '';
+    position: absolute;
+    background: rgba(255,255,255,0.55);
+    border-radius: 50%;
+  }
+  .rain-cloud::before { width: 55%; height: 170%; top: -60%; left: 18%; }
+  .rain-cloud::after  { width: 40%; height: 130%; top: -45%; left: 50%; }
+  @keyframes cloud-drift {
+    0%,100% { transform: translateX(0); }
+    50%     { transform: translateX(6px); }
+  }
   .nav {
     max-width: 1100px; margin: 0 auto;
     padding: 12px 16px;
@@ -615,11 +634,31 @@ function applyRainMode(active) {
     if (!header.querySelector('.rain-container')) {
       const container = document.createElement('div');
       container.className = 'rain-container';
+
+      // Clouds
+      [
+        { left: '4%',  top: '6px',  w: 70,  h: 22, dur: '7s',  delay: '0s'   },
+        { left: '30%', top: '4px',  w: 90,  h: 28, dur: '9s',  delay: '2.5s' },
+        { left: '62%', top: '8px',  w: 60,  h: 19, dur: '6s',  delay: '1s'   },
+        { left: '84%', top: '5px',  w: 80,  h: 24, dur: '8s',  delay: '4s'   },
+      ].forEach(c => {
+        const cloud = document.createElement('div');
+        cloud.className = 'rain-cloud';
+        cloud.style.left              = c.left;
+        cloud.style.top               = c.top;
+        cloud.style.width             = c.w + 'px';
+        cloud.style.height            = c.h + 'px';
+        cloud.style.animationDuration = c.dur;
+        cloud.style.animationDelay    = c.delay;
+        container.appendChild(cloud);
+      });
+
+      // Rain drops
       for (let i = 0; i < 35; i++) {
         const drop = document.createElement('div');
         drop.className = 'rain-drop';
-        drop.style.left            = (Math.random() * 100) + '%';
-        drop.style.height          = (8 + Math.random() * 10) + 'px';
+        drop.style.left               = (Math.random() * 100) + '%';
+        drop.style.height             = (8 + Math.random() * 10) + 'px';
         drop.style.animationDuration  = (0.4 + Math.random() * 0.7) + 's';
         drop.style.animationDelay     = (-Math.random() * 2) + 's';
         container.appendChild(drop);
