@@ -735,10 +735,11 @@ function clearSearch() {
 function renderCategories() {
   const wrap = document.getElementById('categories');
   // Mirror admin exactly: categories derived from products in product-id order
-  const cats = new Set(['All']);
-  PRODUCTS.forEach(p => { if (p.category) cats.add(p.category); });
-  if (activeCategory !== 'All' && ![...cats].includes(activeCategory)) activeCategory = 'All';
-  wrap.innerHTML = [...cats].map(cat =>
+  const catSet = new Set();
+  PRODUCTS.forEach(p => { if (p.category) catSet.add(p.category); });
+  const cats = ['All', ...[...catSet].sort()];
+  if (activeCategory !== 'All' && !cats.includes(activeCategory)) activeCategory = 'All';
+  wrap.innerHTML = cats.map(cat =>
     `<button class="chip ${cat === activeCategory ? 'active' : ''}" onclick="pickCategory('${cat.replace(/'/g, "\\'")}')">${cat}</button>`
   ).join('');
 }
@@ -763,10 +764,7 @@ function renderProducts() {
     if (p.variants && p.variants.length > 0) return p.variants.every(v => (v.stock ?? 0) === 0);
     return p.stock === 0;
   };
-  const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-  const inStock = shuffle(list.filter(p => !isOos(p)));
-  const oos     = shuffle(list.filter(p =>  isOos(p)));
-  list = [...inStock, ...oos];
+  list = [...list.filter(p => !isOos(p)), ...list.filter(p => isOos(p))];
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty">No products found.</div>`;
     return;
@@ -974,9 +972,26 @@ if (window.location.hash === '#cart') {
 init();
 
 // Load products from Firestore — real-time sync across devices
+let shuffledOrder = null;
 db.collection('products').onSnapshot(snapshot => {
-  PRODUCTS = snapshot.docs.map(doc => doc.data());
-  PRODUCTS.sort((a, b) => a.id - b.id);
+  const fresh = snapshot.docs.map(doc => doc.data());
+  if (shuffledOrder === null) {
+    // First load — shuffle once for this session
+    fresh.sort((a, b) => a.id - b.id);
+    for (let i = fresh.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+    }
+    shuffledOrder = fresh.map(p => p.id);
+    PRODUCTS = fresh;
+  } else {
+    // Subsequent update (stock change, etc.) — keep shuffled order, update data
+    const map = {};
+    fresh.forEach(p => map[p.id] = p);
+    PRODUCTS = shuffledOrder.filter(id => map[id]).map(id => map[id]);
+    // Append any brand-new products at the end
+    fresh.forEach(p => { if (!shuffledOrder.includes(p.id)) { PRODUCTS.push(p); shuffledOrder.push(p.id); } });
+  }
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   saveCart();
   renderCategories();
