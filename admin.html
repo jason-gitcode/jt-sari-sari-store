@@ -515,24 +515,53 @@
     .stock-btn:hover { background: var(--line); }
 
     @media (max-width: 600px) {
-      .pt-row { grid-template-columns: 36px 44px 1fr 60px 60px; }
-      .pt-stock, .pt-edit-col { display: none; }
+      .products-layout { flex-direction: column; overflow-y: auto; }
+      .admin-cats {
+        width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden;
+        flex-wrap: nowrap; padding: 4px 0 6px; gap: 6px; flex-shrink: 0;
+      }
+      .products-main { overflow-y: auto; overflow-x: auto; }
+      /* Single grid container — one shared track set, columns always align */
+      .products-grid {
+        display: grid;
+        grid-template-columns: 28px 52px 1fr 68px 90px 46px 44px;
+        column-gap: 5px;
+        min-width: 660px;
+        overflow: visible;
+        border-left: none; border-right: none; border-radius: 0;
+        flex: unset; min-height: unset;
+      }
+      /* Rows are transparent — cells sit directly in the outer grid */
+      .pt-row { display: contents; }
+      .pt-row .pt-cell {
+        display: flex; align-items: center;
+        padding: 5px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .pt-row .pt-cell:first-child { padding-left: 8px; }
+      .pt-row .pt-cell:last-child  { padding-right: 8px; }
+      .pt-data:last-child .pt-cell { border-bottom: none; }
+      /* Header cells individually sticky */
+      .pt-head .pt-cell {
+        background: var(--soft);
+        font-size: 10px; letter-spacing: 0.02em;
+        position: sticky; top: 0; z-index: 1;
+      }
+      .pt-name-col { padding-left: 6px; }
+      .pt-pname { font-size: 12px; white-space: nowrap; line-height: 1.3; }
+      .pt-pmeta { display: none; }
+      .pt-stock { font-size: 11px; }
+      .pt-price-col { font-size: 11px; font-weight: 600; }
+      .pt-edit-col .edit-btn { padding: 3px 6px; font-size: 11px; }
+      .stock-btn { width: 17px; height: 17px; font-size: 12px; }
+      .chip-group { width: auto; flex-shrink: 0; }
+      .admin-chip { flex: initial; text-align: center; }
       .form-grid { grid-template-columns: 1fr; }
       .variant-item { grid-template-columns: 1fr auto; }
       .variant-item input[data-variant-name] { grid-column: 1; }
       .variant-item .vstock-ctrl { grid-column: 1; }
       .variant-item input[data-variant-price] { grid-column: 1; }
       .variant-item .remove-btn { grid-column: 2; grid-row: 1; }
-      .products-layout { flex-direction: column; overflow-y: auto; }
-      .admin-cats {
-        width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden;
-        flex-wrap: nowrap; padding: 4px 0 6px; gap: 6px;
-        flex-shrink: 0;
-      }
-      .products-main { overflow-y: auto; }
-      .products-grid { flex: unset; min-height: unset; overflow-y: unset; }
-      .chip-group { width: auto; flex-shrink: 0; }
-      .admin-chip { flex: initial; text-align: center; }
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
