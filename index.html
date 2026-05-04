@@ -791,7 +791,7 @@ function renderProducts() {
         ${p.description ? `<div style="font-size:12px;color:var(--muted);margin:4px 0;">${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</div>` : ''}
         ${(displayStock !== null && displayStock !== undefined) ? `<div style="font-size:12px;color:${displayStock === 0 ? '#dc2626' : 'var(--warn)'};">Stock: ${displayStock}</div>` : ''}
         <div class="card-bottom">
-          <div class="price">${STORE.currency}${p.price.toFixed(2)}</div>
+          <div class="price">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? STORE.currency + mn.toFixed(2) : STORE.currency + mn.toFixed(2) + ' – ' + STORE.currency + mx.toFixed(2); } return STORE.currency + p.price.toFixed(2); })()}</div>
           <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
         </div>
       </div>

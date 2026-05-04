@@ -583,6 +583,7 @@
         <div class="field">
           <label>Price (₱) *</label>
           <input type="number" id="product-price" step="0.01" placeholder="0.00" required />
+          <div id="price-range-hint" style="display:none;font-size:12px;color:var(--muted);margin-top:4px;"></div>
         </div>
       </div>
 
@@ -627,7 +628,7 @@
       <div class="field form-grid full">
         <label>Product Variants <span style="font-weight:400; color:var(--muted);">(e.g., different sizes)</span></label>
         <small>Add different options customers can choose from</small>
-        <div id="variants-list" style="margin-top: 8px;"></div>
+        <div id="variants-list" style="margin-top: 8px;" oninput="if(event.target.dataset.variantPrice !== undefined) updatePriceRange();"></div>
         <button type="button" onclick="addVariantField()" style="margin-top: 8px; padding: 8px 12px; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer; width: fit-content;">+ Add Variant</button>
       </div>
 
@@ -1228,7 +1229,7 @@ function renderProducts() {
             <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
           </div>
           <div class="pt-cell pt-stock">${stockCell}</div>
-          <div class="pt-cell pt-price-col">₱${parseFloat(p.price).toFixed(2)}</div>
+          <div class="pt-cell pt-price-col">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? '₱' + mn.toFixed(2) : '₱' + mn.toFixed(2) + ' – ₱' + mx.toFixed(2); } return '₱' + parseFloat(p.price).toFixed(2); })()}</div>
           <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
           <div class="pt-cell pt-avail-col">
             <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
@@ -1392,6 +1393,7 @@ function resetForm() {
   document.getElementById('product-form').reset();
   document.getElementById('product-id').value = '';
   document.getElementById('variants-list').innerHTML = '';
+  updatePriceRange();
   const customInp = document.getElementById('custom-category-input');
   if (customInp) { customInp.style.display = 'none'; customInp.value = ''; }
   updateCategorySelect();
@@ -1399,6 +1401,28 @@ function resetForm() {
   editingProductId = null;
   currentImages = [];
   renderPhotoPreviews();
+}
+
+function updatePriceRange() {
+  const prices = [...document.querySelectorAll('[data-variant-price]')]
+    .map(el => parseFloat(el.value))
+    .filter(n => !isNaN(n) && n > 0);
+  const priceField = document.getElementById('product-price');
+  const hint = document.getElementById('price-range-hint');
+  if (prices.length > 0) {
+    const mn = Math.min(...prices), mx = Math.max(...prices);
+    priceField.readOnly = true;
+    priceField.style.cssText = 'background:var(--soft);color:var(--muted);cursor:not-allowed;';
+    priceField.removeAttribute('required');
+    hint.style.display = 'block';
+    hint.textContent = mn === mx ? `Set by variant: ₱${mn.toFixed(2)}` : `Range: ₱${mn.toFixed(2)} – ₱${mx.toFixed(2)}`;
+    priceField.value = mn === mx ? mn : mn;
+  } else {
+    priceField.readOnly = false;
+    priceField.style.cssText = '';
+    priceField.setAttribute('required', '');
+    hint.style.display = 'none';
+  }
 }
 
 function adjVStock(btn, delta) {
@@ -1423,12 +1447,13 @@ function addVariantField(name = '', price = '', stock = 0) {
         <input type="hidden" data-variant-stock="${idx}" value="${s}">
       </div>
       <input type="number" data-variant-price="${idx}" step="0.01" placeholder="Price" value="${price}" />
-      <button type="button" class="remove-btn" onclick="this.closest('.variant-item').remove()">×</button>
+      <button type="button" class="remove-btn" onclick="this.closest('.variant-item').remove(); updatePriceRange();">×</button>
     </div>
   `;
   const div = document.createElement('div');
   div.innerHTML = html.trim();
   document.getElementById('variants-list').appendChild(div.firstChild);
+  updatePriceRange();
 }
 
 // Products are saved directly to Firestore via saveProduct() / deleteProduct()
