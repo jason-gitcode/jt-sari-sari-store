@@ -36,7 +36,25 @@
     flex-shrink: 0;
     background: #fff;
     border-bottom: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+    transition: background .6s, border-color .6s;
   }
+  header.rain-mode { background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 100%); border-bottom-color: #60a5fa; }
+  .rain-container { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .rain-drop {
+    position: absolute; top: -20px;
+    width: 1.5px; border-radius: 0 0 2px 2px;
+    background: linear-gradient(to bottom, transparent, rgba(96,165,250,0.7));
+    animation: rain-fall linear infinite;
+  }
+  @keyframes rain-fall {
+    0%   { transform: translateY(0);    opacity: 0.9; }
+    100% { transform: translateY(90px); opacity: 0.1; }
+  }
+  .info-bar.rain-mode { background: #eff6ff; border-bottom-color: #bfdbfe; }
+  .rain-ticker-item { color: #1e40af; }
+  .rain-ticker-item strong { color: #1e40af; }
   .nav {
     max-width: 1100px; margin: 0 auto;
     padding: 12px 16px;
@@ -413,23 +431,8 @@
   </div>
 </header>
 
-<div class="info-bar">
-  <!-- ticker-track is duplicated so the loop is seamless -->
-  <div class="ticker-track">
-    <span class="ticker-item">📍 <strong>Valle Verde Subdivision</strong></span>
-    <span class="ticker-sep">|</span>
-    <span class="ticker-item">🕐 <strong>Open 8am–7pm daily</strong></span>
-    <span class="ticker-sep">|</span>
-    <span class="ticker-item">🛵 <strong>Free delivery on orders ₱200+ within Valle Verde</strong></span>
-    <span class="ticker-sep">|</span>
-    <!-- duplicate for seamless loop -->
-    <span class="ticker-item">📍 <strong>Valle Verde Subdivision</strong></span>
-    <span class="ticker-sep">|</span>
-    <span class="ticker-item">🕐 <strong>Open 8am–7pm daily</strong></span>
-    <span class="ticker-sep">|</span>
-    <span class="ticker-item">🛵 <strong>Free delivery on orders ₱200+ within Valle Verde</strong></span>
-    <span class="ticker-sep">|</span>
-  </div>
+<div class="info-bar" id="info-bar">
+  <div class="ticker-track" id="ticker-track"></div>
 </div>
 
 <div class="container">
@@ -575,6 +578,67 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 let PRODUCTS = [];
+
+// ---------- RAIN MODE ----------
+const TICKER_BASE = [
+  { icon: '📍', text: 'Valle Verde Subdivision' },
+  { icon: '🕐', text: 'Open 8am–7pm daily' },
+  { icon: '🛵', text: 'Free delivery on orders ₱200+ within Valle Verde' },
+];
+const RAIN_TICKER = {
+  icon: '🌧️',
+  text: 'Weather Advisory: Deliveries may experience delays due to inclement weather conditions. We appreciate your patience and understanding.',
+  rain: true
+};
+
+function buildTicker(rainMode) {
+  const items = rainMode ? [...TICKER_BASE, RAIN_TICKER] : [...TICKER_BASE];
+  const oneSet = items.map(it =>
+    `<span class="ticker-item${it.rain ? ' rain-ticker-item' : ''}">${it.icon} <strong>${it.text}</strong></span>` +
+    `<span class="ticker-sep">|</span>`
+  ).join('');
+  const track = document.getElementById('ticker-track');
+  if (track) {
+    track.innerHTML = oneSet + oneSet;
+    track.style.animationDuration = (items.length * 7.5) + 's';
+  }
+}
+
+function applyRainMode(active) {
+  const header   = document.querySelector('header');
+  const infoBar  = document.getElementById('info-bar');
+  if (!header) return;
+
+  if (active) {
+    header.classList.add('rain-mode');
+    if (infoBar) infoBar.classList.add('rain-mode');
+    if (!header.querySelector('.rain-container')) {
+      const container = document.createElement('div');
+      container.className = 'rain-container';
+      for (let i = 0; i < 35; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'rain-drop';
+        drop.style.left            = (Math.random() * 100) + '%';
+        drop.style.height          = (8 + Math.random() * 10) + 'px';
+        drop.style.animationDuration  = (0.4 + Math.random() * 0.7) + 's';
+        drop.style.animationDelay     = (-Math.random() * 2) + 's';
+        container.appendChild(drop);
+      }
+      header.appendChild(container);
+    }
+  } else {
+    header.classList.remove('rain-mode');
+    if (infoBar) infoBar.classList.remove('rain-mode');
+    const c = header.querySelector('.rain-container');
+    if (c) c.remove();
+  }
+  buildTicker(active);
+}
+
+db.collection('settings').doc('store').onSnapshot(snap => {
+  const rainMode = snap.exists ? (snap.data().rainMode === true) : false;
+  applyRainMode(rainMode);
+});
 
 /* ============================================================
    🚫  Below this line is the app logic — no need to edit

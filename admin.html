@@ -96,6 +96,22 @@
       transition: background .15s;
     }
     .logout-btn:hover { background: var(--line); }
+    .rain-mode-btn {
+      padding: 8px 14px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .rain-mode-btn.active {
+      background: #bfdbfe;
+      border-color: #60a5fa;
+      color: #1d4ed8;
+      font-weight: 600;
+    }
+    .rain-mode-btn:hover { background: #dbeafe; border-color: #93c5fd; }
 
     #admin-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .container {
@@ -538,6 +554,7 @@
 <div id="admin-area" style="display:none;">
   <header>
     <h1>📦 Product Management</h1>
+    <button class="rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </header>
 
@@ -686,6 +703,25 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// ---------- RAIN MODE ----------
+let rainModeActive = false;
+
+db.collection('settings').doc('store').onSnapshot(snap => {
+  rainModeActive = snap.exists ? (snap.data().rainMode === true) : false;
+  const btn = document.getElementById('rain-mode-btn');
+  if (btn) btn.classList.toggle('active', rainModeActive);
+});
+
+async function toggleRainMode() {
+  rainModeActive = !rainModeActive;
+  try {
+    await db.collection('settings').doc('store').set({ rainMode: rainModeActive }, { merge: true });
+  } catch (e) {
+    console.error('Rain mode error:', e);
+    showToast('Error updating rain mode', 'error');
+  }
+}
 
 const DEFAULT_PRODUCTS = [
   { id: 1,  name: "Bigas (Rice) — 1kg",      category: "Rice & Grains",      price: 60,  unit: "per kilo",   emoji: "🌾" },

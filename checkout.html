@@ -90,7 +90,13 @@
 
   /* Send button */
   .send-btn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; font-size: 16px; transition: background .15s; margin-top: 4px; }
-  .send-btn:hover { background: var(--accent-dark); }
+  .send-btn:hover:not(:disabled) { background: var(--accent-dark); }
+  .send-btn:disabled { background: #93c5fd; cursor: not-allowed; opacity: 0.75; }
+
+  /* Weather warning */
+  .weather-warning { display: none; padding: 12px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 10px; }
+  .weather-check-label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; line-height: 1.5; color: #1e40af; }
+  .weather-check-label input[type="checkbox"] { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; accent-color: #2563eb; cursor: pointer; }
 
   /* Toast */
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 300; pointer-events: none; }
@@ -236,8 +242,26 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 let PRODUCTS = [];
 let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
-
 let payMethod = 'cod';
+let rainMode = false;
+
+function updateWeatherWarning() {
+  const warning = document.getElementById('weather-warning');
+  const btn     = document.getElementById('place-order-btn');
+  if (!warning || !btn) return;
+  if (rainMode) {
+    warning.style.display = 'block';
+    btn.disabled = !document.getElementById('weather-confirm')?.checked;
+  } else {
+    warning.style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+db.collection('settings').doc('store').onSnapshot(snap => {
+  rainMode = snap.exists ? (snap.data().rainMode === true) : false;
+  updateWeatherWarning();
+});
 
 function cartTotal() {
   return Object.entries(cart).reduce((sum, [key, qty]) => {
@@ -409,6 +433,12 @@ function init() {
       </div>
     </div>
 
+    <div class="weather-warning" id="weather-warning">
+      <label class="weather-check-label">
+        <input type="checkbox" id="weather-confirm" onchange="updateWeatherWarning()">
+        <span>🌧️ <strong>Weather Advisory:</strong> We are currently experiencing inclement weather that may cause delays in delivery. By checking this box, you acknowledge the delay and confirm that you still wish to proceed with your order.</span>
+      </label>
+    </div>
     <button class="send-btn" id="place-order-btn" onclick="placeOrder()">Place Order</button>
   `;
 
@@ -721,12 +751,12 @@ db.collection('products').get().then(snapshot => {
     PRODUCTS = DEFAULT_PRODUCTS;
   }
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init(); updatePaymentOptions();
+  init(); updatePaymentOptions(); updateWeatherWarning();
 }).catch(() => {
   PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
   if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init(); updatePaymentOptions();
+  init(); updatePaymentOptions(); updateWeatherWarning();
 });
 </script>
 </body>
