@@ -116,10 +116,10 @@
       flex-shrink: 0;
     }
     .tab-btn {
-      padding: 10px 16px;
+      padding: 8px 10px;
       border: none;
       background: transparent;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--muted);
       border-bottom: 3px solid transparent;
@@ -201,23 +201,13 @@
     .delete-sel-btn {
       margin-left: auto;
       margin-bottom: 8px;
-      display: flex; align-items: center; gap: 0;
-      padding: 0; padding-right: 12px;
-      border-radius: 999px;
-      font-size: 13px; font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px; font-weight: 700;
       background: #c0392b; color: #fff;
       border: none;
       transition: background .15s;
-      white-space: nowrap; overflow: hidden;
-      height: 30px;
-    }
-    .delete-sel-btn .del-icon {
-      display: grid; place-items: center;
-      width: 30px; height: 30px;
-      background: rgba(0,0,0,.22);
-      border-radius: 999px 0 0 999px;
-      font-size: 13px; flex-shrink: 0;
-      margin-right: 8px;
+      white-space: nowrap;
     }
     .delete-sel-btn:hover:not(:disabled) { background: #a93226; }
     .delete-sel-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -533,7 +523,7 @@
       <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">Orders<span class="order-badge" id="order-badge" style="display:none;"></span></button>
       <button class="tab-btn" onclick="openAddModal()">Add New Product</button>
       <button class="delete-sel-btn" id="delete-sel-btn" onclick="deleteSelected()" disabled>
-        <span class="del-icon">🗑️</span><span id="delete-sel-label">Delete</span>
+        <span id="delete-sel-label">Delete</span>
       </button>
     </div>
 
