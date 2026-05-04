@@ -239,9 +239,13 @@ let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
 let payMethod = 'cod';
 
 function cartTotal() {
-  return Object.entries(cart).reduce((sum, [id, qty]) => {
-    const p = PRODUCTS.find(x => x.id == id);
-    return p ? sum + p.price * qty : sum;
+  return Object.entries(cart).reduce((sum, [key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
+    if (!p) return sum;
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    return sum + price * qty;
   }, 0);
 }
 function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
@@ -274,12 +278,16 @@ function init() {
   const savedCustomer = JSON.parse(localStorage.getItem('sariCustomer') || 'null');
   const savedAddress  = JSON.parse(localStorage.getItem('sariAddress')  || 'null');
 
-  const itemRows = Object.entries(cart).map(([id, qty]) => {
-    const p = PRODUCTS.find(x => x.id == id);
+  const itemRows = Object.entries(cart).map(([key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
     if (!p) return '';
-    const lineTotal = p.price * qty;
-    const name = p.name.length > 26 ? p.name.slice(0, 26).trimEnd() + '…' : p.name;
-    return `<div class="order-item" title="${p.name}">
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    const lineTotal = price * qty;
+    const displayName = p.name + (variant ? ` (${variant.name})` : '');
+    const name = displayName.length > 26 ? displayName.slice(0, 26).trimEnd() + '…' : displayName;
+    return `<div class="order-item" title="${displayName}">
       <span class="order-item__qty">${qty}x</span>
       <span class="order-item__desc">${name}</span>
       <span class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</span>
@@ -529,10 +537,14 @@ async function placeOrder() {
   btn.disabled = true;
   btn.textContent = 'Placing order…';
 
-  const items = Object.entries(cart).map(([id, qty]) => {
-    const p = PRODUCTS.find(x => x.id == id);
+  const items = Object.entries(cart).map(([key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
     if (!p) return null;
-    return { productId: String(id), productName: p.name, qty, price: p.price, lineTotal: p.price * qty };
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    const productName = p.name + (variant ? ` (${variant.name})` : '');
+    return { productId: idStr, productName, qty, price, lineTotal: price * qty };
   }).filter(Boolean);
 
   const orderData = {
@@ -659,12 +671,12 @@ db.collection('products').get().then(snapshot => {
   } else {
     PRODUCTS = DEFAULT_PRODUCTS;
   }
-  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   init();
 }).catch(() => {
   PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
   if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
-  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   init();
 });
 </script>

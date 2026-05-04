@@ -471,8 +471,10 @@
         <div id="modal-slides" style="border-radius:8px; overflow:hidden; background:var(--soft); touch-action:pan-y; user-select:none;"></div>
         <div id="modal-dots" style="text-align:center; margin-top:8px;"></div>
       </div>
-      <!-- Emoji fallback (shown when no images) -->
-      <div style="font-size: 80px; text-align: center; margin-bottom: 16px;" id="modal-product-emoji"></div>
+      <!-- Placeholder shown when no images -->
+      <div style="display:flex;align-items:center;justify-content:center;background:var(--soft);border-radius:8px;margin-bottom:16px;height:160px;" id="modal-product-emoji">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.2" width="64" height="64"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      </div>
       <div id="modal-product-description" style="margin-bottom: 16px; font-size: 14px; line-height: 1.5;"></div>
       <div style="background: var(--soft); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
         <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;">Price</div>
@@ -495,6 +497,16 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Size Picker -->
+<div id="size-picker" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:flex-end;justify-content:center;z-index:700;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div style="background:#fff;border-radius:16px 16px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px;" id="size-picker-name"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:18px;">Choose a size</div>
+    <div id="size-picker-options" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;"></div>
+    <button onclick="closeSizePicker()" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;background:#fff;cursor:pointer;color:var(--muted);">Cancel</button>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -549,73 +561,7 @@ const CATEGORIES = [
   "Personal Care"
 ];
 
-const DEFAULT_PRODUCTS = [
-  // Rice & Grains
-  { id: 1,  name: "Bigas (Rice) — 1kg",      category: "Rice & Grains",      price: 60,  unit: "per kilo",   emoji: "🌾" },
-
-  // Canned Goods
-  { id: 3,  name: "Sardinas (Sardines)",      category: "Canned Goods",       price: 28,  unit: "155g can",   emoji: "🐟" },
-  { id: 4,  name: "Corned Beef",              category: "Canned Goods",       price: 45,  unit: "150g can",   emoji: "🥫" },
-
-  // Noodles
-  { id: 7,  name: "Pancit Canton",            category: "Noodles",            price: 15,  unit: "per pack",   emoji: "🍜" },
-  { id: 8,  name: "Lucky Me Beef",            category: "Noodles",            price: 12,  unit: "per pack",   emoji: "🍲" },
-
-  // Snacks
-  { id: 10, name: "Piattos",                  category: "Snacks",             price: 30,  unit: "per pack",   emoji: "🥔" },
-
-  // Beverages
-  { id: 14, name: "Coke 1.5L",               category: "Beverages",          price: 75,  unit: "per bottle", emoji: "🥤", image: "https://www.pngkit.com/png/detail/76-764935_coca-cola-1-5-l-png.png" },
-  { id: 15, name: "Nescafé 3-in-1",          category: "Beverages",          price: 8,   unit: "per sachet", emoji: "☕" },
-
-  // Cooking Essentials
-  { id: 18, name: "Cooking Oil — 1L",         category: "Cooking Essentials", price: 110, unit: "per bottle", emoji: "🫒" },
-  { id: 23, name: "Eggs",                     category: "Cooking Essentials", price: 9,   unit: "per piece",  emoji: "🥚" },
-
-  // School Supplies
-  { id: 30, name: "Ballpen Pack (5 pcs)",      category: "School Supplies", price: 45,  unit: "per pack", emoji: "🖊️" },
-  { id: 31, name: "Ruled Notebook",           category: "School Supplies", price: 28,  unit: "per pc",   emoji: "📓" },
-  { id: 32, name: "Mechanical Pencil",        category: "School Supplies", price: 18,  unit: "per pc",   emoji: "✏️" },
-  { id: 33, name: "Highlighter Set",          category: "School Supplies", price: 75,  unit: "per set",  emoji: "🖍️" },
-  { id: 34, name: "Eraser",                   category: "School Supplies", price: 7,   unit: "per pc",   emoji: "🧽" },
-  { id: 35, name: "Pencil Case",              category: "School Supplies", price: 120, unit: "per pc",   emoji: "✒️" },
-  { id: 36, name: "Glue Stick",               category: "School Supplies", price: 22,  unit: "per pc",   emoji: "🧴" },
-  { id: 37, name: "Scissors",                 category: "School Supplies", price: 55,  unit: "per pc",   emoji: "✂️" },
-  { id: 38, name: "Ruler (30cm)",             category: "School Supplies", price: 15,  unit: "per pc",   emoji: "📏" },
-  { id: 39, name: "Colored Pencil Set",       category: "School Supplies", price: 95,  unit: "per set",  emoji: "🎨" },
-  { id: 40, name: "Folders (Pack of 10)",     category: "School Supplies", price: 25,  unit: "per pack", emoji: "📁" },
-  { id: 41, name: "Binding Tape",             category: "School Supplies", price: 15,  unit: "per roll", emoji: "📎" },
-  { id: 42, name: "Stapler",                  category: "School Supplies", price: 85,  unit: "per pc",   emoji: "📌" },
-  { id: 43, name: "Staples (Box)",            category: "School Supplies", price: 20,  unit: "per box",  emoji: "📍" },
-  { id: 44, name: "Correction Tape",         category: "School Supplies", price: 30,  unit: "per pc",   emoji: "🔲" },
-  { id: 45, name: "Index Cards",              category: "School Supplies", price: 40,  unit: "per pack", emoji: "🗑️" },
-  { id: 46, name: "Water-based Markers",      category: "School Supplies", price: 65,  unit: "per set",  emoji: "🖌️" },
-  { id: 47, name: "Bond Paper (500 sheets)",  category: "School Supplies", price: 180, unit: "per pack", emoji: "📄" },
-  { id: 48, name: "Carbon Paper",             category: "School Supplies", price: 35,  unit: "per pad",  emoji: "📋" },
-  { id: 49, name: "Compass",                  category: "School Supplies", price: 70,  unit: "per pc",   emoji: "🧭" },
-
-  // Grocery - Additional
-  { id: 50, name: "Jasmine Rice — 2kg",       category: "Rice & Grains",      price: 125, unit: "per bag",   emoji: "🌾" },
-  { id: 51, name: "Brown Sugar — 500g",       category: "Cooking Essentials", price: 35,  unit: "per pack",  emoji: "🟤" },
-  { id: 52, name: "Iodized Salt — 1kg",       category: "Cooking Essentials", price: 20,  unit: "per pack",  emoji: "🧂" },
-  { id: 53, name: "Fresh Garlic",             category: "Cooking Essentials", price: 50,  unit: "per kilo",  emoji: "🧄" },
-  { id: 54, name: "Fresh Onion",              category: "Cooking Essentials", price: 40,  unit: "per kilo",  emoji: "🧅" },
-  { id: 55, name: "Soy Sauce — 1L",           category: "Cooking Essentials", price: 45,  unit: "per bottle", emoji: "🍶" },
-  { id: 56, name: "Vinegar — 1L",             category: "Cooking Essentials", price: 35,  unit: "per bottle", emoji: "🍯" },
-  { id: 57, name: "Tomato Sauce",             category: "Canned Goods",       price: 25,  unit: "per can",    emoji: "🍅" },
-  { id: 58, name: "Condensed Milk",           category: "Beverages",          price: 28,  unit: "per can",    emoji: "🥛" },
-  { id: 59, name: "Evaporated Milk — 400ml",  category: "Beverages",          price: 32,  unit: "per can",    emoji: "🥛" },
-  { id: 60, name: "Cheese (Luncheon)",        category: "Canned Goods",       price: 60,  unit: "per can",    emoji: "🧀" },
-  { id: 61, name: "Hotdog (Canned)",          category: "Canned Goods",       price: 32,  unit: "per can",    emoji: "🌭" },
-  { id: 62, name: "Luncheon Meat",            category: "Canned Goods",       price: 55,  unit: "per can",    emoji: "🥓" },
-  { id: 63, name: "Tuna Flakes (Canned)",     category: "Canned Goods",       price: 48,  unit: "per can",    emoji: "🐟" },
-  { id: 64, name: "Instant Ramen Pack",       category: "Noodles",            price: 8,   unit: "per pack",   emoji: "🍜" },
-  { id: 65, name: "Mami Noodles",             category: "Noodles",            price: 10,  unit: "per pack",   emoji: "🍲" },
-  { id: 66, name: "Crackers Pack",            category: "Snacks",             price: 22,  unit: "per pack",   emoji: "🥣" },
-  { id: 67, name: "Sliced Bread",             category: "Household",          price: 35,  unit: "per loaf",   emoji: "🍞" },
-  { id: 68, name: "Butter (Unsalted)",        category: "Cooking Essentials", price: 80,  unit: "per carton", emoji: "🧈" },
-  { id: 69, name: "Coffee Mix — 1kg",         category: "Beverages",          price: 120, unit: "per pack",   emoji: "☕" },
-];
+const DEFAULT_PRODUCTS = [];
 
 // Firebase — products sync across devices via Firestore
 const firebaseConfig = {
@@ -707,8 +653,7 @@ function showProductDetail(id) {
     };
   } else {
     gallery.style.display  = 'none';
-    emojiDiv.style.display = 'block';
-    emojiDiv.textContent   = p.emoji || '📦';
+    emojiDiv.style.display = 'flex';
   }
   document.getElementById('modal-product-price').textContent = STORE.currency + p.price.toFixed(2);
   document.getElementById('modal-product-unit').textContent = p.unit;
@@ -749,13 +694,20 @@ function closeProductModal() {
 function addFromModal() {
   const id = parseInt(document.getElementById('modal-product-id').value);
   const p = PRODUCTS.find(x => x.id == id);
-  if (p && p.stock !== null && p.stock !== undefined) {
-    if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  if (!p) return;
+  let key;
+  if (p.variants && p.variants.length > 0) {
+    const sel = document.getElementById('variant-select');
+    if (!sel.value) { showToast('Please select a size first'); return; }
+    key = `${id}_v${sel.value}`;
+  } else {
+    key = String(id);
   }
-  cart[id] = (cart[id] || 0) + 1;
-  saveCart();
-  renderCart();
-  renderProducts();
+  if (p.stock !== null && p.stock !== undefined) {
+    if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  }
+  cart[key] = (cart[key] || 0) + 1;
+  saveCart(); renderCart(); renderProducts();
   closeProductModal();
   showToast("Added to cart");
 }
@@ -806,13 +758,13 @@ function renderProducts() {
   }
   grid.innerHTML = list.map(p => {
     const ok = p.available !== false;
-    const cartQty = cart[p.id] || 0;
+    const cartQty = productCartQty(p.id);
     const atMax = ok && p.stock !== null && p.stock !== undefined && p.stock > 0 && cartQty >= p.stock;
     const btnDisabled = !ok || atMax;
     return `
     <div class="card" onclick="showProductDetail(${p.id})">
       <div class="thumb">
-        ${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : p.emoji || '📦'}
+        ${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.2" width="44" height="44"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
         ${!ok ? `<div style="position:absolute;top:6px;left:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;line-height:1.5;z-index:1;">OUT OF STOCK</div>` : ''}
       </div>
       <div class="card-body">
@@ -832,35 +784,67 @@ function renderProducts() {
 // ---------- CART ----------
 function saveCart() { localStorage.setItem('sariCart', JSON.stringify(cart)); }
 
+function productCartQty(pid) {
+  return Object.entries(cart)
+    .filter(([k]) => k === String(pid) || k.startsWith(`${pid}_v`))
+    .reduce((s, [,q]) => s + q, 0);
+}
+function openSizePicker(id) {
+  const p = PRODUCTS.find(x => x.id == id);
+  if (!p) return;
+  document.getElementById('size-picker-name').textContent = p.name;
+  const allQty = productCartQty(id);
+  document.getElementById('size-picker-options').innerHTML = p.variants.map((v, i) => {
+    const atMax = p.stock !== null && p.stock !== undefined && p.stock > 0 && allQty >= p.stock;
+    return `<button onclick="addWithVariant(${id},${i})" ${atMax ? 'disabled' : ''}
+      style="padding:10px 16px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;
+      cursor:pointer;background:var(--soft);text-align:left;${atMax ? 'opacity:0.45;cursor:not-allowed;' : ''}">
+      <span style="display:block;font-weight:500;">${v.name}</span>
+      <span style="display:block;font-size:12px;color:var(--accent);font-weight:700;margin-top:2px;">${STORE.currency}${parseFloat(v.price || p.price).toFixed(2)}</span>
+    </button>`;
+  }).join('');
+  const el = document.getElementById('size-picker');
+  el.style.opacity = '1'; el.style.pointerEvents = 'all';
+}
+function closeSizePicker() {
+  const el = document.getElementById('size-picker');
+  el.style.opacity = '0'; el.style.pointerEvents = 'none';
+}
+function addWithVariant(id, variantIdx) {
+  const p = PRODUCTS.find(x => x.id == id);
+  if (!p) return;
+  const allQty = productCartQty(id);
+  if (p.stock !== null && p.stock !== undefined && allQty >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  const key = `${id}_v${variantIdx}`;
+  cart[key] = (cart[key] || 0) + 1;
+  saveCart(); renderCart(); renderProducts();
+  closeSizePicker();
+  showToast('Added to cart');
+}
 function addToCart(id) {
   const p = PRODUCTS.find(x => x.id == id);
-  if (p && p.stock !== null && p.stock !== undefined) {
-    if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
+  if (!p) return;
+  if (p.variants && p.variants.length > 0) { openSizePicker(id); return; }
+  if (p.stock !== null && p.stock !== undefined) {
+    if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
   }
-  cart[id] = (cart[id] || 0) + 1;
-  saveCart();
-  renderCart();
-  renderProducts();
+  cart[String(id)] = (cart[String(id)] || 0) + 1;
+  saveCart(); renderCart(); renderProducts();
   showToast("Added to cart");
 }
-function changeQty(id, delta) {
-  if (delta > 0) {
-    const p = PRODUCTS.find(x => x.id == id);
-    if (p && p.stock !== null && p.stock !== undefined) {
-      if ((cart[id] || 0) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
-    }
+function changeQty(key, delta) {
+  const id = parseInt(key.split('_v')[0]);
+  const p = PRODUCTS.find(x => x.id == id);
+  if (delta > 0 && p && p.stock !== null && p.stock !== undefined) {
+    if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
   }
-  cart[id] = (cart[id] || 0) + delta;
-  if (cart[id] <= 0) delete cart[id];
-  saveCart();
-  renderCart();
-  renderProducts();
+  cart[key] = (cart[key] || 0) + delta;
+  if (cart[key] <= 0) delete cart[key];
+  saveCart(); renderCart(); renderProducts();
 }
-function removeFromCart(id) {
-  delete cart[id];
-  saveCart();
-  renderCart();
-  renderProducts();
+function removeFromCart(key) {
+  delete cart[key];
+  saveCart(); renderCart(); renderProducts();
 }
 function removeAll() {
   cart = {};
@@ -870,9 +854,13 @@ function removeAll() {
   showToast('Removed all items');
 }
 function cartTotal() {
-  return Object.entries(cart).reduce((sum, [id, qty]) => {
-    const p = PRODUCTS.find(x => x.id == id);
-    return p ? sum + p.price * qty : sum;
+  return Object.entries(cart).reduce((sum, [key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
+    if (!p) return sum;
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    return sum + price * qty;
   }, 0);
 }
 function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
@@ -887,27 +875,33 @@ function renderCart() {
   if (ids.length === 0) {
     wrap.innerHTML = `<div class="cart-empty">Your cart is empty.<br>Add some products to get started!</div>`;
   } else {
-    wrap.innerHTML = ids.map(id => {
-      const p = PRODUCTS.find(x => x.id == id);
+    wrap.innerHTML = ids.map(key => {
+      const [idStr, vPart] = key.split('_v');
+      const p = PRODUCTS.find(x => x.id == idStr);
       if (!p) return '';
-      const qty = cart[id];
-      const lineTotal = (p.price * qty).toFixed(2);
+      const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+      const price = variant ? parseFloat(variant.price || p.price) : p.price;
+      const qty = cart[key];
+      const lineTotal = (price * qty).toFixed(2);
+      const allQty = productCartQty(p.id);
+      const atMax = p.stock !== null && p.stock !== undefined && allQty >= p.stock;
+      const thumb = p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="width:80%;height:80%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : '';
       return `
         <div class="cart-row">
-          <div class="cart-thumb">${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="width:80%;height:80%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : p.emoji}</div>
+          <div class="cart-thumb">${thumb}</div>
           <div class="cart-info">
             <div class="name-row">
               <div class="name">${p.name.length > 30 ? p.name.slice(0, 30) + '…' : p.name}</div>
               <div class="cart-line-total">${STORE.currency}${lineTotal}</div>
             </div>
-            <div class="meta">${STORE.currency}${p.price.toFixed(2)} · ${p.unit}</div>
+            <div class="meta">${STORE.currency}${price.toFixed(2)} · ${p.unit}${variant ? ` · ${variant.name}` : ''}</div>
             <div class="qty">
-              <button onclick="changeQty(${p.id}, -1)">−</button>
+              <button onclick="changeQty('${key}', -1)">−</button>
               <span>${qty}</span>
-              <button onclick="changeQty(${p.id}, 1)" ${p.stock !== null && p.stock !== undefined && qty >= p.stock ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>+</button>
+              <button onclick="changeQty('${key}', 1)" ${atMax ? 'disabled style="opacity:0.35;cursor:not-allowed;"' : ''}>+</button>
             </div>
           </div>
-          <button class="remove-x" onclick="removeFromCart(${p.id})" title="Remove">×</button>
+          <button class="remove-x" onclick="removeFromCart('${key}')" title="Remove">×</button>
         </div>
       `;
     }).join('');
@@ -950,7 +944,7 @@ init();
 db.collection('products').onSnapshot(snapshot => {
   PRODUCTS = snapshot.docs.map(doc => doc.data());
   PRODUCTS.sort((a, b) => a.id - b.id);
-  Object.keys(cart).forEach(id => { if (!PRODUCTS.find(x => x.id == id)) delete cart[id]; });
+  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   saveCart();
   renderCategories();
   renderProducts();
