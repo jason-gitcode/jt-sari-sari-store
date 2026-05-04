@@ -914,7 +914,7 @@ function renderOrders() {
 
   list.innerHTML = filtered.map(o => {
     const shortId  = o.orderId.slice(-6).toUpperCase();
-    const addr     = o.address ? `Block ${o.address.block}, Lot ${o.address.lot}, Phase ${o.address.phase}, St. ${o.address.street}, Valle Verde` : '—';
+    const addr     = o.address ? `Block ${o.address.block}, Lot ${o.address.lot}, Phase ${o.address.phase}, ${o.address.street}, Valle Verde` : '—';
     const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
     const itemsHtml = (o.items || []).map(item => `
       <div class="order-item-row">
