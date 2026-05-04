@@ -980,6 +980,26 @@ async function confirmOrder(orderId) {
   }
 }
 
+function buildStockRestoreUpdates(order, batch) {
+  for (const item of (order.items || [])) {
+    const product = products.find(p => String(p.id) === String(item.productId));
+    if (!product) continue;
+    if (item.variantIdx !== null && item.variantIdx !== undefined && product.variants && product.variants.length > 0) {
+      const newVariants = product.variants.map((v, idx) =>
+        idx === item.variantIdx ? { ...v, stock: (v.stock ?? 0) + item.qty } : v
+      );
+      const upd = { variants: newVariants };
+      if (product.available === false && newVariants.some(v => (v.stock ?? 0) > 0)) upd.available = true;
+      batch.update(db.collection('products').doc(String(item.productId)), upd);
+    } else if (product.stock !== null && product.stock !== undefined) {
+      const newStock = product.stock + item.qty;
+      const upd = { stock: newStock };
+      if (product.stock === 0 && newStock > 0) upd.available = true;
+      batch.update(db.collection('products').doc(String(item.productId)), upd);
+    }
+  }
+}
+
 async function cancelOrder(orderId) {
   const order = orders.find(o => o.orderId === orderId);
   if (!order) return;
@@ -989,15 +1009,7 @@ async function cancelOrder(orderId) {
       status: 'cancelled',
       cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    for (const item of (order.items || [])) {
-      const product = products.find(p => String(p.id) === String(item.productId));
-      if (product && product.stock !== null && product.stock !== undefined) {
-        const newStock = product.stock + item.qty;
-        const upd = { stock: newStock };
-        if (product.stock === 0 && newStock > 0) upd.available = true;
-        batch.update(db.collection('products').doc(String(item.productId)), upd);
-      }
-    }
+    buildStockRestoreUpdates(order, batch);
     await batch.commit();
     showToast('Order cancelled — stock restored', 'success');
   } catch (err) {
@@ -1015,15 +1027,7 @@ async function refundAndRestock(orderId) {
       status: 'refunded',
       refundedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    for (const item of (order.items || [])) {
-      const product = products.find(p => String(p.id) === String(item.productId));
-      if (product && product.stock !== null && product.stock !== undefined) {
-        const newStock = product.stock + item.qty;
-        const upd = { stock: newStock };
-        if (product.stock === 0 && newStock > 0) upd.available = true;
-        batch.update(db.collection('products').doc(String(item.productId)), upd);
-      }
-    }
+    buildStockRestoreUpdates(order, batch);
     await batch.commit();
     showToast('Order refunded — stock restored', 'success');
   } catch (err) {
