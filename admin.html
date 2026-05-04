@@ -981,22 +981,39 @@ async function confirmOrder(orderId) {
 }
 
 function buildStockRestoreUpdates(order, batch) {
+  // Group by productId first — multiple variants of the same product must be
+  // applied to one shared copy of the variants array, then written once.
+  const grouped = {};
   for (const item of (order.items || [])) {
     const product = products.find(p => String(p.id) === String(item.productId));
     if (!product) continue;
-    if (item.variantIdx !== null && item.variantIdx !== undefined && product.variants && product.variants.length > 0) {
-      const newVariants = product.variants.map((v, idx) =>
-        idx === item.variantIdx ? { ...v, stock: (v.stock ?? 0) + item.qty } : v
-      );
-      const upd = { variants: newVariants };
-      if (product.available === false && newVariants.some(v => (v.stock ?? 0) > 0)) upd.available = true;
-      batch.update(db.collection('products').doc(String(item.productId)), upd);
-    } else if (product.stock !== null && product.stock !== undefined) {
-      const newStock = product.stock + item.qty;
-      const upd = { stock: newStock };
-      if (product.stock === 0 && newStock > 0) upd.available = true;
-      batch.update(db.collection('products').doc(String(item.productId)), upd);
+    const pid = String(item.productId);
+    if (!grouped[pid]) {
+      grouped[pid] = {
+        product,
+        variants: product.variants ? product.variants.map(v => ({ ...v })) : null,
+        stockDelta: 0
+      };
     }
+    if (item.variantIdx !== null && item.variantIdx !== undefined && grouped[pid].variants) {
+      const v = grouped[pid].variants[item.variantIdx];
+      if (v) grouped[pid].variants[item.variantIdx] = { ...v, stock: (v.stock ?? 0) + item.qty };
+    } else {
+      grouped[pid].stockDelta += item.qty;
+    }
+  }
+  for (const [pid, { product, variants, stockDelta }] of Object.entries(grouped)) {
+    const upd = {};
+    if (variants) {
+      upd.variants = variants;
+      if (product.available === false && variants.some(v => (v.stock ?? 0) > 0)) upd.available = true;
+    }
+    if (stockDelta > 0 && product.stock !== null && product.stock !== undefined) {
+      const newStock = product.stock + stockDelta;
+      upd.stock = newStock;
+      if (product.stock === 0 && newStock > 0) upd.available = true;
+    }
+    if (Object.keys(upd).length > 0) batch.update(db.collection('products').doc(pid), upd);
   }
 }
 
