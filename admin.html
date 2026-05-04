@@ -457,6 +457,30 @@
     .order-card.refunded { border-left: 4px solid #f87171; opacity: 0.65; }
     .order-status-badge.refunded { background: #fee2e2; color: #991b1b; }
 
+    /* ---------- ITEM CONFIRMATION ---------- */
+    .order-section-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .order-section-label.confirmed-label { color: var(--ok); }
+    .item-check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; }
+    .item-check { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--ok); cursor: pointer; }
+    .confirmed-list { margin-bottom: 0; }
+    .confirmed-list .order-item-row { background: #f0fdf4; }
+    .order-total-pending { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 4px; margin-bottom: 2px; }
+    .order-total-confirmed { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; color: var(--ok); border-top: 1px solid #bbf7d0; padding-top: 4px; margin-top: 4px; }
+    .confirmed-section { margin-top: 10px; }
+    .unavailable-item-row { background: #fff7ed; }
+    .unavailable-item-row span:first-child { color: var(--muted); text-decoration: line-through; }
+    .partial-refund-section { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+    .partial-refund-section .order-section-label { color: #d97706; margin-bottom: 4px; }
+    .partial-refund-done { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: 6px; }
+    .partial-refund-form { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+    .refund-ref-input { flex: 1; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; }
+    .refund-ref-input:focus { border-color: #d97706; }
+    .btn-partial-refund { padding: 7px 12px; background: #d97706; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s; }
+    .btn-partial-refund:hover { background: #b45309; }
+    .copy-phone-btn { display: inline-flex; align-items: center; justify-content: center; margin-left: 6px; padding: 1px 6px; font-size: 11px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--muted); cursor: pointer; vertical-align: middle; transition: all .15s; }
+    .copy-phone-btn:hover { background: var(--soft); color: var(--ink); border-color: #9ca3af; }
+    .copy-phone-btn.copied { border-color: var(--ok); color: var(--ok); }
+
     /* ---------- ORDER BADGE ---------- */
     .order-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; background: #ef4444; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 5px; line-height: 1; vertical-align: middle; }
 
@@ -920,11 +944,83 @@ function renderOrders() {
     const shortId  = o.orderId.slice(-6).toUpperCase();
     const addr     = o.address ? `Block ${o.address.block}, Lot ${o.address.lot}, Phase ${o.address.phase}, ${o.address.street}, Valle Verde` : '—';
     const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
-    const itemsHtml = (o.items || []).map(item => `
-      <div class="order-item-row">
-        <span>${item.qty}× ${item.productName}</span>
-        <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
-      </div>`).join('');
+    const fee      = parseFloat(o.deliveryFee ?? 0);
+    const feeStr   = fee === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + fee.toFixed(2);
+
+    let bodyHtml = '';
+
+    if (o.status === 'pending') {
+      const items = o.items || [];
+      const allTotal = items.reduce((s, it) => s + parseFloat(it.lineTotal), 0);
+      const itemsHtml = items.map((item, i) => `
+        <div class="order-item-row" data-idx="${i}" data-price="${parseFloat(item.lineTotal)}">
+          <label class="item-check-label">
+            <input type="checkbox" class="item-check" onchange="toggleItemConfirm(this,'${o.orderId}',${i})">
+            <span>${item.qty}× ${item.productName}</span>
+          </label>
+          <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
+        </div>`).join('');
+
+      bodyHtml = `
+        <div class="order-section-label">Items — check when available</div>
+        <div class="order-items-list" id="pending-items-${o.orderId}">${itemsHtml}</div>
+        <div class="order-total-pending" id="pending-total-${o.orderId}">
+          <span>Subtotal</span><span>₱${allTotal.toFixed(2)}</span>
+        </div>
+        <div class="confirmed-section" id="confirmed-section-${o.orderId}" style="display:none;">
+          <div class="order-section-label confirmed-label">✓ Confirmed Available</div>
+          <div class="order-items-list confirmed-list" id="confirmed-items-${o.orderId}"></div>
+          <div class="order-total-confirmed" id="confirmed-total-${o.orderId}">
+            <span>Confirmed Total</span><span>₱0.00</span>
+          </div>
+        </div>
+        ${o.deliveryFee != null ? `<div class="order-subtotal-row" style="margin-top:8px;"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
+        <div class="order-pay-label">${payLabel}</div>
+        ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
+    } else {
+      const displayItems = o.confirmedItems || o.items || [];
+      const itemsHtml = displayItems.map(item => `
+        <div class="order-item-row">
+          <span>${item.qty}× ${item.productName}</span>
+          <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
+        </div>`).join('');
+      const displaySubtotal = displayItems.reduce((s, it) => s + parseFloat(it.lineTotal), 0);
+      const displayTotal = displaySubtotal + fee;
+
+      const unchecked = o.uncheckedItems || [];
+      const uncheckedTotal = unchecked.reduce((s, it) => s + parseFloat(it.lineTotal), 0);
+      const uncheckedHtml = unchecked.map(item => `
+        <div class="order-item-row unavailable-item-row">
+          <span>${item.qty}× ${item.productName}</span>
+          <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
+        </div>`).join('');
+
+      const partialRefundHtml = unchecked.length > 0 ? `
+        <div class="partial-refund-section">
+          <div class="order-section-label">Unavailable Items</div>
+          <div class="order-items-list" style="margin-bottom:4px;">${uncheckedHtml}</div>
+          <div class="order-subtotal-row" style="margin-bottom:8px;"><span>Refund Amount</span><span>₱${uncheckedTotal.toFixed(2)}</span></div>
+          ${o.partialRefundRef
+            ? `<div class="partial-refund-done">✓ Partial Refund Recorded — Ref: ${o.partialRefundRef}</div>`
+            : `<div class="partial-refund-form">
+                <input type="text" id="refund-ref-${o.orderId}" class="refund-ref-input" placeholder="GCash Reference Number">
+                <button class="btn-partial-refund" onclick="recordPartialRefund('${o.orderId}')">Partial Refund Complete</button>
+               </div>`
+          }
+        </div>` : '';
+
+      bodyHtml = `
+        ${o.confirmedItems ? `<div class="order-section-label confirmed-label" style="margin-bottom:4px;">✓ Confirmed Items</div>` : ''}
+        <div class="order-items-list">${itemsHtml}</div>
+        ${o.subtotal != null ? `
+          <div class="order-subtotal-row"><span>Subtotal</span><span>₱${displaySubtotal.toFixed(2)}</span></div>
+          <div class="order-subtotal-row"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
+        <div class="order-total-row"><span>Total</span><span>₱${displayTotal.toFixed(2)}</span></div>
+        <div class="order-pay-label">${payLabel}</div>
+        ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
+        ${partialRefundHtml}`;
+    }
+
     const actionsHtml = o.status === 'pending' ? `
       <div class="order-actions-row">
         <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm Order</button>
@@ -943,27 +1039,72 @@ function renderOrders() {
           <span class="order-time-label">${formatOrderTime(o.createdAt)}</span>
         </div>
         <div class="order-card-body">
-          <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}</div>
+          <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}${o.customer?.phone ? `<button class="copy-phone-btn" onclick="copyPhone(this,'${o.customer.phone}')">copy</button>` : ''}</div>
           <div class="order-addr">${addr}</div>
-          <div class="order-items-list">${itemsHtml}</div>
-          ${(o.subtotal != null && o.deliveryFee != null) ? `
-          <div class="order-subtotal-row"><span>Subtotal</span><span>₱${parseFloat(o.subtotal).toFixed(2)}</span></div>
-          <div class="order-subtotal-row"><span>Delivery Fee</span><span>${parseFloat(o.deliveryFee) === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + parseFloat(o.deliveryFee).toFixed(2)}</span></div>` : ''}
-          <div class="order-total-row"><span>Total</span><span>₱${parseFloat(o.total).toFixed(2)}</span></div>
-          <div class="order-pay-label">${payLabel}</div>
-          ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
+          ${bodyHtml}
         </div>
         ${actionsHtml}
       </div>`;
   }).join('');
 }
 
+function toggleItemConfirm(checkbox, orderId, idx) {
+  const row = checkbox.closest('.order-item-row');
+  const pendingList   = document.getElementById(`pending-items-${orderId}`);
+  const confirmedList = document.getElementById(`confirmed-items-${orderId}`);
+  const confirmedSection = document.getElementById(`confirmed-section-${orderId}`);
+
+  if (checkbox.checked) {
+    confirmedList.appendChild(row);
+  } else {
+    const siblings = Array.from(pendingList.querySelectorAll('.order-item-row'));
+    const after = siblings.find(r => parseInt(r.dataset.idx) > idx);
+    if (after) pendingList.insertBefore(row, after);
+    else pendingList.appendChild(row);
+  }
+
+  const confirmedCount = confirmedList.querySelectorAll('.order-item-row').length;
+  confirmedSection.style.display = confirmedCount > 0 ? 'block' : 'none';
+  recalcOrderTotals(orderId);
+}
+
+function recalcOrderTotals(orderId) {
+  const pendingRows   = document.querySelectorAll(`#pending-items-${orderId} .order-item-row`);
+  const confirmedRows = document.querySelectorAll(`#confirmed-items-${orderId} .order-item-row`);
+  const pendingTotal   = Array.from(pendingRows).reduce((s, r) => s + parseFloat(r.dataset.price || 0), 0);
+  const confirmedTotal = Array.from(confirmedRows).reduce((s, r) => s + parseFloat(r.dataset.price || 0), 0);
+  const ptEl = document.getElementById(`pending-total-${orderId}`);
+  const ctEl = document.getElementById(`confirmed-total-${orderId}`);
+  if (ptEl) ptEl.querySelector('span:last-child').textContent = `₱${pendingTotal.toFixed(2)}`;
+  if (ctEl) ctEl.querySelector('span:last-child').textContent = `₱${confirmedTotal.toFixed(2)}`;
+}
+
 async function confirmOrder(orderId) {
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order) return;
+
+  const confirmedRows = Array.from(document.querySelectorAll(`#confirmed-items-${orderId} .order-item-row`));
+  if (confirmedRows.length === 0) {
+    showToast('Check at least one available item first', 'error');
+    return;
+  }
+
+  const confirmedIndices = new Set(confirmedRows.map(r => parseInt(r.dataset.idx)));
+  const confirmedItems  = (order.items || []).filter((_, i) => confirmedIndices.has(i));
+  const uncheckedItems  = (order.items || []).filter((_, i) => !confirmedIndices.has(i));
+
   try {
-    await db.collection('orders').doc(orderId).update({
+    const batch = db.batch();
+    batch.update(db.collection('orders').doc(orderId), {
       status: 'confirmed',
+      confirmedItems,
+      uncheckedItems,
       confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    if (uncheckedItems.length > 0) {
+      buildStockRestoreUpdates({ ...order, items: uncheckedItems }, batch);
+    }
+    await batch.commit();
     showToast('Order confirmed', 'success');
   } catch (err) {
     console.error('Confirm order error:', err);
@@ -1035,12 +1176,33 @@ async function refundAndRestock(orderId) {
       status: 'refunded',
       refundedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    buildStockRestoreUpdates(order, batch);
+    // Only restock confirmedItems — unchecked items were already restocked at confirm time
+    const itemsToRestock = order.confirmedItems || order.items;
+    buildStockRestoreUpdates({ ...order, items: itemsToRestock }, batch);
     await batch.commit();
     showToast('Order refunded — stock restored', 'success');
   } catch (err) {
     console.error('Refund order error:', err);
     showToast('Error processing refund', 'error');
+  }
+}
+
+async function recordPartialRefund(orderId) {
+  const input = document.getElementById(`refund-ref-${orderId}`);
+  const refNum = input ? input.value.trim() : '';
+  if (!refNum) {
+    showToast('Please enter the GCash reference number', 'error');
+    return;
+  }
+  try {
+    await db.collection('orders').doc(orderId).update({
+      partialRefundRef: refNum,
+      partialRefundAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast('Partial refund recorded', 'success');
+  } catch (err) {
+    console.error('Partial refund error:', err);
+    showToast('Error recording partial refund', 'error');
   }
 }
 
@@ -1057,6 +1219,14 @@ async function adjustStock(id, delta) {
     console.error('Adjust stock error:', err);
     showToast('Error updating stock', 'error');
   }
+}
+
+function copyPhone(btn, phone) {
+  navigator.clipboard.writeText(phone).then(() => {
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => showToast('Copy failed', 'error'));
 }
 
 // ---------- TABS ----------
