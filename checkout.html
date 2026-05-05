@@ -139,6 +139,7 @@ const STORE = {
   name: "JT Sari-Sari Store",
   messengerUsername: "jbtubilag",
   gcashName: "Jason Tubilag",
+  gcashDisplayName: "JA**N T. (JASON TUBILAG)",
   gcashNumber: "09184067841",
   currency: "₱"
 };
@@ -697,7 +698,7 @@ function showOrderConfirmation(orderId, payment) {
     <div class="confirm-gcash-box">
       <h3>📱 GCash Payment Required</h3>
       <p>Send payment to:</p>
-      <p style="margin-top:6px;"><strong>${STORE.gcashName}</strong></p>
+      <p style="margin-top:6px;"><strong>${STORE.gcashDisplayName || STORE.gcashName}</strong></p>
       <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
         <strong>${STORE.gcashNumber}</strong>
         <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
