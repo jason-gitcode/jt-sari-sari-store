@@ -929,12 +929,8 @@ function subscribeToProducts() {
   unsubscribeProducts = db.collection('products').onSnapshot(snapshot => {
     products = snapshot.docs.map(doc => doc.data());
     products.sort((a, b) => a.id - b.id);
-    if (products.length === 0) {
-      seedDefaultProducts();
-    } else {
-      renderAdminCategories();
-      renderProducts();
-    }
+    renderAdminCategories();
+    renderProducts();
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
