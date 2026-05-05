@@ -312,10 +312,9 @@ function init() {
     const price = variant ? parseFloat(variant.price || p.price) : p.price;
     const lineTotal = price * qty;
     const displayName = p.name + (variant ? ` (${variant.name})` : '');
-    const name = displayName.length > 26 ? displayName.slice(0, 26).trimEnd() + '…' : displayName;
     return `<div class="order-item" title="${displayName}">
       <span class="order-item__qty">${qty}x</span>
-      <span class="order-item__desc">${name}</span>
+      <span class="order-item__desc">${displayName}</span>
       <span class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</span>
     </div>`;
   }).join('');
