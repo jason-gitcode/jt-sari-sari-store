@@ -75,6 +75,16 @@
     }
     .login-btn:hover { background: var(--accent-dark); }
     .login-error { color: #dc2626; font-size: 13px; margin-top: 12px; }
+    .google-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 11px 16px; margin-top: 8px;
+      background: #fff; color: #3c4043;
+      border: 1px solid #dadce0; border-radius: 8px;
+      font-size: 15px; font-weight: 500; cursor: pointer;
+      transition: background .15s, box-shadow .15s;
+    }
+    .google-btn:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+    .google-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
     /* ---------- ADMIN LAYOUT ---------- */
     header {
@@ -565,19 +575,20 @@
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
 <!-- ADMIN LOGIN -->
-<div class="login-screen" id="login-screen">
+<div class="login-screen hidden" id="login-screen">
   <div class="login-box">
     <h1>🔐 Admin Access</h1>
-    <p>Enter password to manage products</p>
-    <div class="field">
-      <input type="password" id="password-input" placeholder="Password" />
-    </div>
-    <button class="login-btn" onclick="login()">Login</button>
+    <p>Sign in with your Google account to continue</p>
+    <button class="google-btn" id="login-btn" onclick="login()">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/><path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -720,7 +731,6 @@
 </div>
 
 <script>
-const ADMIN_PASSWORD = "admin123"; // Change this to your password
 
 const ADMIN_CATEGORIES = [
   "Rice & Grains", "Canned Goods", "Noodles", "Snacks", "Beverages",
@@ -736,7 +746,8 @@ const firebaseConfig = {
   appId: "1:625852109606:web:7474c10133701eafbce7e7"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db   = firebase.firestore();
+const auth = firebase.auth();
 
 // ---------- RAIN MODE ----------
 let rainModeActive = false;
@@ -812,7 +823,6 @@ const DEFAULT_PRODUCTS = [
 
 let products = [];
 let orders = [];
-let isLoggedIn = localStorage.getItem('sariAdminLoggedIn') === 'true';
 let editingProductId = null;
 let variantCount = 0;
 let searchTerm = '';
@@ -889,23 +899,31 @@ function removePhoto(index) {
 }
 
 // ---------- AUTH ----------
-function login() {
-  const pwd = document.getElementById('password-input').value;
-  if (pwd === ADMIN_PASSWORD) {
-    localStorage.setItem('sariAdminLoggedIn', 'true');
-    isLoggedIn = true;
-    showAdmin();
-  } else {
-    document.getElementById('login-error').textContent = 'Incorrect password';
+const ALLOWED_EMAILS = [
+  'aws.jason.b.tubilag@gmail.com',
+  'jason.b.tubilag@gmail.com'
+];
+
+async function login() {
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  } catch (e) {
+    err.textContent = 'Sign-in failed. Please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Sign in with Google';
   }
 }
 
 function logout() {
   if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
   if (unsubscribeOrders)   { unsubscribeOrders();   unsubscribeOrders   = null; }
-  localStorage.removeItem('sariAdminLoggedIn');
-  isLoggedIn = false;
-  showLogin();
+  auth.signOut();
   resetForm();
 }
 
@@ -1694,20 +1712,23 @@ function showToast(msg, type = 'success') {
 
 // ---------- INIT ----------
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.getElementById('password-input') === document.activeElement) {
-    login();
-  }
   if (e.key === 'Escape') {
     closeProductModal();
     closeConfirmModal();
   }
 });
 
-if (isLoggedIn) {
-  showAdmin();
-} else {
-  showLogin();
-}
+auth.onAuthStateChanged(user => {
+  if (user && ALLOWED_EMAILS.includes(user.email)) {
+    showAdmin();
+  } else {
+    if (user) {
+      auth.signOut();
+      document.getElementById('login-error').textContent = 'Access denied. This account is not authorised.';
+    }
+    showLogin();
+  }
+});
 </script>
 </body>
 </html>
