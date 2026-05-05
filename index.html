@@ -762,7 +762,7 @@ function showProductDetail(id) {
     gallery.style.display  = 'none';
     emojiDiv.style.display = 'flex';
   }
-  document.getElementById('modal-product-price').textContent = STORE.currency + p.price.toFixed(2);
+  const priceEl = document.getElementById('modal-product-price');
   document.getElementById('modal-product-unit').textContent = p.unit;
   document.getElementById('modal-product-description').textContent = p.description || '';
 
@@ -770,6 +770,8 @@ function showProductDetail(id) {
   const variantDiv = document.getElementById('modal-variants');
   const variantSelect = document.getElementById('variant-select');
   if (p.variants && p.variants.length > 0) {
+    const minPrice = Math.min(...p.variants.map(v => parseFloat(v.price || p.price)));
+    priceEl.textContent = STORE.currency + minPrice.toFixed(2);
     variantDiv.style.display = 'block';
     variantSelect.innerHTML = '<option value="">Select one</option>' + p.variants.map((v, i) => {
       const vStock = v.stock ?? null;
@@ -778,11 +780,21 @@ function showProductDetail(id) {
       const atMax  = vStock !== null && inCart >= vStock && vStock > 0;
       const disabled = oos || atMax;
       const suffix = oos ? ' — Out of Stock' : atMax ? ` — Max (${vStock})` : '';
-      return `<option value="${i}" ${disabled ? 'disabled' : ''}>${v.name} (${STORE.currency}${parseFloat(v.price || 0).toFixed(2)})${suffix}</option>`;
+      return `<option value="${i}" ${disabled ? 'disabled' : ''}>${v.name}${suffix}</option>`;
     }).join('');
+    variantSelect.onchange = () => {
+      const idx = variantSelect.value;
+      if (idx !== '') {
+        priceEl.textContent = STORE.currency + parseFloat(p.variants[idx].price || p.price).toFixed(2);
+      } else {
+        priceEl.textContent = STORE.currency + minPrice.toFixed(2);
+      }
+    };
   } else {
+    priceEl.textContent = STORE.currency + p.price.toFixed(2);
     variantDiv.style.display = 'none';
     variantSelect.innerHTML = '<option value="">Select one</option>';
+    variantSelect.onchange = null;
   }
 
   // Disable Add to Cart if out of stock
