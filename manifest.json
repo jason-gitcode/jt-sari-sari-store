@@ -1,0 +1,19 @@
+{
+  "name": "JT Sari-Sari Store",
+  "short_name": "JT Sari-Sari",
+  "description": "Order groceries and essentials from JT Sari-Sari Store in Valle Verde.",
+  "start_url": "/jt-sari-sari-store/",
+  "scope": "/jt-sari-sari-store/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logo.PNG",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

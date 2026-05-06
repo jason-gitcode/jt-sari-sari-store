@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Order Summary — JT Sari-Sari Store</title>
+<link rel="manifest" href="/jt-sari-sari-store/manifest.json" />
+<meta name="theme-color" content="#2563eb" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="JT Sari-Sari" />
+<link rel="apple-touch-icon" href="logo.PNG" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -758,6 +764,11 @@ db.collection('products').get().then(snapshot => {
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   init(); updatePaymentOptions(); updateWeatherWarning();
 });
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/jt-sari-sari-store/sw.js');
+  }
 </script>
 </body>
 </html>
