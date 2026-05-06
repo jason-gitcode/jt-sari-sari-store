@@ -484,8 +484,6 @@
   </div>
   <div class="cart-items" id="cart-items"></div>
   <div class="drawer-foot">
-    <div class="totals"><span>Subtotal</span><span id="subtotal">₱0.00</span></div>
-    <div class="totals"><span>Delivery</span><span id="delivery-fee">Free</span></div>
     <div class="totals grand"><span>Total</span><span id="grand-total">₱0.00</span></div>
     <button class="btn-secondary" id="remove-all-btn" onclick="removeAll()">Remove All</button>
     <button class="checkout-btn" id="checkout-btn" onclick="window.location.href='checkout.html'" disabled>Checkout</button>
@@ -1074,9 +1072,11 @@ function renderCart() {
   }
   const total = cartTotal();
   const fee = deliveryFee();
-  document.getElementById('subtotal').textContent = STORE.currency + total.toFixed(2);
-  document.getElementById('delivery-fee').textContent = fee === 0 ? 'Free' : STORE.currency + fee.toFixed(2);
-  document.getElementById('grand-total').textContent = STORE.currency + (total + fee).toFixed(2);
+  const subtotalEl = document.getElementById('subtotal');
+  const deliveryEl = document.getElementById('delivery-fee');
+  if (subtotalEl) subtotalEl.textContent = STORE.currency + total.toFixed(2);
+  if (deliveryEl) deliveryEl.textContent = fee === 0 ? 'Free' : STORE.currency + fee.toFixed(2);
+  document.getElementById('grand-total').textContent = STORE.currency + total.toFixed(2);
   document.getElementById('checkout-btn').disabled = (ids.length === 0);
 }
 
