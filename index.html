@@ -61,6 +61,8 @@
   .info-bar.rain-mode { background: #eff6ff; border-bottom-color: #bfdbfe; }
   .rain-ticker-item { color: #1e40af; }
   .rain-ticker-item strong { color: #1e40af; }
+  .closed-ticker-item { color: #9f1239; }
+  .closed-ticker-item strong { color: #9f1239; }
   .rain-cloud {
     position: absolute;
     background: rgba(255,255,255,0.55);
@@ -613,7 +615,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 let PRODUCTS = [];
 
-// ---------- RAIN MODE ----------
+// ---------- RAIN MODE / STORE CLOSED ----------
 const TICKER_BASE = [
   { icon: '📍', text: 'Valle Verde Subdivision' },
   { icon: '🕐', text: 'Open 8am–7pm daily' },
@@ -624,13 +626,23 @@ const RAIN_TICKER = {
   text: 'Weather Advisory: Deliveries may experience delays due to inclement weather conditions. We appreciate your patience and understanding.',
   rain: true
 };
+const CLOSED_TICKER = {
+  icon: '🔒',
+  text: 'Store Closed: Our store is currently closed. Operating hours are 8:00 AM – 7:00 PM daily. Thank you for your patience.',
+  closed: true
+};
 
-function buildTicker(rainMode) {
-  const items = rainMode ? [...TICKER_BASE, RAIN_TICKER] : [...TICKER_BASE];
-  const oneSet = items.map(it =>
-    `<span class="ticker-item${it.rain ? ' rain-ticker-item' : ''}">${it.icon} <strong>${it.text}</strong></span>` +
-    `<span class="ticker-sep">|</span>`
-  ).join('');
+let storeClosedMode = false;
+
+function buildTicker(rainMode, storeClosed) {
+  const items = [...TICKER_BASE];
+  if (rainMode) items.push(RAIN_TICKER);
+  if (storeClosed) items.push(CLOSED_TICKER);
+  const oneSet = items.map(it => {
+    const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : '';
+    return `<span class="ticker-item${cls}">${it.icon} <strong>${it.text}</strong></span>` +
+           `<span class="ticker-sep">|</span>`;
+  }).join('');
   const track = document.getElementById('ticker-track');
   if (track) {
     track.innerHTML = oneSet + oneSet;
@@ -686,12 +698,15 @@ function applyRainMode(active) {
     const c = header.querySelector('.rain-container');
     if (c) c.remove();
   }
-  buildTicker(active);
+  buildTicker(active, storeClosedMode);
 }
 
 db.collection('settings').doc('store').onSnapshot(snap => {
-  const rainMode = snap.exists ? (snap.data().rainMode === true) : false;
+  const data     = snap.exists ? snap.data() : {};
+  const rainMode = data.rainMode === true;
+  storeClosedMode = data.storeClosed === true;
   applyRainMode(rainMode);
+  buildTicker(rainMode, storeClosedMode);
 });
 
 /* ============================================================

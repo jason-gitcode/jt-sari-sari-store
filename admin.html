@@ -125,6 +125,23 @@
       font-weight: 600;
     }
     .rain-mode-btn:hover { background: #dbeafe; border-color: #93c5fd; }
+    .store-closed-btn {
+      padding: 6px 10px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .store-closed-btn.active {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    .store-closed-btn:hover { background: #fef2f2; border-color: #fca5a5; }
 
     #admin-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .container {
@@ -599,6 +616,7 @@
     <h1>📦 Product Management</h1>
     <div class="header-actions">
       <button class="rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
+      <button class="store-closed-btn" id="store-closed-btn" onclick="toggleStoreClosed()">🔒 Store Closed</button>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </header>
@@ -751,11 +769,18 @@ const auth = firebase.auth();
 
 // ---------- RAIN MODE ----------
 let rainModeActive = false;
+let storeClosedActive = false;
 
 db.collection('settings').doc('store').onSnapshot(snap => {
-  rainModeActive = snap.exists ? (snap.data().rainMode === true) : false;
+  const data = snap.exists ? snap.data() : {};
+  rainModeActive = data.rainMode === true;
+  storeClosedActive = data.storeClosed === true;
+  storeClosedSource = data.storeClosedSource || 'auto';
   const btn = document.getElementById('rain-mode-btn');
   if (btn) btn.classList.toggle('active', rainModeActive);
+  const cbtn = document.getElementById('store-closed-btn');
+  if (cbtn) cbtn.classList.toggle('active', storeClosedActive);
+  initAutoStoreClosed();
 });
 
 async function toggleRainMode() {
@@ -767,6 +792,56 @@ async function toggleRainMode() {
     showToast('Error updating rain mode', 'error');
   }
 }
+
+// ---------- STORE CLOSED ----------
+let storeClosedSource = 'auto';
+let autoClosedState = null;
+let storeClosedInitialized = false;
+
+function isStoreHoursClosed() {
+  const h = parseInt(new Intl.DateTimeFormat('en-PH', {
+    hour: 'numeric', hour12: false, timeZone: 'Asia/Manila'
+  }).format(new Date()));
+  return h >= 19 || h < 8;
+}
+
+function initAutoStoreClosed() {
+  if (storeClosedInitialized) return;
+  storeClosedInitialized = true;
+  autoClosedState = isStoreHoursClosed();
+  // On page load: sync Firestore to time-based state only if last write was not a manual override
+  if (storeClosedSource !== 'manual' && storeClosedActive !== autoClosedState) {
+    db.collection('settings').doc('store').set(
+      { storeClosed: autoClosedState, storeClosedSource: 'auto' },
+      { merge: true }
+    ).catch(e => console.error('Auto store-closed init error:', e));
+  }
+}
+
+async function toggleStoreClosed() {
+  storeClosedActive = !storeClosedActive;
+  try {
+    await db.collection('settings').doc('store').set(
+      { storeClosed: storeClosedActive, storeClosedSource: 'manual' },
+      { merge: true }
+    );
+  } catch (e) {
+    console.error('Store closed error:', e);
+    showToast('Error updating store status', 'error');
+  }
+}
+
+// Only writes at time boundaries (7pm / 8am), never mid-period — prevents fighting manual toggles
+setInterval(() => {
+  const shouldBeClosed = isStoreHoursClosed();
+  if (autoClosedState !== null && shouldBeClosed !== autoClosedState) {
+    autoClosedState = shouldBeClosed;
+    db.collection('settings').doc('store').set(
+      { storeClosed: shouldBeClosed, storeClosedSource: 'auto' },
+      { merge: true }
+    ).catch(e => console.error('Auto store-closed error:', e));
+  }
+}, 60000);
 
 const DEFAULT_PRODUCTS = [
   { id: 1,  name: "Bigas (Rice) — 1kg",      category: "Rice & Grains",      price: 60,  unit: "per kilo",   emoji: "🌾" },
