@@ -405,18 +405,24 @@
     .ticker-item, .ticker-item strong,
     .rain-ticker-item, .rain-ticker-item strong,
     .ticker-sep { font-size: 11px !important; font-weight: 500; }
-    .nav { flex-wrap: wrap; align-items: stretch; }
-    .brand { width: 100%; }
-    .brand h1 { font-size: 15px; }
-    .brand small { display: none; }
-    .search {
-      width: 100%; min-width: 0;
-      padding: 7px 10px;
-    }
+    .nav { flex-wrap: nowrap; align-items: center; padding: 10px 12px; gap: 10px; }
+    .brand { width: auto; flex-shrink: 0; }
+    .brand h1, .brand small { display: none; }
+    .brand .logo { width: 44px; height: 44px; }
+    .search { flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px; }
     .cart-btn {
-      margin-top: 10px;
-      width: auto;
-      flex-shrink: 0;
+      margin-top: 0; flex-shrink: 0;
+      width: 44px; height: 44px; padding: 0;
+      border-radius: 50%; background: transparent; color: var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; position: relative;
+    }
+    .cart-btn .badge {
+      position: absolute; top: 1px; right: 1px;
+      min-width: 18px; height: 18px; padding: 0 4px;
+      font-size: 11px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
     }
     .cart-btn span.label { display: none; }
     .container { flex-direction: column; overflow-y: auto; }
@@ -459,7 +465,7 @@
     </div>
     <button class="cart-btn" onclick="openCart()">
       🛒 <span class="label">Cart</span>
-      <span class="badge" id="cart-count">0</span>
+      <span class="badge" id="cart-count" style="display:none;">0</span>
     </button>
   </div>
 </header>
@@ -1054,7 +1060,10 @@ function cartCount() {
 }
 
 function renderCart() {
-  document.getElementById('cart-count').textContent = cartCount();
+  const _count = cartCount();
+  const _badge = document.getElementById('cart-count');
+  _badge.textContent = _count;
+  _badge.style.display = _count > 0 ? '' : 'none';
   const wrap = document.getElementById('cart-items');
   const ids = Object.keys(cart);
   if (ids.length === 0) {
