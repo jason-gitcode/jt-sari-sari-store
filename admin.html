@@ -490,6 +490,9 @@
     .btn-cancel-order:hover { background: var(--line); }
     .btn-refund-order { padding: 8px 14px; background: #fff; border: 1px solid #fca5a5; border-radius: 6px; font-size: 13px; cursor: pointer; color: #dc2626; transition: background .15s; }
     .btn-refund-order:hover { background: #fef2f2; }
+    .btn-copy-order { padding: 8px 14px; background: #fff; border: 1px solid var(--ok); border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--ok); transition: background .15s; }
+    .btn-copy-order:hover { background: #f0fdf4; }
+    .btn-copy-order.copied { background: #f0fdf4; }
     .order-card.refunded { border-left: 4px solid #f87171; opacity: 0.65; }
     .order-status-badge.refunded { background: #fee2e2; color: #991b1b; }
 
@@ -1093,13 +1096,58 @@ function setOrdersFilter(filter) {
 
 function formatOrderTime(ts) {
   if (!ts || !ts.toDate) return '';
-  const date = ts.toDate();
-  const diffMins = Math.floor((Date.now() - date) / 60000);
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  return ts.toDate().toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  });
+}
+
+function copyOrder(orderId, btn) {
+  const o = orders.find(x => x.orderId === orderId);
+  if (!o) return;
+
+  const shortId  = o.orderId.slice(-6).toUpperCase();
+  const time     = formatOrderTime(o.createdAt);
+  const addr     = o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—';
+  const fee      = parseFloat(o.deliveryFee ?? 0);
+  const feeStr   = fee === 0 ? 'Free' : `₱${fee.toFixed(2)}`;
+  const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
+
+  const confirmed    = o.confirmedItems || o.items || [];
+  const displaySub   = confirmed.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
+  const displayTotal = displaySub + fee;
+
+  const unchecked      = o.uncheckedItems || [];
+  const uncheckedTotal = unchecked.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
+
+  let t = '';
+  t += `#${shortId} - ${o.status.toUpperCase()} - ${time}\n`;
+  t += `\n`;
+  t += `${o.customer?.name || '—'} · ${o.customer?.phone || '—'}\n`;
+  t += `${addr}\n`;
+  if (o.notes) t += `Note: ${o.notes}\n`;
+  t += `\n`;
+  t += `✓ Confirmed Items\n`;
+  t += `\n`;
+  confirmed.forEach(i => { t += `${i.qty}× ${i.productName}     ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
+  t += `Subtotal:     ₱${displaySub.toFixed(2)}\n`;
+  t += `Delivery Fee:     ${feeStr}\n`;
+  t += `Total:     ₱${displayTotal.toFixed(2)}\n`;
+  t += `Payment:     ${payLabel}\n`;
+
+  if (unchecked.length) {
+    t += `\nUnavailable Items\n\n`;
+    unchecked.forEach(i => { t += `${i.qty}× ${i.productName}     ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
+    t += `Refund Amount: ₱${uncheckedTotal.toFixed(2)}\n`;
+    if (o.partialRefundRef) t += `✓ Partial Refund Recorded — GCash Reference Number: ${o.partialRefundRef}\n`;
+  }
+
+  navigator.clipboard.writeText(t.trim()).then(() => {
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Order'; btn.classList.remove('copied'); }, 2000);
+  });
 }
 
 function renderOrders() {
@@ -1175,7 +1223,7 @@ function renderOrders() {
           <div class="order-items-list" style="margin-bottom:4px;">${uncheckedHtml}</div>
           <div class="order-subtotal-row" style="margin-bottom:8px;"><span>Refund Amount</span><span>₱${uncheckedTotal.toFixed(2)}</span></div>
           ${o.partialRefundRef
-            ? `<div class="partial-refund-done">✓ Partial Refund Recorded — Ref: ${o.partialRefundRef}</div>`
+            ? `<div class="partial-refund-done">✓ Partial Refund Recorded — GCash Reference Number: ${o.partialRefundRef}</div>`
             : `<div class="partial-refund-form">
                 <input type="text" id="refund-ref-${o.orderId}" class="refund-ref-input" placeholder="GCash Reference Number">
                 <button class="btn-partial-refund" onclick="recordPartialRefund('${o.orderId}')">Partial Refund Complete</button>
@@ -1199,10 +1247,12 @@ function renderOrders() {
       <div class="order-actions-row">
         <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm Order</button>
         <button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>
+        <button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>
       </div>` :
       o.status === 'confirmed' ? `
       <div class="order-actions-row">
         <button class="btn-refund-order" onclick="refundAndRestock('${o.orderId}')">↩ Refund &amp; Restock</button>
+        <button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>
       </div>` : '';
 
     return `
