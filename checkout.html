@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Order Summary — JT Sari-Sari Store</title>
 <link rel="manifest" href="/jt-sari-sari-store/manifest.json" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <meta name="theme-color" content="#2563eb" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -69,21 +70,32 @@
   }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
   .field textarea { resize: vertical; min-height: 60px; }
-  .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
-  .address-grid .full { grid-column: 1 / -1; }
-  .sub-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
-  .csel { position: relative; }
-  .csel-btn { width: 100%; padding: 9px 32px 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; text-align: left; cursor: pointer; color: var(--ink); -webkit-appearance: none; appearance: none; background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
-  .csel-btn:focus { border-color: var(--accent); outline: none; }
-  .csel-btn .placeholder { color: #9ca3af; }
-  .csel-arrow { display: none; }
-  .csel-drop { display: none; position: absolute; z-index: 200; top: calc(100% + 3px); left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); overflow: hidden; }
-  .csel-search { width: 100%; padding: 8px 12px; border: none; border-bottom: 1px solid var(--line); font-size: 16px; outline: none; font-family: inherit; }
-  .csel-list { max-height: 180px; overflow-y: auto; }
-  .csel-opt { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--line); }
-  .csel-opt:last-child { border-bottom: none; }
-  .csel-opt:hover { background: var(--soft); }
-  .csel-empty { padding: 10px 12px; font-size: 13px; color: var(--muted); }
+  .map-container { border-radius: 8px; overflow: hidden; margin-bottom: 0; border: 1px solid var(--line); line-height: 0; position: relative; }
+  .map-edit-btn { position: absolute; bottom: 10px; right: 10px; background: #fff; border: 1px solid rgba(0,0,0,.18); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-weight: 500; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; z-index: 10; line-height: 1.4; }
+  .map-edit-btn:hover { background: var(--soft); }
+  .locate-btn { font-size: 13px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 4px 0; display: block; }
+  .locate-btn:hover { text-decoration: underline; }
+
+  /* Location picker modal */
+  .loc-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 500; overflow-y: auto; }
+  .loc-overlay.open { display: block; }
+  .loc-modal { background: #fff; width: 100%; max-width: 640px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+  .loc-header { padding: 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .loc-header-text h2 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .loc-header-text p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .loc-close { font-size: 20px; color: var(--muted); padding: 0; flex-shrink: 0; line-height: 1; }
+  .loc-search { padding: 12px 16px; border-bottom: 1px solid var(--line); position: relative; }
+  .loc-search input { width: 100%; padding: 9px 36px 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; outline: none; font-family: inherit; }
+  .loc-search input:focus { border-color: var(--accent); }
+  .loc-search-clear { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--muted); cursor: pointer; padding: 0; display: none; }
+  .loc-results { position: absolute; left: 16px; right: 16px; top: calc(100% - 1px); background: #fff; border: 1px solid var(--line); border-radius: 0 0 8px 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 600; display: none; max-height: 220px; overflow-y: auto; }
+  .loc-result { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--line); line-height: 1.4; color: var(--ink); }
+  .loc-result:last-child { border-bottom: none; }
+  .loc-result:hover { background: var(--soft); }
+  #loc-map { flex: 1; min-height: 380px; }
+  .loc-footer { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+  .loc-submit { padding: 11px 32px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: .5px; }
+  .loc-submit:hover { background: var(--accent-dark); }
 
   /* Payment */
   .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -160,7 +172,7 @@ const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1500127416901959761/oO
 
 async function sendDiscordNotification(order, shortId) {
   const addr = order.address
-    ? `Block ${order.address.block}, Lot ${order.address.lot}, Phase ${order.address.phase}, St. ${order.address.street}, Valle Verde`
+    ? [order.address.lotBlock, order.address.street, order.address.subdivision, order.address.floor ? `Floor ${order.address.floor}` : ''].filter(Boolean).join(', ')
     : '—';
   const itemLines = (order.items || [])
     .map(i => `  ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}`)
@@ -299,17 +311,6 @@ function cartTotal() {
 }
 function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
 
-const STREETS = [
-  'Basil Street', 'Carribean Street', 'Castleton Avenue', 'Celadon Street',
-  'Charleston Street', 'Chartreuse Street', 'Citrine Street', 'Emerald Street',
-  'Fern Street', 'Forest Street', 'Glade Street', 'Granite Street',
-  'Herlequin Street', 'Honey Dew Street', 'Irish Street', 'Jade Street',
-  'Kelly Avenue', 'Laurel Street', 'Lime Street', 'Martle Street',
-  'Mint Street', 'Moss Street', 'Olive Street', 'Parakeet Street',
-  'Pearl Street', 'Phanton Street', 'Pickle Street', 'Pistacho Street',
-  'Reseda Street', 'Rifle Street', 'Shamrock Street', 'Spring Street',
-  'Vine Street', 'Viridian Avenue'
-];
 
 function init() {
   const main = document.getElementById('main');
@@ -341,8 +342,6 @@ function init() {
       <span class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</span>
     </div>`;
   }).join('');
-
-  const sel = (n, val) => n == val ? 'selected' : '';
 
   const subtotal = cartTotal();
   const fee = deliveryFee();
@@ -378,54 +377,41 @@ function init() {
     <div class="section">
       <div class="section-label">Delivery Address</div>
       <div class="field">
-        <div class="address-grid">
-          <div class="full">
-            <span class="sub-label">Lot</span>
-            <div class="csel" id="lot-wrap">
-              <button type="button" class="csel-btn" onclick="toggleCsel('lot')" id="lot-btn">
-                <span id="lot-label" class="${savedAddress?.lot ? '' : 'placeholder'}">${savedAddress?.lot || 'Select'}</span>
-                <span class="csel-arrow">▾</span>
-              </button>
-              <div class="csel-drop" id="lot-drop">
-                <input class="csel-search" placeholder="Search lot…" oninput="filterCsel('lot', this.value)" />
-                <div class="csel-list" id="lot-list"></div>
-              </div>
-            </div>
-            <input type="hidden" id="cust-lot" value="${savedAddress?.lot || ''}" />
-          </div>
-          <div class="full">
-            <span class="sub-label">Block</span>
-            <select id="cust-block">
-              <option value="">Select</option>
-              ${Array.from({length: 18}, (_, i) => `<option ${sel(savedAddress?.block, i+1)}>${i+1}</option>`).join('')}
-            </select>
-          </div>
-          <div class="full">
-            <span class="sub-label">Street</span>
-            <div class="csel" id="street-wrap">
-              <button type="button" class="csel-btn" onclick="toggleCsel('street')" id="street-btn">
-                <span id="street-label" class="${savedAddress?.street ? '' : 'placeholder'}">${savedAddress?.street || 'Select'}</span>
-                <span class="csel-arrow">▾</span>
-              </button>
-              <div class="csel-drop" id="street-drop">
-                <input class="csel-search" placeholder="Search street…" oninput="filterCsel('street', this.value)" />
-                <div class="csel-list" id="street-list"></div>
-              </div>
-            </div>
-            <input type="hidden" id="cust-street" value="${savedAddress?.street || ''}" />
-          </div>
-          <div class="full">
-            <span class="sub-label">Phase</span>
-            <select id="cust-phase">
-              <option value="">Select</option>
-              ${[1,2,3,4].map(n => `<option ${sel(savedAddress?.phase, n)}>${n}</option>`).join('')}
-            </select>
-          </div>
+        <div class="map-container">
+          <iframe id="map-iframe"
+            src="https://maps.google.com/maps?q=14.3025,120.9437&z=16&output=embed"
+            width="100%" height="200" style="border:0;display:block;"
+            loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade">
+          </iframe>
+          <button type="button" class="map-edit-btn" onclick="openLocPicker()">Edit</button>
         </div>
-        <div>
-          <span class="sub-label">Subdivision</span>
-          <input type="text" value="Valle Verde" readonly style="background:var(--soft);color:var(--muted);cursor:default;" />
-        </div>
+        <button type="button" class="locate-btn" onclick="locateMe()">📍 Use my location</button>
+      </div>
+      <div class="field">
+        <label for="cust-lot-block">Lot, Block, Phase Number</label>
+        <input type="text" id="cust-lot-block" placeholder="e.g. Lot 12, Block 3, Phase 2" value="${savedAddress?.lotBlock || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-street">Street / Avenue</label>
+        <input type="text" id="cust-street" placeholder="e.g. Jade St, New York Avenue" value="${savedAddress?.street || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-subdivision">Subdivision</label>
+        <select id="cust-subdivision">
+          <option value="">Select</option>
+          <option ${savedAddress?.subdivision === 'City Homes Resort Ville' ? 'selected' : ''}>City Homes Resort Ville</option>
+          <option ${savedAddress?.subdivision === 'Dasmarinas Executive Village' ? 'selected' : ''}>Dasmarinas Executive Village</option>
+          <option ${savedAddress?.subdivision === 'Valle Verde' ? 'selected' : ''}>Valle Verde</option>
+          <option ${savedAddress?.subdivision === 'Villa Luisa' ? 'selected' : ''}>Villa Luisa</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cust-floor">Floor <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="text" id="cust-floor" placeholder="e.g. 2nd Floor" value="${savedAddress?.floor || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-notes">Note to rider <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <textarea id="cust-notes" placeholder="e.g. building, landmark, gate code">${savedAddress?.noteRider || ''}</textarea>
       </div>
     </div>
 
@@ -449,12 +435,6 @@ function init() {
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-label">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
-      <div class="field">
-        <textarea id="cust-notes" placeholder="e.g., No onions please, leave at gate, etc."></textarea>
-      </div>
-    </div>
 
     <div class="store-closed-notice" id="store-closed-notice">
       <p>We sincerely apologize for the inconvenience. Our store is currently closed. Store operations are available daily from <strong>8:00 AM to 7:00 PM</strong>. We look forward to serving you during our operating hours.</p>
@@ -489,57 +469,17 @@ function init() {
   });
 }
 
-const CSEL_DATA = {
-  lot:    Array.from({length: 84}, (_, i) => String(i + 1)),
-  street: STREETS
-};
-
-function toggleCsel(name) {
-  const drop = document.getElementById(`${name}-drop`);
-  if (!drop) return;
-  const isOpen = drop.style.display === 'block';
-  // close all
-  ['lot', 'street'].forEach(n => {
-    const d = document.getElementById(`${n}-drop`);
-    if (d) d.style.display = 'none';
-  });
-  if (!isOpen) {
-    drop.style.display = 'block';
-    const search = drop.querySelector('.csel-search');
-    if (search) { search.value = ''; if (!('ontouchstart' in window)) search.focus(); }
-    renderCselList(name, CSEL_DATA[name]);
-  }
+function locateMe() {
+  if (!navigator.geolocation) { showToast('Geolocation is not supported by your browser.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const iframe = document.getElementById('map-iframe');
+      if (iframe) iframe.src = `https://maps.google.com/maps?q=${lat},${lon}&z=17&output=embed`;
+    },
+    () => showToast('Unable to retrieve your location.')
+  );
 }
-
-function filterCsel(name, q) {
-  const all = CSEL_DATA[name];
-  renderCselList(name, q ? all.filter(o => o.toLowerCase().includes(q.toLowerCase())) : all);
-}
-
-function renderCselList(name, list) {
-  const container = document.getElementById(`${name}-list`);
-  if (!container) return;
-  container.innerHTML = list.length
-    ? list.map(o => `<div class="csel-opt" onclick="pickCsel('${name}','${o.replace(/'/g,"\\'")}')"> ${o}</div>`).join('')
-    : `<div class="csel-empty">No results</div>`;
-}
-
-function pickCsel(name, value) {
-  const hid   = document.getElementById(`cust-${name}`);
-  const label = document.getElementById(`${name}-label`);
-  const drop  = document.getElementById(`${name}-drop`);
-  if (hid)   hid.value = value;
-  if (label) { label.textContent = value; label.classList.remove('placeholder'); }
-  if (drop)  drop.style.display = 'none';
-}
-
-document.addEventListener('click', e => {
-  ['lot', 'street'].forEach(name => {
-    const wrap = document.getElementById(`${name}-wrap`);
-    const drop = document.getElementById(`${name}-drop`);
-    if (wrap && drop && !wrap.contains(e.target)) drop.style.display = 'none';
-  });
-});
 
 function pickPay(method) {
   payMethod = method;
@@ -566,10 +506,10 @@ function updatePaymentOptions() {
 async function placeOrder() {
   const name   = document.getElementById('cust-name').value.trim();
   const phone  = document.getElementById('cust-phone').value.trim();
-  const block  = document.getElementById('cust-block').value;
-  const lot    = document.getElementById('cust-lot').value.trim();
-  const phase  = document.getElementById('cust-phase').value;
-  const street = document.getElementById('cust-street').value.trim();
+  const lotBlock    = document.getElementById('cust-lot-block').value.trim();
+  const subdivision = document.getElementById('cust-subdivision').value;
+  const street      = document.getElementById('cust-street').value.trim();
+  const floor       = document.getElementById('cust-floor').value.trim();
 
   let hasError = false;
 
@@ -588,21 +528,16 @@ async function placeOrder() {
     if (phoneInput) phoneInput.style.borderColor = '';
   }
 
-  const lotNum = parseInt(lot);
-  if (!lot || isNaN(lotNum) || lotNum < 1 || lotNum > 84) {
-    if (!hasError) showToast("Please enter a valid lot number (1–84).");
+  if (!lotBlock) {
+    if (!hasError) showToast("Please enter your Lot, Block, Street, and Phase.");
     hasError = true;
   }
-  if (!block) {
-    if (!hasError) showToast("Please select a block.");
+  if (!subdivision) {
+    if (!hasError) showToast("Please select your subdivision.");
     hasError = true;
   }
-  if (!street || !STREETS.includes(street)) {
-    if (!hasError) showToast("Please select a valid street.");
-    hasError = true;
-  }
-  if (!phase) {
-    if (!hasError) showToast("Please select a phase.");
+  if (!street) {
+    if (!hasError) showToast("Please enter your street.");
     hasError = true;
   }
 
@@ -626,7 +561,7 @@ async function placeOrder() {
   const orderData = {
     status: 'pending',
     customer: { name, phone },
-    address: { block, lot, phase, street },
+    address: { lotBlock, subdivision, street, floor },
     payment: payMethod,
     notes: document.getElementById('cust-notes').value.trim(),
     items,
@@ -706,7 +641,7 @@ async function placeOrder() {
     const shortId = orderRef.id.slice(-6).toUpperCase();
     sendDiscordNotification(orderData, shortId).catch(() => {});
     localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
-    localStorage.setItem('sariAddress',  JSON.stringify({ block, lot, phase, street }));
+    localStorage.setItem('sariAddress', JSON.stringify({ lotBlock, subdivision, street, floor, noteRider: document.getElementById('cust-notes').value.trim() }));
     localStorage.removeItem('sariCart');
     showOrderConfirmation(orderRef.id, payMethod);
   } catch (err) {
@@ -784,6 +719,116 @@ db.collection('products').get().then(snapshot => {
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   init(); updatePaymentOptions(); updateWeatherWarning();
 });
+</script>
+<!-- Location Picker Modal -->
+<div class="loc-overlay" id="loc-overlay">
+  <div class="loc-modal">
+    <div class="loc-header">
+      <div class="loc-header-text">
+        <h2>📍 What's your exact location?</h2>
+        <p>Providing your location enables more accurate search and delivery ETA, seamless order tracking and personalised recommendations.</p>
+      </div>
+      <button class="loc-close" onclick="closeLocPicker()">✕</button>
+    </div>
+    <div class="loc-search">
+      <input type="text" id="loc-search-input" placeholder="Enter your address" autocomplete="off" oninput="locSearchInput(this.value)" />
+      <button class="loc-search-clear" id="loc-search-clear" onclick="locClearSearch()">✕</button>
+      <div class="loc-results" id="loc-results"></div>
+    </div>
+    <div id="loc-map"></div>
+    <div class="loc-footer">
+      <button class="loc-submit" onclick="submitLocPicker()">SUBMIT</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let locMap = null, locMarker = null;
+  let locLat = 14.3025, locLon = 120.9437;
+  let locSearchTimer = null;
+
+  function openLocPicker() {
+    document.getElementById('loc-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      if (!locMap) initLocMap();
+      else locMap.invalidateSize();
+    }, 60);
+  }
+
+  function closeLocPicker() {
+    document.getElementById('loc-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function initLocMap() {
+    locMap = L.map('loc-map', { zoomControl: true }).setView([locLat, locLon], 17);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(locMap);
+
+    locMarker = L.marker([locLat, locLon], { draggable: true }).addTo(locMap);
+
+    locMarker.on('dragend', () => {
+      const p = locMarker.getLatLng();
+      locLat = p.lat; locLon = p.lng;
+      locReverseGeocode(locLat, locLon);
+    });
+
+    locMap.on('click', e => {
+      locLat = e.latlng.lat; locLon = e.latlng.lng;
+      locMarker.setLatLng([locLat, locLon]);
+      locReverseGeocode(locLat, locLon);
+    });
+  }
+
+  function locReverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.display_name) document.getElementById('loc-search-input').value = d.display_name;
+      }).catch(() => {});
+  }
+
+  function locSearchInput(q) {
+    document.getElementById('loc-search-clear').style.display = q ? 'block' : 'none';
+    clearTimeout(locSearchTimer);
+    if (!q.trim()) { document.getElementById('loc-results').style.display = 'none'; return; }
+    locSearchTimer = setTimeout(() => {
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=ph`)
+        .then(r => r.json())
+        .then(results => {
+          const box = document.getElementById('loc-results');
+          if (!results.length) { box.style.display = 'none'; return; }
+          box.style.display = 'block';
+          box.innerHTML = results.map(r =>
+            `<div class="loc-result" onclick="locPickResult(${r.lat},${r.lon},this.dataset.name)" data-name="${r.display_name.replace(/"/g,'&quot;')}">${r.display_name}</div>`
+          ).join('');
+        }).catch(() => {});
+    }, 400);
+  }
+
+  function locPickResult(lat, lon, name) {
+    locLat = parseFloat(lat); locLon = parseFloat(lon);
+    locMarker.setLatLng([locLat, locLon]);
+    locMap.setView([locLat, locLon], 17);
+    document.getElementById('loc-search-input').value = name;
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function locClearSearch() {
+    document.getElementById('loc-search-input').value = '';
+    document.getElementById('loc-search-clear').style.display = 'none';
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function submitLocPicker() {
+    const iframe = document.getElementById('map-iframe');
+    if (iframe) iframe.src = `https://maps.google.com/maps?q=${locLat},${locLon}&z=17&output=embed`;
+    closeLocPicker();
+  }
 </script>
 <script>
   if ('serviceWorker' in navigator) {

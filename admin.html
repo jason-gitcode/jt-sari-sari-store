@@ -1102,7 +1102,7 @@ function renderOrders() {
 
   list.innerHTML = filtered.map(o => {
     const shortId  = o.orderId.slice(-6).toUpperCase();
-    const addr     = o.address ? `Block ${o.address.block}, Lot ${o.address.lot}, Phase ${o.address.phase}, ${o.address.street}, Valle Verde` : '—';
+    const addr     = o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—';
     const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
     const fee      = parseFloat(o.deliveryFee ?? 0);
     const feeStr   = fee === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + fee.toFixed(2);
