@@ -561,7 +561,7 @@ async function placeOrder() {
   const orderData = {
     status: 'pending',
     customer: { name, phone },
-    address: { lotBlock, subdivision, street, floor },
+    address: { lotBlock, subdivision, street, floor, ...(locPicked ? { lat: locLat, lng: locLon } : {}) },
     payment: payMethod,
     notes: document.getElementById('cust-notes').value.trim(),
     items,
@@ -641,7 +641,7 @@ async function placeOrder() {
     const shortId = orderRef.id.slice(-6).toUpperCase();
     sendDiscordNotification(orderData, shortId).catch(() => {});
     localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
-    localStorage.setItem('sariAddress', JSON.stringify({ lotBlock, subdivision, street, floor, noteRider: document.getElementById('cust-notes').value.trim() }));
+    localStorage.setItem('sariAddress', JSON.stringify({ lotBlock, subdivision, street, floor, noteRider: document.getElementById('cust-notes').value.trim(), ...(locPicked ? { lat: locLat, lng: locLon } : {}) }));
     localStorage.removeItem('sariCart');
     showOrderConfirmation(orderRef.id, payMethod);
   } catch (err) {
@@ -746,6 +746,7 @@ db.collection('products').get().then(snapshot => {
 <script>
   let locMap = null, locMarker = null;
   let locLat = 14.3025, locLon = 120.9437;
+  let locPicked = false;
   let locSearchTimer = null;
 
   function openLocPicker() {
@@ -827,6 +828,7 @@ db.collection('products').get().then(snapshot => {
   function submitLocPicker() {
     const iframe = document.getElementById('map-iframe');
     if (iframe) iframe.src = `https://maps.google.com/maps?q=${locLat},${locLon}&z=17&output=embed`;
+    locPicked = true;
     closeLocPicker();
   }
 </script>

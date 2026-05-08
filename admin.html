@@ -98,50 +98,38 @@
     }
     header h1 { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .logout-btn {
-      padding: 6px 12px;
-      background: var(--soft);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 12px;
+    /* Hamburger menu */
+    .hamburger-wrap { position: relative; }
+    .hamburger-btn {
+      width: 36px; height: 36px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+      background: var(--soft); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; padding: 0;
       transition: background .15s;
-      white-space: nowrap;
     }
-    .logout-btn:hover { background: var(--line); }
-    .rain-mode-btn {
-      padding: 6px 10px;
-      background: var(--soft);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all .15s;
-      white-space: nowrap;
+    .hamburger-btn:hover { background: var(--line); }
+    .hamburger-btn span { display: block; width: 18px; height: 2px; background: var(--ink); border-radius: 2px; transition: transform .2s, opacity .2s; }
+    .hamburger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger-btn.open span:nth-child(2) { opacity: 0; }
+    .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .hamburger-menu {
+      display: none; position: absolute; right: 0; top: calc(100% + 6px);
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.12); min-width: 190px; overflow: hidden; z-index: 200;
     }
-    .rain-mode-btn.active {
-      background: #bfdbfe;
-      border-color: #60a5fa;
-      color: #1d4ed8;
-      font-weight: 600;
+    .hamburger-menu.open { display: block; }
+    .hm-item {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 11px 16px; font-size: 14px; text-align: left;
+      background: none; border: none; cursor: pointer; transition: background .1s; color: var(--ink);
     }
-    .rain-mode-btn:hover { background: #dbeafe; border-color: #93c5fd; }
-    .store-closed-btn {
-      padding: 6px 10px;
-      background: var(--soft);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .store-closed-btn.active {
-      background: #fee2e2;
-      border-color: #fca5a5;
-      color: #b91c1c;
-      font-weight: 600;
-    }
-    .store-closed-btn:hover { background: #fef2f2; border-color: #fca5a5; }
+    .hm-item:hover { background: var(--soft); }
+    .hm-item.rain-mode-btn.active { color: #1d4ed8; background: #eff6ff; font-weight: 600; }
+    .hm-item.rain-mode-btn.active:hover { background: #dbeafe; }
+    .hm-item.store-closed-btn.active { color: #b91c1c; background: #fff1f2; font-weight: 600; }
+    .hm-item.store-closed-btn.active:hover { background: #fee2e2; }
+    .hm-divider { height: 1px; background: var(--line); }
+    .hm-logout { color: #dc2626; }
+    .hm-logout:hover { background: #fff1f2 !important; }
 
     #admin-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .container {
@@ -485,7 +473,9 @@
     .order-time-label { font-size: 12px; color: var(--muted); margin-left: auto; }
     .order-card-body { padding: 12px 14px; }
     .order-cust { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-    .order-addr { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .order-addr { font-size: 12px; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .order-map-pin { font-size: 15px; line-height: 1; flex-shrink: 0; text-decoration: none; }
+    .order-map-pin:hover { opacity: .75; }
     .order-items-list { font-size: 13px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
     .order-item-row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--line); }
     .order-item-row:last-child { border-bottom: none; }
@@ -615,9 +605,17 @@
   <header>
     <h1>📦 Product Management</h1>
     <div class="header-actions">
-      <button class="rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
-      <button class="store-closed-btn" id="store-closed-btn" onclick="toggleStoreClosed()">🔒 Store Closed</button>
-      <button class="logout-btn" onclick="logout()">Logout</button>
+      <div class="hamburger-wrap">
+        <button class="hamburger-btn" id="hamburger-btn" onclick="toggleHamburger()">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="hamburger-menu" id="hamburger-menu">
+          <button class="hm-item rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
+          <button class="hm-item store-closed-btn" id="store-closed-btn" onclick="toggleStoreClosed()">🔒 Store Closed</button>
+          <div class="hm-divider"></div>
+          <button class="hm-item hm-logout" onclick="logout()">Logout</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -781,6 +779,21 @@ db.collection('settings').doc('store').onSnapshot(snap => {
   const cbtn = document.getElementById('store-closed-btn');
   if (cbtn) cbtn.classList.toggle('active', storeClosedActive);
   initAutoStoreClosed();
+});
+
+function toggleHamburger() {
+  const btn  = document.getElementById('hamburger-btn');
+  const menu = document.getElementById('hamburger-menu');
+  const open = menu.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.hamburger-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('hamburger-menu')?.classList.remove('open');
+    document.getElementById('hamburger-btn')?.classList.remove('open');
+  }
 });
 
 async function toggleRainMode() {
@@ -1103,6 +1116,7 @@ function renderOrders() {
   list.innerHTML = filtered.map(o => {
     const shortId  = o.orderId.slice(-6).toUpperCase();
     const addr     = o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—';
+    const pinHtml  = (o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps?q=${o.address.lat},${o.address.lng}" target="_blank" title="Open in Google Maps">📍</a>` : '';
     const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
     const fee      = parseFloat(o.deliveryFee ?? 0);
     const feeStr   = fee === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + fee.toFixed(2);
@@ -1200,7 +1214,7 @@ function renderOrders() {
         </div>
         <div class="order-card-body">
           <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}${o.customer?.phone ? `<button class="copy-phone-btn" onclick="copyPhone(this,'${o.customer.phone}')">copy</button>` : ''}</div>
-          <div class="order-addr">${addr}</div>
+          <div class="order-addr">${addr}${pinHtml}</div>
           ${bodyHtml}
         </div>
         ${actionsHtml}
