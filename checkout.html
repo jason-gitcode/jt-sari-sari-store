@@ -379,7 +379,7 @@ function init() {
       <div class="field">
         <div class="map-container">
           <iframe id="map-iframe"
-            src="https://maps.google.com/maps?q=14.3025,120.9437&z=16&output=embed"
+            src="https://maps.google.com/maps?q=${savedAddress?.lat && savedAddress?.lng ? `${savedAddress.lat},${savedAddress.lng}` : '14.3025,120.9437'}&z=17&output=embed"
             width="100%" height="200" style="border:0;display:block;"
             loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade">
           </iframe>
@@ -447,6 +447,13 @@ function init() {
     </div>
     <button class="send-btn" id="place-order-btn" onclick="placeOrder()">Place Order</button>
   `;
+
+  // Restore saved pin coordinates so the picker reopens at the right spot
+  if (savedAddress?.lat && savedAddress?.lng) {
+    locLat = savedAddress.lat;
+    locLon = savedAddress.lng;
+    locPicked = true;
+  }
 
   // Attach real-time phone validation after HTML is rendered
   const phoneInput = document.getElementById('cust-phone');
