@@ -752,8 +752,8 @@
 <script>
 
 const ADMIN_CATEGORIES = [
-  "Rice & Grains", "Canned Goods", "Noodles", "Snacks", "Beverages",
-  "Cooking Essentials", "School Supplies", "Household", "Personal Care"
+  "Bakery", "Bathroom Essentials", "Beverages", "Canned Goods", "Condiments",
+  "Cooking Essentials", "Noodles", "Pet Care", "School Supplies", "Slippers", "Snacks"
 ];
 
 const firebaseConfig = {
@@ -1525,7 +1525,7 @@ function updateCategorySelect(selectedValue = '') {
   products.forEach(p => { if (p.category) cats.add(p.category); });
   sel.innerHTML =
     `<option value="">Select Category</option>` +
-    [...cats].map(c => `<option value="${c}" ${selectedValue === c ? 'selected' : ''}>${c}</option>`).join('') +
+    [...cats].sort((a, b) => a.localeCompare(b)).map(c => `<option value="${c}" ${selectedValue === c ? 'selected' : ''}>${c}</option>`).join('') +
     `<option value="__custom__">+ Create new category…</option>`;
 }
 
