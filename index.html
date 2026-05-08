@@ -558,7 +558,13 @@ const STORE = {
   tagline: "",
   address: "Valle Verde Subdivision",
   hours: "Open 8am–7pm daily",
-  delivery: "Free delivery on orders ₱200+ within Valle Verde",
+  delivery: "Free delivery on orders min. Php200",
+  deliveryAreas: [
+    "City Homes Resort Ville",
+    "Dasmarinas Executive Village",
+    "Valle Verde",
+    "Villa Luisa"
+  ],
 
   // Your Facebook page username (the part after facebook.com/)
   // Example: if your page is facebook.com/AlingNenasStore, put "AlingNenasStore"
@@ -617,9 +623,9 @@ let PRODUCTS = [];
 
 // ---------- RAIN MODE / STORE CLOSED ----------
 const TICKER_BASE = [
-  { icon: '📍', text: 'Valle Verde Subdivision' },
+  { icon: '📍', text: 'Delivering to: ' + STORE.deliveryAreas.join(' · ') },
   { icon: '🕐', text: 'Open 8am–7pm daily' },
-  { icon: '🛵', text: 'Free delivery on orders ₱200+ within Valle Verde' },
+  { icon: '🛵', text: 'Free delivery on orders min. Php200' },
 ];
 const RAIN_TICKER = {
   icon: '🌧️',

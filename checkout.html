@@ -164,7 +164,13 @@ const STORE = {
   gcashName: "Jason Tubilag",
   gcashDisplayName: "JA**N T. (JASON TUBILAG)",
   gcashNumber: "09184067841",
-  currency: "₱"
+  currency: "₱",
+  deliveryAreas: [
+    "City Homes Resort Ville",
+    "Dasmarinas Executive Village",
+    "Valle Verde",
+    "Villa Luisa"
+  ]
 };
 
 // ---------- DISCORD NOTIFICATIONS ----------
@@ -399,10 +405,7 @@ function init() {
         <label for="cust-subdivision">Subdivision</label>
         <select id="cust-subdivision">
           <option value="">Select</option>
-          <option ${savedAddress?.subdivision === 'City Homes Resort Ville' ? 'selected' : ''}>City Homes Resort Ville</option>
-          <option ${savedAddress?.subdivision === 'Dasmarinas Executive Village' ? 'selected' : ''}>Dasmarinas Executive Village</option>
-          <option ${savedAddress?.subdivision === 'Valle Verde' ? 'selected' : ''}>Valle Verde</option>
-          <option ${savedAddress?.subdivision === 'Villa Luisa' ? 'selected' : ''}>Villa Luisa</option>
+          ${STORE.deliveryAreas.map(a => `<option ${savedAddress?.subdivision === a ? 'selected' : ''}>${a}</option>`).join('')}
         </select>
       </div>
       <div class="field">
