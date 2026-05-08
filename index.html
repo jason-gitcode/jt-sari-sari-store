@@ -98,18 +98,23 @@
   .brand h1 { font-size: 17px; font-weight: 600; line-height: 1.2; }
   .brand small { color: var(--muted); font-size: 12px; }
   .search {
-    flex: 1;
+    flex: 1; position: relative;
     display: flex; align-items: center; gap: 8px;
     background: var(--soft); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 8px 12px;
   }
   .search input {
     flex: 1; border: none; background: transparent; outline: none; font-size: 16px;
+    padding-right: 28px;
+  }
+  #search-clear {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font-size: 18px; color: var(--muted); line-height: 1; padding: 0;
   }
   .cart-btn {
     position: relative;
     padding: 8px 14px;
-    background: var(--ink); color: #fff;
+    background: transparent; color: var(--ink);
     border-radius: var(--radius);
     font-weight: 500; font-size: 14px;
     display: flex; align-items: center; gap: 6px;
@@ -463,7 +468,7 @@
     <div class="search">
       <span>🔍</span>
       <input type="text" id="search-input" placeholder="Search products..." />
-      <button id="search-clear" onclick="clearSearch()" style="display:none; color:var(--muted); font-size:18px; line-height:1; padding:0 2px; flex-shrink:0;">×</button>
+      <button id="search-clear" onclick="clearSearch()" style="display:none;">×</button>
     </div>
     <button class="cart-btn" onclick="openCart()">
       🛒 <span class="label">Cart</span>
