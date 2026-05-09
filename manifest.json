@@ -1,6 +1,6 @@
 {
   "name": "JS Mini Mart",
-  "short_name": "JT Sari-Sari",
+  "short_name": "JS Mini Mart",
   "description": "Order groceries and essentials from JS Mini Mart in Valle Verde.",
   "start_url": "/jt-sari-sari-store/",
   "scope": "/jt-sari-sari-store/",
