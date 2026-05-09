@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>JS Mini Mart</title>
+<script>if(location.pathname==='/index.html')location.replace('/');</script>
 <link rel="manifest" href="/jt-sari-sari-store/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -501,7 +502,7 @@
   <div class="drawer-foot">
     <div class="totals grand"><span>Total</span><span id="grand-total">₱0.00</span></div>
     <button class="btn-secondary" id="remove-all-btn" onclick="removeAll()">Remove All</button>
-    <button class="checkout-btn" id="checkout-btn" onclick="window.location.href='checkout.html'" disabled>Checkout</button>
+    <button class="checkout-btn" id="checkout-btn" onclick="window.location.href='/checkout/'" disabled>Checkout</button>
   </div>
 </aside>
 

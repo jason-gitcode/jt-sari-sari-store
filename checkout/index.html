@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Summary — JS Mini Mart</title>
+<link rel="manifest" href="/jt-sari-sari-store/manifest.json" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<meta name="theme-color" content="#2563eb" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
+<link rel="apple-touch-icon" href="logo.PNG" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --ink: #1a1a1a; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --accent-dark: #1d4ed8;
+    --ok: #16a34a; --soft: #f9fafb; --radius: 10px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, select, textarea { font: inherit; color: inherit; }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 50; background: #fff; border-bottom: 1px solid var(--line); }
+  .nav { max-width: 640px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .back-btn { font-size: 14px; color: var(--accent); font-weight: 500; text-decoration: none; flex-shrink: 0; }
+  .back-btn:hover { color: var(--accent-dark); }
+  .nav-title { font-size: 16px; font-weight: 600; }
+
+  /* Layout */
+  .container { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; }
+  .section { margin-bottom: 20px; }
+  .section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+
+  /* Order summary */
+  .summary-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .summary-list { width: 100%; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+  .order-item { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .order-item:last-child { border-bottom: none; }
+  .order-item__qty { font-weight: 700; color: var(--ink); width: 34px; min-width: 34px; }
+  .order-item__desc { display: inline-block; width: 100%; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .order-item__price { font-weight: 700; color: var(--ink); white-space: nowrap; text-align: right; }
+  .summary-fee-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  .summary-fee-row span:last-child { font-weight: 600; color: var(--ink); }
+  .summary-fee-row .free { color: var(--ok); }
+  .summary-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px; background: var(--soft); font-weight: 700; font-size: 15px; border-top: 1px solid var(--line); }
+  .summary-total__amount { color: var(--accent); }
+  @media (max-width: 480px) {
+    .order-item { padding: 10px 12px; gap: 8px; }
+    .order-item__qty, .order-item__desc { font-size: 11px; }
+    .order-item__price { font-size: 13px; }
+    .summary-total { padding: 12px; font-size: 14px; }
+  }
+
+  /* Form fields */
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    font-size: 16px; outline: none; background: #fff;
+  }
+  .field select {
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .map-container { border-radius: 8px; overflow: hidden; margin-bottom: 0; border: 1px solid var(--line); line-height: 0; position: relative; }
+  .map-edit-btn { position: absolute; bottom: 10px; right: 10px; background: #fff; border: 1px solid rgba(0,0,0,.18); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-weight: 500; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; z-index: 10; line-height: 1.4; }
+  .map-edit-btn:hover { background: var(--soft); }
+  .locate-btn { font-size: 13px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 4px 0; display: block; }
+  .locate-btn:hover { text-decoration: underline; }
+
+  /* Location picker modal */
+  .loc-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 500; }
+  .loc-overlay.open { display: flex; flex-direction: column; }
+  .loc-modal { background: #fff; width: 100%; max-width: 640px; margin: 0 auto; height: 100dvh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  .loc-header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-shrink: 0; }
+  .loc-header-text h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; margin: 0; }
+  .loc-header-text p { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .loc-close { font-size: 20px; color: var(--muted); padding: 0; flex-shrink: 0; line-height: 1; }
+  .loc-search { padding: 10px 16px; border-bottom: 1px solid var(--line); position: relative; flex-shrink: 0; }
+  .loc-search input { width: 100%; padding: 8px 36px 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; outline: none; font-family: inherit; }
+  .loc-search input:focus { border-color: var(--accent); }
+  .loc-search-clear { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--muted); cursor: pointer; padding: 0; display: none; }
+  .loc-results { position: absolute; left: 16px; right: 16px; top: calc(100% - 1px); background: #fff; border: 1px solid var(--line); border-radius: 0 0 8px 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 600; display: none; max-height: 220px; overflow-y: auto; }
+  .loc-result { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--line); line-height: 1.4; color: var(--ink); }
+  .loc-result:last-child { border-bottom: none; }
+  .loc-result:hover { background: var(--soft); }
+  #loc-map { flex: 1; min-height: 0; }
+  .loc-footer { padding: 10px 16px; border-top: 1px solid var(--line); flex-shrink: 0; }
+  .loc-submit { width: 100%; padding: 13px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: .5px; }
+  .loc-submit:hover { background: var(--accent-dark); }
+
+  /* Payment */
+  .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pay-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px; text-align: center; transition: all .15s; }
+  .pay-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
+  .pay-opt.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+  .pay-info { margin-top: 10px; padding: 10px; background: var(--soft); border-radius: 8px; font-size: 13px; color: var(--muted); display: none; }
+  .pay-info.show { display: block; }
+  .pay-info strong { color: var(--ink); }
+
+  /* Send button */
+  .send-btn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; font-size: 16px; transition: background .15s; margin-top: 4px; }
+  .send-btn:hover:not(:disabled) { background: var(--accent-dark); }
+  .send-btn:disabled { background: #93c5fd; cursor: not-allowed; opacity: 0.75; }
+
+  /* Weather warning */
+  .weather-warning { display: none; padding: 12px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; margin-bottom: 10px; }
+  .weather-check-label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; line-height: 1.5; color: #1e40af; }
+  .weather-check-label input[type="checkbox"] { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; accent-color: #2563eb; cursor: pointer; }
+
+  /* Store closed notice */
+  .store-closed-notice { display: none; padding: 14px 16px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; margin-bottom: 10px; text-align: center; }
+  .store-closed-notice p { margin: 0; font-size: 14px; line-height: 1.6; color: #9f1239; }
+  .store-closed-notice strong { color: #881337; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 300; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 16px; color: var(--muted); }
+  .empty a { color: var(--accent); font-weight: 500; text-decoration: none; }
+
+  /* Order confirmation screen */
+  .confirm-screen { text-align: center; padding: 48px 16px; }
+  .confirm-icon { font-size: 72px; margin-bottom: 16px; line-height: 1; }
+  .confirm-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .confirm-order-num { font-size: 13px; color: var(--muted); margin-bottom: 16px; font-family: monospace; letter-spacing: 0.1em; }
+  .confirm-gcash-box { background: var(--soft); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; text-align: left; margin: 16px auto; max-width: 360px; font-size: 14px; }
+  .confirm-gcash-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .confirm-gcash-box p { margin-top: 6px; }
+  .confirm-back { display: inline-block; margin-top: 24px; padding: 12px 28px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; text-decoration: none; font-size: 15px; transition: background .15s; }
+  .confirm-back:hover { background: var(--accent-dark); }
+
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a href="/#cart" class="back-btn">← Back</a>
+    <span class="nav-title">Order Summary</span>
+  </div>
+</header>
+
+<div class="container" id="main"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE = {
+  name: "JS Mini Mart",
+  messengerUsername: "jbtubilag",
+  gcashName: "Jason Tubilag",
+  gcashDisplayName: "JA**N T. (JASON TUBILAG)",
+  gcashNumber: "09184067841",
+  currency: "₱",
+  deliveryAreas: [
+    "City Homes Resort Ville",
+    "Dasmarinas Executive Village",
+    "Valle Verde",
+    "Villa Luisa"
+  ]
+};
+
+// ---------- DISCORD NOTIFICATIONS ----------
+const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1500127416901959761/oOa7M12ubSvN_KDDO1uNX7nTPVBSYc_h56t0MSC4BDPGrKL3Adov0B8G5cBcw7n3DDpt';
+
+async function sendDiscordNotification(order, shortId) {
+  const addr = order.address
+    ? [order.address.lotBlock, order.address.street, order.address.subdivision, order.address.floor ? `Floor ${order.address.floor}` : ''].filter(Boolean).join(', ')
+    : '—';
+  const itemLines = (order.items || [])
+    .map(i => `  ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}`)
+    .join('\n');
+  const lines = [
+    `🛒 **New Order #${shortId}**`,
+    ``,
+    `👤 ${order.customer.name} · ${order.customer.phone}`,
+    `📍 ${addr}`,
+    ``,
+    itemLines,
+    ``,
+    `🧾 Subtotal: ₱${parseFloat(order.subtotal || order.total).toFixed(2)}`,
+    `🛵 Delivery: ${(order.deliveryFee || 0) === 0 ? 'Free' : '₱' + parseFloat(order.deliveryFee).toFixed(2)}`,
+    `💰 **Total: ₱${parseFloat(order.total).toFixed(2)}**`,
+    `💳 ${order.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery'}`,
+  ];
+  if (order.notes) lines.push(`📝 Notes: ${order.notes}`);
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: lines.join('\n') })
+    });
+  } catch (e) { console.error('Discord notification error:', e); }
+}
+
+const DEFAULT_PRODUCTS = [
+  { id: 1,  name: "Bigas (Rice) — 1kg",      price: 60,  unit: "per kilo"   },
+  { id: 3,  name: "Sardinas (Sardines)",      price: 28,  unit: "155g can"   },
+  { id: 4,  name: "Corned Beef",              price: 45,  unit: "150g can"   },
+  { id: 7,  name: "Pancit Canton",            price: 15,  unit: "per pack"   },
+  { id: 8,  name: "Lucky Me Beef",            price: 12,  unit: "per pack"   },
+  { id: 10, name: "Piattos",                  price: 30,  unit: "per pack"   },
+  { id: 14, name: "Coke 1.5L",               price: 75,  unit: "per bottle" },
+  { id: 15, name: "Nescafé 3-in-1",          price: 8,   unit: "per sachet" },
+  { id: 18, name: "Cooking Oil — 1L",         price: 110, unit: "per bottle" },
+  { id: 23, name: "Eggs",                     price: 9,   unit: "per piece"  },
+  { id: 30, name: "Ballpen Pack (5 pcs)",      price: 45,  unit: "per pack"   },
+  { id: 31, name: "Ruled Notebook",           price: 28,  unit: "per pc"     },
+  { id: 32, name: "Mechanical Pencil",        price: 18,  unit: "per pc"     },
+  { id: 33, name: "Highlighter Set",          price: 75,  unit: "per set"    },
+  { id: 34, name: "Eraser",                   price: 7,   unit: "per pc"     },
+  { id: 35, name: "Pencil Case",              price: 120, unit: "per pc"     },
+  { id: 36, name: "Glue Stick",               price: 22,  unit: "per pc"     },
+  { id: 37, name: "Scissors",                 price: 55,  unit: "per pc"     },
+  { id: 38, name: "Ruler (30cm)",             price: 15,  unit: "per pc"     },
+  { id: 39, name: "Colored Pencil Set",       price: 95,  unit: "per set"    },
+  { id: 40, name: "Folders (Pack of 10)",     price: 25,  unit: "per pack"   },
+  { id: 41, name: "Binding Tape",             price: 15,  unit: "per roll"   },
+  { id: 42, name: "Stapler",                  price: 85,  unit: "per pc"     },
+  { id: 43, name: "Staples (Box)",            price: 20,  unit: "per box"    },
+  { id: 44, name: "Correction Tape",         price: 30,  unit: "per pc"     },
+  { id: 45, name: "Index Cards",              price: 40,  unit: "per pack"   },
+  { id: 46, name: "Water-based Markers",      price: 65,  unit: "per set"    },
+  { id: 47, name: "Bond Paper (500 sheets)",  price: 180, unit: "per pack"   },
+  { id: 48, name: "Carbon Paper",             price: 35,  unit: "per pad"    },
+  { id: 49, name: "Compass",                  price: 70,  unit: "per pc"     },
+  { id: 50, name: "Jasmine Rice — 2kg",       price: 125, unit: "per bag"    },
+  { id: 51, name: "Brown Sugar — 500g",       price: 35,  unit: "per pack"   },
+  { id: 52, name: "Iodized Salt — 1kg",       price: 20,  unit: "per pack"   },
+  { id: 53, name: "Fresh Garlic",             price: 50,  unit: "per kilo"   },
+  { id: 54, name: "Fresh Onion",              price: 40,  unit: "per kilo"   },
+  { id: 55, name: "Soy Sauce — 1L",           price: 45,  unit: "per bottle" },
+  { id: 56, name: "Vinegar — 1L",             price: 35,  unit: "per bottle" },
+  { id: 57, name: "Tomato Sauce",             price: 25,  unit: "per can"    },
+  { id: 58, name: "Condensed Milk",           price: 28,  unit: "per can"    },
+  { id: 59, name: "Evaporated Milk — 400ml",  price: 32,  unit: "per can"    },
+  { id: 60, name: "Cheese (Luncheon)",        price: 60,  unit: "per can"    },
+  { id: 61, name: "Hotdog (Canned)",          price: 32,  unit: "per can"    },
+  { id: 62, name: "Luncheon Meat",            price: 55,  unit: "per can"    },
+  { id: 63, name: "Tuna Flakes (Canned)",     price: 48,  unit: "per can"    },
+  { id: 64, name: "Instant Ramen Pack",       price: 8,   unit: "per pack"   },
+  { id: 65, name: "Mami Noodles",             price: 10,  unit: "per pack"   },
+  { id: 66, name: "Crackers Pack",            price: 22,  unit: "per pack"   },
+  { id: 67, name: "Sliced Bread",             price: 35,  unit: "per loaf"   },
+  { id: 68, name: "Butter (Unsalted)",        price: 80,  unit: "per carton" },
+  { id: 69, name: "Coffee Mix — 1kg",         price: 120, unit: "per pack"   }
+];
+
+// Firebase — load products from Firestore
+const firebaseConfig = {
+  apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let PRODUCTS = [];
+let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
+let payMethod = 'cod';
+let rainMode = false;
+let storeClosed = false;
+
+function updateWeatherWarning() {
+  const closedNotice = document.getElementById('store-closed-notice');
+  const warning      = document.getElementById('weather-warning');
+  const btn          = document.getElementById('place-order-btn');
+  if (!btn) return;
+
+  if (storeClosed) {
+    if (closedNotice) closedNotice.style.display = 'block';
+    if (warning) warning.style.display = 'none';
+    btn.disabled = true;
+  } else {
+    if (closedNotice) closedNotice.style.display = 'none';
+    if (rainMode) {
+      if (warning) warning.style.display = 'block';
+      btn.disabled = !document.getElementById('weather-confirm')?.checked;
+    } else {
+      if (warning) warning.style.display = 'none';
+      btn.disabled = false;
+    }
+  }
+}
+
+db.collection('settings').doc('store').onSnapshot(snap => {
+  const data = snap.exists ? snap.data() : {};
+  rainMode    = data.rainMode === true;
+  storeClosed = data.storeClosed === true;
+  updateWeatherWarning();
+});
+
+function cartTotal() {
+  return Object.entries(cart).reduce((sum, [key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
+    if (!p) return sum;
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    return sum + price * qty;
+  }, 0);
+}
+function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
+
+
+function init() {
+  const main = document.getElementById('main');
+
+  if (Object.keys(cart).length === 0) {
+    main.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px; margin-bottom:12px;">🛒</div>
+        <div style="font-size:16px; font-weight:600; margin-bottom:8px;">Your cart is empty</div>
+        <a href="/">← Back to store</a>
+      </div>`;
+    return;
+  }
+
+  const savedCustomer = JSON.parse(localStorage.getItem('sariCustomer') || 'null');
+  const savedAddress  = JSON.parse(localStorage.getItem('sariAddress')  || 'null');
+
+  const itemRows = Object.entries(cart).map(([key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
+    if (!p) return '';
+    const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    const lineTotal = price * qty;
+    const displayName = p.name + (variant ? ` (${variant.name})` : '');
+    return `<div class="order-item" title="${displayName}">
+      <span class="order-item__qty">${qty}x</span>
+      <span class="order-item__desc">${displayName}</span>
+      <span class="order-item__price">${STORE.currency}${lineTotal.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+
+  const subtotal = cartTotal();
+  const fee = deliveryFee();
+  const grandTotal = subtotal + fee;
+
+  main.innerHTML = `
+    <div class="section">
+      <div class="section-label">Items</div>
+      <div class="summary-card">
+        <div class="summary-list">${itemRows}</div>
+        <div class="summary-fee-row"><span>Subtotal</span><span>${STORE.currency}${subtotal.toFixed(2)}</span></div>
+        <div class="summary-fee-row"><span>Delivery</span><span class="${fee === 0 ? 'free' : ''}">${fee === 0 ? '✓ Free' : STORE.currency + fee.toFixed(2)}</span></div>
+        <div class="summary-total">
+          <span>Grand Total</span>
+          <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Your Details</div>
+      <div class="field">
+        <label for="cust-name">Name</label>
+        <input type="text" id="cust-name" placeholder="Juan dela Cruz" value="${savedCustomer?.name || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-phone">Mobile number</label>
+        <input type="tel" id="cust-phone" placeholder="09171234567" maxlength="11" value="${savedCustomer?.phone || ''}" />
+        <div id="phone-error" style="color:#dc2626;font-size:12px;margin-top:4px;display:none;">Mobile number must be 11 digits and start with 09.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Delivery Address</div>
+      <div class="field">
+        <div class="map-container">
+          <iframe id="map-iframe"
+            src="https://maps.google.com/maps?q=${savedAddress?.lat && savedAddress?.lng ? `${savedAddress.lat},${savedAddress.lng}` : '14.3025,120.9437'}&z=17&output=embed"
+            width="100%" height="200" style="border:0;display:block;"
+            loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade">
+          </iframe>
+          <button type="button" class="map-edit-btn" onclick="openLocPicker()">Edit</button>
+        </div>
+        <button type="button" class="locate-btn" onclick="locateMe()">📍 Use my location</button>
+      </div>
+      <div class="field">
+        <label for="cust-lot-block">Lot, Block, Phase Number</label>
+        <input type="text" id="cust-lot-block" placeholder="e.g. Lot 12, Block 3, Phase 2" value="${savedAddress?.lotBlock || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-street">Street / Avenue</label>
+        <input type="text" id="cust-street" placeholder="e.g. Jade St, New York Avenue" value="${savedAddress?.street || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-subdivision">Subdivision</label>
+        <select id="cust-subdivision">
+          <option value="">Select</option>
+          ${STORE.deliveryAreas.map(a => `<option ${savedAddress?.subdivision === a ? 'selected' : ''}>${a}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label for="cust-floor">Floor <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="text" id="cust-floor" placeholder="e.g. 2nd Floor" value="${savedAddress?.floor || ''}" />
+      </div>
+      <div class="field">
+        <label for="cust-notes">Note to rider <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <textarea id="cust-notes" placeholder="e.g. building, landmark, gate code">${savedAddress?.noteRider || ''}</textarea>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Payment Method</div>
+      <div class="field">
+        <div class="pay-options">
+          <button type="button" class="pay-opt active" data-pay="cod" onclick="pickPay('cod')">💵 Cash on Delivery</button>
+          <button type="button" class="pay-opt" data-pay="gcash" onclick="pickPay('gcash')">📱 GCash</button>
+        </div>
+        <div class="pay-info show" id="pay-info-cod">
+          <strong>Cash on Delivery</strong><br>
+          Please prepare exact amount or small bills. Pay upon delivery.
+        </div>
+        <div class="pay-info" id="pay-info-gcash">
+          <strong>GCash selected</strong> — payment details will be shown after you place your order.
+        </div>
+        <div id="cod-restricted-note" style="display:none;margin-top:8px;font-size:12px;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;">
+          Cash on Delivery is not available for orders ₱200 and above. Please use GCash.
+        </div>
+      </div>
+    </div>
+
+
+    <div class="store-closed-notice" id="store-closed-notice">
+      <p>We sincerely apologize for the inconvenience. Our store is currently closed. Store operations are available daily from <strong>8:00 AM to 7:00 PM</strong>. We look forward to serving you during our operating hours.</p>
+    </div>
+    <div class="weather-warning" id="weather-warning">
+      <label class="weather-check-label">
+        <input type="checkbox" id="weather-confirm" onchange="updateWeatherWarning()">
+        <span>🌧️ <strong>Weather Advisory:</strong> We are currently experiencing inclement weather that may cause delays in delivery. Kindly confirm if you still wish to proceed with your order. Thank you.</span>
+      </label>
+    </div>
+    <button class="send-btn" id="place-order-btn" onclick="placeOrder()">Place Order</button>
+  `;
+
+  // Restore saved pin coordinates so the picker reopens at the right spot
+  if (savedAddress?.lat && savedAddress?.lng) {
+    locLat = savedAddress.lat;
+    locLon = savedAddress.lng;
+    locPicked = true;
+  }
+
+  // Attach real-time phone validation after HTML is rendered
+  const phoneInput = document.getElementById('cust-phone');
+  const phoneErr   = document.getElementById('phone-error');
+
+  phoneInput.addEventListener('input', function () {
+    this.value = this.value.replace(/[^0-9]/g, '');
+    const val = this.value;
+    const bad = (val.length >= 1 && val[0] !== '0') ||
+                (val.length >= 2 && val[1] !== '9') ||
+                (val.length === 11 && !/^09\d{9}$/.test(val));
+    phoneErr.style.display = bad ? 'block' : 'none';
+    this.style.borderColor  = bad ? '#dc2626' : '';
+  });
+
+  phoneInput.addEventListener('blur', function () {
+    const bad = this.value.length > 0 && !/^09\d{9}$/.test(this.value);
+    phoneErr.style.display = bad ? 'block' : 'none';
+    this.style.borderColor  = bad ? '#dc2626' : '';
+  });
+}
+
+function locateMe() {
+  if (!navigator.geolocation) { showToast('Geolocation is not supported by your browser.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const iframe = document.getElementById('map-iframe');
+      if (iframe) iframe.src = `https://maps.google.com/maps?q=${lat},${lon}&z=17&output=embed`;
+    },
+    () => showToast('Unable to retrieve your location.')
+  );
+}
+
+function pickPay(method) {
+  payMethod = method;
+  document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
+  document.querySelectorAll('.pay-info').forEach(el => el.classList.remove('show'));
+  document.getElementById('pay-info-' + method).classList.add('show');
+}
+
+function updatePaymentOptions() {
+  const total = cartTotal();
+  const codBtn = document.querySelector('[data-pay="cod"]');
+  const note   = document.getElementById('cod-restricted-note');
+  if (!codBtn) return;
+  if (total >= 200) {
+    codBtn.classList.add('disabled');
+    if (note) note.style.display = 'block';
+    if (payMethod === 'cod') pickPay('gcash');
+  } else {
+    codBtn.classList.remove('disabled');
+    if (note) note.style.display = 'none';
+  }
+}
+
+async function placeOrder() {
+  const name   = document.getElementById('cust-name').value.trim();
+  const phone  = document.getElementById('cust-phone').value.trim();
+  const lotBlock    = document.getElementById('cust-lot-block').value.trim();
+  const subdivision = document.getElementById('cust-subdivision').value;
+  const street      = document.getElementById('cust-street').value.trim();
+  const floor       = document.getElementById('cust-floor').value.trim();
+
+  let hasError = false;
+
+  if (!name) { showToast("Please fill in your name."); hasError = true; }
+
+  const phoneErr   = document.getElementById('phone-error');
+  const phoneInput = document.getElementById('cust-phone');
+  const validPhone = /^09\d{9}$/.test(phone);
+  if (!validPhone) {
+    if (phoneErr)   phoneErr.style.display = 'block';
+    if (phoneInput) phoneInput.style.borderColor = '#dc2626';
+    if (!hasError)  showToast("Mobile number must be 11 digits and start with 09.");
+    hasError = true;
+  } else {
+    if (phoneErr)   phoneErr.style.display = 'none';
+    if (phoneInput) phoneInput.style.borderColor = '';
+  }
+
+  if (!lotBlock) {
+    if (!hasError) showToast("Please enter your Lot, Block, Street, and Phase.");
+    hasError = true;
+  }
+  if (!subdivision) {
+    if (!hasError) showToast("Please select your subdivision.");
+    hasError = true;
+  }
+  if (!street) {
+    if (!hasError) showToast("Please enter your street.");
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  const btn = document.getElementById('place-order-btn');
+  btn.disabled = true;
+  btn.textContent = 'Placing order…';
+
+  const items = Object.entries(cart).map(([key, qty]) => {
+    const [idStr, vPart] = key.split('_v');
+    const p = PRODUCTS.find(x => x.id == idStr);
+    if (!p) return null;
+    const variantIdx = vPart !== undefined ? parseInt(vPart) : null;
+    const variant = variantIdx !== null && p.variants ? p.variants[variantIdx] : null;
+    const price = variant ? parseFloat(variant.price || p.price) : p.price;
+    const productName = p.name + (variant ? ` (${variant.name})` : '');
+    return { productId: idStr, productName, qty, price, lineTotal: price * qty, variantIdx };
+  }).filter(Boolean);
+
+  const orderData = {
+    status: 'pending',
+    customer: { name, phone },
+    address: { lotBlock, subdivision, street, floor, ...(locPicked ? { lat: locLat, lng: locLon } : {}) },
+    payment: payMethod,
+    notes: document.getElementById('cust-notes').value.trim(),
+    items,
+    subtotal: cartTotal(),
+    deliveryFee: deliveryFee(),
+    total: cartTotal() + deliveryFee(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  const orderRef = db.collection('orders').doc();
+  let stockErrorMsg = null;
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      // Group items by productId (one Firestore read per product, not per cart line)
+      const productGroups = {};
+      items.forEach(item => {
+        if (!productGroups[item.productId]) productGroups[item.productId] = [];
+        productGroups[item.productId].push(item);
+      });
+      const productIds = Object.keys(productGroups);
+      const productRefs = productIds.map(pid => db.collection('products').doc(pid));
+      const snaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
+
+      // Validate stock — reads must all complete before any writes
+      for (let i = 0; i < productIds.length; i++) {
+        const data = snaps[i].data();
+        for (const item of productGroups[productIds[i]]) {
+          if (item.variantIdx !== null) {
+            // Variant product — check per-variant stock
+            const vStock = data.variants?.[item.variantIdx]?.stock ?? null;
+            if (vStock !== null) {
+              if (vStock === 0) { stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg); }
+              if (vStock < item.qty) { stockErrorMsg = `Only ${vStock} of "${item.productName}" left in stock.`; throw new Error(stockErrorMsg); }
+            }
+          } else {
+            // Non-variant product — check product-level stock
+            if (!snaps[i].exists || data.available === false || data.stock === 0) {
+              stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg);
+            }
+            if (data.stock !== null && data.stock !== undefined && data.stock < item.qty) {
+              stockErrorMsg = `Only ${data.stock} of "${item.productName}" left in stock.`; throw new Error(stockErrorMsg);
+            }
+          }
+        }
+      }
+
+      // All checks passed — write order and deduct stock atomically
+      transaction.set(orderRef, orderData);
+      for (let i = 0; i < productIds.length; i++) {
+        const data = snaps[i].data();
+        const pid = productIds[i];
+        const upd = {};
+        const variantItems = productGroups[pid].filter(it => it.variantIdx !== null);
+        const plainItems   = productGroups[pid].filter(it => it.variantIdx === null);
+
+        if (variantItems.length > 0) {
+          const newVariants = (data.variants || []).map((v, idx) => {
+            const item = variantItems.find(it => it.variantIdx === idx);
+            if (!item || v.stock === null || v.stock === undefined) return v;
+            return { ...v, stock: Math.max(0, v.stock - item.qty) };
+          });
+          upd.variants = newVariants;
+          // Mark unavailable only when every variant is depleted
+          if (newVariants.every(v => (v.stock ?? 0) === 0)) upd.available = false;
+        }
+        if (plainItems.length > 0 && data.stock !== null && data.stock !== undefined) {
+          const totalQty = plainItems.reduce((s, it) => s + it.qty, 0);
+          const newStock = Math.max(0, data.stock - totalQty);
+          upd.stock = newStock;
+          if (newStock === 0) upd.available = false;
+        }
+        if (Object.keys(upd).length > 0) transaction.update(productRefs[i], upd);
+      }
+    });
+
+    const shortId = orderRef.id.slice(-6).toUpperCase();
+    sendDiscordNotification(orderData, shortId).catch(() => {});
+    localStorage.setItem('sariCustomer', JSON.stringify({ name, phone }));
+    localStorage.setItem('sariAddress', JSON.stringify({ lotBlock, subdivision, street, floor, noteRider: document.getElementById('cust-notes').value.trim(), ...(locPicked ? { lat: locLat, lng: locLon } : {}) }));
+    localStorage.removeItem('sariCart');
+    showOrderConfirmation(orderRef.id, payMethod);
+  } catch (err) {
+    console.error('Order error:', err);
+    btn.disabled = false;
+    btn.textContent = 'Place Order';
+    showToast(stockErrorMsg || 'Failed to place order. Please try again.');
+  }
+}
+
+function showOrderConfirmation(orderId, payment) {
+  const shortId = orderId.slice(-6).toUpperCase();
+  const gcashHtml = payment === 'gcash' ? `
+    <div class="confirm-gcash-box">
+      <h3>📱 GCash Payment Required</h3>
+      <p>Send payment to:</p>
+      <p style="margin-top:6px;"><strong>${STORE.gcashDisplayName || STORE.gcashName}</strong></p>
+      <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+        <strong>${STORE.gcashNumber}</strong>
+        <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+      </p>
+      <p style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        <span>Order No. <strong>#${shortId}</strong></span>
+        <button onclick="navigator.clipboard.writeText('#${shortId}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+      </p>
+      <p style="margin-top:10px;font-size:13px;color:var(--muted);">When sending payment in the GCash app, include the Order No. in the message.</p>
+    </div>
+  ` : '';
+
+  document.getElementById('main').innerHTML = `
+    <div class="confirm-screen">
+      <div class="confirm-icon">✅</div>
+      <div class="confirm-title">Order Placed!</div>
+      <div class="confirm-order-num">Order #${shortId}</div>
+      <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
+      ${gcashHtml}
+      <a href="/" class="confirm-back">Continue Shopping</a>
+    </div>
+  `;
+}
+
+function copyGcashNumber() {
+  const number = document.getElementById('gcash-number').textContent;
+  navigator.clipboard.writeText(number).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.style.borderColor = 'var(--ok)';
+    btn.style.color = 'var(--ok)';
+    setTimeout(() => { btn.textContent = 'Copy'; btn.style.borderColor = 'var(--line)'; btn.style.color = ''; }, 2000);
+  });
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Load products from Firestore, then render
+db.collection('products').get().then(snapshot => {
+  if (!snapshot.empty) {
+    PRODUCTS = snapshot.docs.map(doc => doc.data());
+    PRODUCTS.sort((a, b) => a.id - b.id);
+  } else {
+    PRODUCTS = DEFAULT_PRODUCTS;
+  }
+  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
+  init(); updatePaymentOptions(); updateWeatherWarning();
+}).catch(() => {
+  PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+  if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
+  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
+  init(); updatePaymentOptions(); updateWeatherWarning();
+});
+</script>
+<!-- Location Picker Modal -->
+<div class="loc-overlay" id="loc-overlay">
+  <div class="loc-modal">
+    <div class="loc-header">
+      <div class="loc-header-text">
+        <h2>📍 What's your exact location?</h2>
+        <p>Providing your location enables more accurate search and delivery ETA, seamless order tracking and personalised recommendations.</p>
+      </div>
+      <button class="loc-close" onclick="closeLocPicker()">✕</button>
+    </div>
+    <div class="loc-search">
+      <input type="text" id="loc-search-input" placeholder="Enter your address" autocomplete="off" oninput="locSearchInput(this.value)" />
+      <button class="loc-search-clear" id="loc-search-clear" onclick="locClearSearch()">✕</button>
+      <div class="loc-results" id="loc-results"></div>
+    </div>
+    <div id="loc-map"></div>
+    <div class="loc-footer">
+      <button class="loc-submit" onclick="submitLocPicker()">SUBMIT</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let locMap = null, locMarker = null;
+  let locLat = 14.3025, locLon = 120.9437;
+  let locPicked = false;
+  let locSearchTimer = null;
+
+  function openLocPicker() {
+    document.getElementById('loc-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => {
+      if (!locMap) initLocMap();
+      else locMap.invalidateSize();
+    }, 60);
+  }
+
+  function closeLocPicker() {
+    document.getElementById('loc-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function initLocMap() {
+    locMap = L.map('loc-map', { zoomControl: true }).setView([locLat, locLon], 17);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(locMap);
+
+    locMarker = L.marker([locLat, locLon], { draggable: true }).addTo(locMap);
+
+    locMarker.on('dragend', () => {
+      const p = locMarker.getLatLng();
+      locLat = p.lat; locLon = p.lng;
+      locReverseGeocode(locLat, locLon);
+    });
+
+    locMap.on('click', e => {
+      locLat = e.latlng.lat; locLon = e.latlng.lng;
+      locMarker.setLatLng([locLat, locLon]);
+      locReverseGeocode(locLat, locLon);
+    });
+  }
+
+  function locReverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.display_name) document.getElementById('loc-search-input').value = d.display_name;
+      }).catch(() => {});
+  }
+
+  function locSearchInput(q) {
+    document.getElementById('loc-search-clear').style.display = q ? 'block' : 'none';
+    clearTimeout(locSearchTimer);
+    if (!q.trim()) { document.getElementById('loc-results').style.display = 'none'; return; }
+    locSearchTimer = setTimeout(() => {
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=ph`)
+        .then(r => r.json())
+        .then(results => {
+          const box = document.getElementById('loc-results');
+          if (!results.length) { box.style.display = 'none'; return; }
+          box.style.display = 'block';
+          box.innerHTML = results.map(r =>
+            `<div class="loc-result" onclick="locPickResult(${r.lat},${r.lon},this.dataset.name)" data-name="${r.display_name.replace(/"/g,'&quot;')}">${r.display_name}</div>`
+          ).join('');
+        }).catch(() => {});
+    }, 400);
+  }
+
+  function locPickResult(lat, lon, name) {
+    locLat = parseFloat(lat); locLon = parseFloat(lon);
+    locMarker.setLatLng([locLat, locLon]);
+    locMap.setView([locLat, locLon], 17);
+    document.getElementById('loc-search-input').value = name;
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function locClearSearch() {
+    document.getElementById('loc-search-input').value = '';
+    document.getElementById('loc-search-clear').style.display = 'none';
+    document.getElementById('loc-results').style.display = 'none';
+  }
+
+  function submitLocPicker() {
+    const iframe = document.getElementById('map-iframe');
+    if (iframe) iframe.src = `https://maps.google.com/maps?q=${locLat},${locLon}&z=17&output=embed`;
+    locPicked = true;
+    closeLocPicker();
+  }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/jt-sari-sari-store/sw.js');
+  }
+</script>
+</body>
+</html>
