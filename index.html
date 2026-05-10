@@ -403,12 +403,13 @@
   }
   .footer-inner {
     padding: 18px 16px 14px;
-    display: flex; flex-wrap: wrap; gap: 16px;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
   }
   .footer-section {
-    flex: 1; min-width: 130px;
     display: flex; flex-direction: column; gap: 4px;
+    align-items: center; text-align: center;
   }
   .footer-section h4 {
     margin: 0 0 4px; font-size: 11px; font-weight: 700;
@@ -471,8 +472,7 @@
     .thumb { font-size: 40px; }
     .card-body { padding: 10px; }
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
-    .footer-inner { flex-direction: column; gap: 14px; align-items: flex-start; padding: 16px 16px 12px; }
-    .footer-section { min-width: unset; }
+    .footer-inner { grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 16px 16px 12px; }
   }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
