@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
-<link rel="apple-touch-icon" href="logo.PNG" />
+<link rel="apple-touch-icon" href="newlogo.jpeg" />
 <style>
   /* ---------- BASE ---------- */
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -91,11 +91,9 @@
   }
   .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .brand .logo {
-    width: 54px; height: 54px; border-radius: 50%;
-    overflow: hidden; flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    height: 54px; width: auto; flex-shrink: 0;
   }
-  .brand .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .brand .logo img { height: 100%; width: auto; object-fit: contain; }
   .brand h1 { font-size: 17px; font-weight: 600; line-height: 1.2; }
   .brand small { color: var(--muted); font-size: 12px; }
   .search {
@@ -414,7 +412,7 @@
     .nav { flex-wrap: nowrap; align-items: center; padding: 10px 12px; gap: 10px; }
     .brand { width: auto; flex-shrink: 0; }
     .brand h1, .brand small { display: none; }
-    .brand .logo { width: 44px; height: 44px; }
+    .brand .logo { height: 44px; width: auto; }
     .search { flex: 1; min-width: 0; border-radius: 999px; padding: 8px 14px; }
     .cart-btn {
       margin-top: 0; flex-shrink: 0;
@@ -460,7 +458,7 @@
 <header>
   <div class="nav">
     <div class="brand">
-      <div class="logo"><img src="logo.PNG" alt="JS Mini Mart" /></div>
+      <div class="logo"><img src="newlogo.jpeg" alt="JS Mini Mart" /></div>
       <div>
         <h1 id="store-name">JS Mini Mart</h1>
         <small id="store-tag" style="display:none;"></small>
