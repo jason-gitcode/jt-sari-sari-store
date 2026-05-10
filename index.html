@@ -529,7 +529,7 @@
           <a href="tel:+639184067841">0918-406-7841</a>
         </div>
       </div>
-      <div class="footer-bottom">© 2025 JS Mini Mart · Maraming salamat po! 🙏</div>
+      <div class="footer-bottom">© <span id="footer-year"></span> JS Mini Mart · Maraming salamat po! 🙏</div>
     </footer>
   </div>
 </div>
@@ -604,6 +604,7 @@
 </div>
 
 <script>
+document.getElementById('footer-year').textContent = new Date().getFullYear();
 /* ============================================================
    ⚙️  STORE CONFIGURATION — EDIT THIS SECTION
    ============================================================
