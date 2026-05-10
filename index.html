@@ -398,9 +398,33 @@
 
   /* ---------- FOOTER ---------- */
   footer {
-    margin-top: 40px; padding: 24px 0;
+    margin-top: 32px;
     border-top: 1px solid var(--line);
-    text-align: center; color: var(--muted); font-size: 13px;
+    background: #fafafa;
+  }
+  .footer-inner {
+    padding: 18px 16px 14px;
+    display: flex; flex-wrap: wrap; gap: 16px;
+    justify-content: space-between;
+  }
+  .footer-section {
+    flex: 1; min-width: 130px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .footer-section h4 {
+    margin: 0 0 4px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase;
+    color: #555;
+  }
+  .footer-section p, .footer-section a {
+    margin: 0; font-size: 13px; line-height: 1.6;
+    color: var(--muted); text-decoration: none;
+  }
+  .footer-section a:hover { color: var(--primary); }
+  .footer-bottom {
+    text-align: center; padding: 10px 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px; color: #bbb;
   }
 
   /* ---------- MOBILE ---------- */
@@ -448,6 +472,8 @@
     .thumb { font-size: 40px; }
     .card-body { padding: 10px; }
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
+    .footer-inner { flex-direction: column; gap: 14px; align-items: flex-start; padding: 16px 16px 12px; }
+    .footer-section { min-width: unset; }
   }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -485,7 +511,26 @@
   <div class="products-col">
     <div class="grid" id="products"></div>
     <footer>
-      <div>Maraming salamat po! 🙏</div>
+      <div class="footer-inner">
+        <div class="footer-section">
+          <h4>🕐 Store Hours</h4>
+          <p>Monday – Sunday</p>
+          <p>6:00 AM – 5:00 PM</p>
+        </div>
+        <div class="footer-section">
+          <h4>🛵 Delivery Times</h4>
+          <p>9:00 AM · 1:00 PM · 5:00 PM</p>
+        </div>
+        <div class="footer-section">
+          <h4>🌐 Website</h4>
+          <a href="https://jsminimart.com">jsminimart.com</a>
+        </div>
+        <div class="footer-section">
+          <h4>📞 Contact Us</h4>
+          <a href="tel:+639184067841">0918-406-7841</a>
+        </div>
+      </div>
+      <div class="footer-bottom">© 2025 JS Mini Mart · Maraming salamat po! 🙏</div>
     </footer>
   </div>
 </div>
