@@ -636,7 +636,7 @@ const STORE = {
   tagline: "",
   address: "Valle Verde Subdivision",
   hours: "Open 6am–5pm daily",
-  delivery: "Free delivery on orders min. Php200",
+  delivery: "Free delivery on orders min. Php250",
   deliveryAreas: [
     "City Homes Resort Ville",
     "Dasmarinas Executive Village",
@@ -703,7 +703,7 @@ let PRODUCTS = [];
 const TICKER_BASE = [
   { icon: '📍', text: 'Delivering to: ' + STORE.deliveryAreas.join(' · ') },
   { icon: '🕐', text: 'Open 6am–5pm daily' },
-  { icon: '🛵', text: 'Free delivery on orders min. Php200' },
+  { icon: '🛵', text: 'Free delivery on orders min. Php250' },
   { icon: '🕒', text: 'Delivery times: 9am · 1pm · 5pm' },
 ];
 const RAIN_TICKER = {
@@ -1127,7 +1127,7 @@ function cartTotal() {
     return sum + price * qty;
   }, 0);
 }
-function deliveryFee() { return cartTotal() >= 200 ? 0 : 15; }
+function deliveryFee() { return cartTotal() >= 250 ? 0 : 25; }
 function cartCount() {
   return Object.values(cart).reduce((a, b) => a + b, 0);
 }
