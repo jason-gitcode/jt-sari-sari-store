@@ -569,7 +569,7 @@ const STORE = {
   name: "JS Mini Mart",
   tagline: "",
   address: "Valle Verde Subdivision",
-  hours: "Open 8am–7pm daily",
+  hours: "Open 6am–5pm daily",
   delivery: "Free delivery on orders min. Php200",
   deliveryAreas: [
     "City Homes Resort Ville",
@@ -636,9 +636,9 @@ let PRODUCTS = [];
 // ---------- RAIN MODE / STORE CLOSED ----------
 const TICKER_BASE = [
   { icon: '📍', text: 'Delivering to: ' + STORE.deliveryAreas.join(' · ') },
-  { icon: '🕐', text: 'Open 8am–7pm daily' },
+  { icon: '🕐', text: 'Open 6am–5pm daily' },
   { icon: '🛵', text: 'Free delivery on orders min. Php200' },
-  { icon: '🕒', text: 'Delivery times: 9am · 12pm · 3pm · 7pm' },
+  { icon: '🕒', text: 'Delivery times: 9am · 1pm · 5pm' },
 ];
 const RAIN_TICKER = {
   icon: '🌧️',
@@ -647,7 +647,7 @@ const RAIN_TICKER = {
 };
 const CLOSED_TICKER = {
   icon: '🔒',
-  text: 'Store Closed: Our store is currently closed. Operating hours are 8:00 AM – 7:00 PM daily. Thank you for your patience.',
+  text: 'Store Closed: Our store is currently closed. Operating hours are 6:00 AM – 5:00 PM daily. Thank you for your patience.',
   closed: true
 };
 

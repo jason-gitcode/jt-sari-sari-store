@@ -818,7 +818,7 @@ function isStoreHoursClosed() {
   const h = parseInt(new Intl.DateTimeFormat('en-PH', {
     hour: 'numeric', hour12: false, timeZone: 'Asia/Manila'
   }).format(new Date()));
-  return h >= 19 || h < 8;
+  return h >= 17 || h < 6;
 }
 
 function initAutoStoreClosed() {
