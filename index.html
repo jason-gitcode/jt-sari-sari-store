@@ -627,6 +627,9 @@
 
 <script>
 document.getElementById('footer-year').textContent = new Date().getFullYear();
+function fmt(n) {
+  return parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 /* ============================================================
    ⚙️  STORE CONFIGURATION — EDIT THIS SECTION
    ============================================================
@@ -883,7 +886,7 @@ function showProductDetail(id) {
   const variantSelect = document.getElementById('variant-select');
   if (p.variants && p.variants.length > 0) {
     const minPrice = Math.min(...p.variants.map(v => parseFloat(v.price || p.price)));
-    priceEl.textContent = STORE.currency + minPrice.toFixed(2);
+    priceEl.textContent = STORE.currency + fmt(minPrice);
     variantDiv.style.display = 'block';
     variantSelect.innerHTML = '<option value="">Select one</option>' + p.variants.map((v, i) => {
       const vStock = v.stock ?? null;
@@ -897,13 +900,13 @@ function showProductDetail(id) {
     variantSelect.onchange = () => {
       const idx = variantSelect.value;
       if (idx !== '') {
-        priceEl.textContent = STORE.currency + parseFloat(p.variants[idx].price || p.price).toFixed(2);
+        priceEl.textContent = STORE.currency + fmt(p.variants[idx].price || p.price);
       } else {
-        priceEl.textContent = STORE.currency + minPrice.toFixed(2);
+        priceEl.textContent = STORE.currency + fmt(minPrice);
       }
     };
   } else {
-    priceEl.textContent = STORE.currency + p.price.toFixed(2);
+    priceEl.textContent = STORE.currency + fmt(p.price);
     variantDiv.style.display = 'none';
     variantSelect.innerHTML = '<option value="">Select one</option>';
     variantSelect.onchange = null;
@@ -1023,7 +1026,7 @@ function renderProducts() {
         ${p.description ? `<div style="font-size:12px;color:var(--muted);margin:4px 0;">${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</div>` : ''}
         ${(displayStock === 0) ? `<div style="font-size:12px;color:#dc2626;">Out of Stock</div>` : ''}
         <div class="card-bottom">
-          <div class="price">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? STORE.currency + mn.toFixed(2) : STORE.currency + mn.toFixed(2) + ' – ' + STORE.currency + mx.toFixed(2); } return STORE.currency + p.price.toFixed(2); })()}</div>
+          <div class="price">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? STORE.currency + fmt(mn) : STORE.currency + fmt(mn) + ' – ' + STORE.currency + fmt(mx); } return STORE.currency + fmt(p.price); })()}</div>
           <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
         </div>
       </div>
@@ -1058,7 +1061,7 @@ function openSizePicker(id) {
       text-align:left;${disabled ? 'opacity:0.4;filter:grayscale(1);' : ''}transition:border-color .1s,transform .1s;"
       ${disabled ? '' : 'onmousedown="this.style.transform=\'scale(0.96)\';this.style.borderColor=\'var(--accent)\'" onmouseup="this.style.transform=\'scale(1)\'" onmouseleave="this.style.transform=\'scale(1)\';this.style.borderColor=\'var(--line)\'"'}>
       <span style="display:block;font-weight:600;font-size:13px;color:var(--ink);">${v.name}</span>
-      <span style="display:block;font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;">${STORE.currency}${parseFloat(v.price || p.price).toFixed(2)}${disabled ? `<span style="color:${statusColor};font-weight:500;">${statusLabel}</span>` : ''}</span>
+      <span style="display:block;font-size:12px;font-weight:700;color:var(--accent);margin-top:2px;">${STORE.currency}${fmt(v.price || p.price)}${disabled ? `<span style="color:${statusColor};font-weight:500;">${statusLabel}</span>` : ''}</span>
     </button>`;
   }).join('');
   const el = document.getElementById('size-picker');
@@ -1150,7 +1153,7 @@ function renderCart() {
       const variant = vPart !== undefined && p.variants ? p.variants[parseInt(vPart)] : null;
       const price = variant ? parseFloat(variant.price || p.price) : p.price;
       const qty = cart[key];
-      const lineTotal = (price * qty).toFixed(2);
+      const lineTotal = fmt(price * qty);
       const allQty = productCartQty(p.id);
       const atMax = p.stock !== null && p.stock !== undefined && allQty >= p.stock;
       const thumb = p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="width:80%;height:80%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : '';
@@ -1162,7 +1165,7 @@ function renderCart() {
               <div class="name">${p.name.length > 30 ? p.name.slice(0, 30) + '…' : p.name}</div>
               <div class="cart-line-total">${STORE.currency}${lineTotal}</div>
             </div>
-            <div class="meta">${STORE.currency}${price.toFixed(2)} · ${p.unit}${variant ? ` · ${variant.name}` : ''}</div>
+            <div class="meta">${STORE.currency}${fmt(price)} · ${p.unit}${variant ? ` · ${variant.name}` : ''}</div>
             <div class="qty">
               <button onclick="changeQty('${key}', -1)">−</button>
               <span>${qty}</span>
@@ -1178,9 +1181,9 @@ function renderCart() {
   const fee = deliveryFee();
   const subtotalEl = document.getElementById('subtotal');
   const deliveryEl = document.getElementById('delivery-fee');
-  if (subtotalEl) subtotalEl.textContent = STORE.currency + total.toFixed(2);
-  if (deliveryEl) deliveryEl.textContent = fee === 0 ? 'Free' : STORE.currency + fee.toFixed(2);
-  document.getElementById('grand-total').textContent = STORE.currency + total.toFixed(2);
+  if (subtotalEl) subtotalEl.textContent = STORE.currency + fmt(total);
+  if (deliveryEl) deliveryEl.textContent = fee === 0 ? 'Free' : STORE.currency + fmt(fee);
+  document.getElementById('grand-total').textContent = STORE.currency + fmt(total);
   document.getElementById('checkout-btn').disabled = (ids.length === 0);
 }
 
