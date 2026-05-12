@@ -698,7 +698,21 @@
         </div>
         <div class="field">
           <label>Unit/Measurement *</label>
-          <input type="text" id="product-unit" placeholder="e.g., per kilo, per pack, per pc" required />
+          <select id="product-unit-select" onchange="handleUnitChange(this.value)" required>
+            <option value="">Select Unit</option>
+            <option value="per pc">per pc</option>
+            <option value="per pack">per pack</option>
+            <option value="per can">per can</option>
+            <option value="per bottle">per bottle</option>
+            <option value="per kilo">per kilo</option>
+            <option value="per sachet">per sachet</option>
+            <option value="per set">per set</option>
+            <option value="per ream">per ream</option>
+            <option value="per roll">per roll</option>
+            <option value="__custom__">+ Create a new unit/measurement</option>
+          </select>
+          <input type="text" id="custom-unit-input" placeholder="Type new unit (e.g., per tray, per box)"
+            style="display:none; margin-top:6px; width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; outline:none;" />
         </div>
       </div>
 
@@ -1540,6 +1554,17 @@ function handleCategoryChange(val) {
   }
 }
 
+function handleUnitChange(val) {
+  const inp = document.getElementById('custom-unit-input');
+  if (val === '__custom__') {
+    inp.style.display = 'block';
+    inp.focus();
+  } else {
+    inp.style.display = 'none';
+    inp.value = '';
+  }
+}
+
 async function toggleAvailability(id, available) {
   try {
     await db.collection('products').doc(String(id)).update({ available });
@@ -1696,7 +1721,16 @@ function editProduct(id) {
   updateCategorySelect(p.category);
   document.getElementById('custom-category-input').style.display = 'none';
   document.getElementById('product-price').value = p.price;
-  document.getElementById('product-unit').value = p.unit;
+  const unitSelect = document.getElementById('product-unit-select');
+  const unitCustom = document.getElementById('custom-unit-input');
+  const knownUnits = Array.from(unitSelect.options).map(o => o.value);
+  if (knownUnits.includes(p.unit)) {
+    unitSelect.value = p.unit;
+    unitCustom.style.display = 'none'; unitCustom.value = '';
+  } else {
+    unitSelect.value = '__custom__';
+    unitCustom.style.display = 'block'; unitCustom.value = p.unit;
+  }
   document.getElementById('product-stock').value = p.stock || '';
   currentImages = p.images ? [...p.images] : [];
   renderPhotoPreviews();
@@ -1725,12 +1759,20 @@ async function saveProduct(e) {
     return;
   }
 
+  const selUnit = document.getElementById('product-unit-select').value;
+  const customUnit = document.getElementById('custom-unit-input').value.trim();
+  const unit = selUnit === '__custom__' ? customUnit : selUnit;
+  if (!unit) {
+    showToast('Please select or enter a unit/measurement', 'error');
+    return;
+  }
+
   const formData = {
     name: document.getElementById('product-name').value,
     description: document.getElementById('product-description').value,
     category,
     price: parseFloat(document.getElementById('product-price').value),
-    unit: document.getElementById('product-unit').value,
+    unit,
     stock: document.getElementById('product-stock').value ? parseInt(document.getElementById('product-stock').value) : null,
     emoji: editingProductId ? (products.find(p => p.id === editingProductId)?.emoji || '📦') : '📦',
     images: [...currentImages],
@@ -1781,6 +1823,9 @@ function resetForm() {
   updatePriceRange();
   const customInp = document.getElementById('custom-category-input');
   if (customInp) { customInp.style.display = 'none'; customInp.value = ''; }
+  const customUnit = document.getElementById('custom-unit-input');
+  if (customUnit) { customUnit.style.display = 'none'; customUnit.value = ''; }
+  document.getElementById('product-unit-select').value = '';
   updateCategorySelect();
   variantCount = 0;
   editingProductId = null;
