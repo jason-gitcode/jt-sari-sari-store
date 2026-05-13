@@ -525,10 +525,13 @@
     .itb-header h3 { font-size: 14px; font-weight: 700; margin: 0; }
     .itb-copy-btn { padding: 6px 14px; background: var(--accent); color: #fff; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
     .itb-copy-btn:hover { background: var(--accent-dark); }
-    .itb-list { display: flex; flex-direction: column; gap: 6px; }
-    .itb-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
-    .itb-name { font-size: 14px; font-weight: 500; }
-    .itb-qty { font-size: 15px; font-weight: 700; color: var(--accent); background: #eff6ff; padding: 2px 10px; border-radius: 999px; }
+    .itb-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .itb-table th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 2px solid var(--line); background: var(--soft); }
+    .itb-table th.right, .itb-table td.right { text-align: right; }
+    .itb-table th.center, .itb-table td.center { text-align: center; }
+    .itb-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .itb-table tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+    .itb-table tfoot td { border-top: 2px solid var(--line); padding: 12px 14px; font-weight: 700; }
 
     /* ---------- ORDER BADGE ---------- */
     .order-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; background: #ef4444; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 5px; line-height: 1; vertical-align: middle; }
@@ -900,6 +903,10 @@ firebase.initializeApp(firebaseConfig);
 const db   = firebase.firestore();
 const auth = firebase.auth();
 
+function fmt(n) {
+  return parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // ---------- RAIN MODE ----------
 let rainModeActive = false;
 let storeClosedActive = false;
@@ -1230,26 +1237,44 @@ function renderItemsToBuy(listEl) {
   pending.forEach(o => {
     (o.items || []).forEach(item => {
       const key = item.productName;
-      if (!map[key]) map[key] = { name: item.productName, qty: 0 };
-      map[key].qty += parseInt(item.qty) || 0;
+      if (!map[key]) map[key] = { name: item.productName, qty: 0, total: 0 };
+      map[key].qty   += parseInt(item.qty) || 0;
+      map[key].total += parseFloat(item.lineTotal) || 0;
     });
   });
 
-  const items = Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
-  const copyText = items.map(i => `${i.qty}x ${i.name}`).join('\n');
+  const items      = Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+  const grandTotal = items.reduce((s, i) => s + i.total, 0);
+  const copyText   = items.map(i => `${i.qty}x ${i.name}`).join('\n');
 
   listEl.innerHTML = `
     <div class="itb-header">
       <h3>🛒 Items to Buy <span style="font-weight:400;color:var(--muted);font-size:12px;">(${pending.length} pending order${pending.length !== 1 ? 's' : ''})</span></h3>
       <button class="itb-copy-btn" onclick="copyItemsToBuy()">📋 Copy List</button>
     </div>
-    <div class="itb-list">
-      ${items.map(i => `
-        <div class="itb-row">
-          <span class="itb-name">${i.name}</span>
-          <span class="itb-qty">${i.qty}×</span>
-        </div>`).join('')}
-    </div>`;
+    <table class="itb-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th class="center">No. of Order</th>
+          <th class="right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(i => `
+          <tr>
+            <td>${i.name}</td>
+            <td class="center" style="font-weight:700;color:var(--accent)">${i.qty}×</td>
+            <td class="right" style="font-weight:600;color:#059669">${i.total > 0 ? '₱' + fmt(i.total) : '—'}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="right">Grand Total:</td>
+          <td class="right" style="color:#059669">₱${fmt(grandTotal)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
 
   listEl._itbCopyText = copyText;
 }
