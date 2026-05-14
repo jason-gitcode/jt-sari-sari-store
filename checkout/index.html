@@ -315,7 +315,7 @@ function cartTotal() {
     return sum + price * qty;
   }, 0);
 }
-function deliveryFee() { return cartTotal() >= 300 ? 0 : 25; }
+function deliveryFee() { return cartTotal() >= 300 ? 0 : 35; }
 
 
 function init() {
@@ -359,7 +359,7 @@ function init() {
       <div class="summary-card">
         <div class="summary-list">${itemRows}</div>
         <div class="summary-fee-row"><span>Subtotal</span><span>${STORE.currency}${subtotal.toFixed(2)}</span></div>
-        <div class="summary-fee-row"><span>Delivery</span><span class="${fee === 0 ? 'free' : ''}">${fee === 0 ? '✓ Free' : STORE.currency + fee.toFixed(2)}</span></div>
+        <div class="summary-fee-row"><span>Delivery Fee</span><span class="${fee === 0 ? 'free' : ''}">${fee === 0 ? '✓ Free' : STORE.currency + fee.toFixed(2)}</span></div>
         <div class="summary-total">
           <span>Grand Total</span>
           <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
