@@ -749,7 +749,7 @@
       <!-- Top 20 items -->
       <div class="dash-section">
         <div class="dash-section-header">
-          <h3>🏆 Top 20 Items Sold <span style="font-weight:400;color:var(--muted);font-size:12px;">(click a row to see item analytics)</span></h3>
+          <h3>🏆 Top 50 Items Sold <span style="font-weight:400;color:var(--muted);font-size:12px;">(click a row to see item analytics)</span></h3>
           <button class="dash-export-btn" onclick="exportCSV()">⬇ Export CSV</button>
         </div>
         <table class="dash-table">
@@ -2285,7 +2285,7 @@ function buildItemSalesMap(confirmedOrders) {
 function renderTopItems(confirmedOrders) {
   const map    = buildItemSalesMap(confirmedOrders);
   const sorted = Object.entries(map).map(([name, v]) => ({ name, ...v }))
-                   .sort((a, b) => b.qty - a.qty).slice(0, 20);
+                   .sort((a, b) => b.qty - a.qty).slice(0, 50);
   const tbody = document.getElementById('top-items-tbody');
   if (!sorted.length) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No confirmed orders in this period</td></tr>`;
