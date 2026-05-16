@@ -47,6 +47,11 @@
   .summary-fee-row .free { color: var(--ok); }
   .summary-total { display: flex; justify-content: space-between; align-items: center; padding: 14px 14px; background: var(--soft); font-weight: 700; font-size: 15px; border-top: 1px solid var(--line); }
   .summary-total__amount { color: var(--accent); }
+  .free-delivery-nudge { padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+  .free-delivery-nudge-track { height: 5px; background: var(--line); border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+  .free-delivery-nudge-fill { height: 100%; background: #16a34a; border-radius: 99px; }
+  .free-delivery-nudge-text { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.5; }
+  .free-delivery-nudge-text strong { color: var(--ink); }
   @media (max-width: 480px) {
     .order-item { padding: 10px 12px; gap: 8px; }
     .order-item__qty, .order-item__desc { font-size: 11px; }
@@ -402,6 +407,10 @@ function init() {
           <span>Grand Total</span>
           <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
         </div>
+        ${fee > 0 ? `<div class="free-delivery-nudge">
+          <div class="free-delivery-nudge-track"><div class="free-delivery-nudge-fill" style="width:${Math.min(100,(subtotal/400)*100).toFixed(1)}%"></div></div>
+          <p class="free-delivery-nudge-text">Add <strong>₱${(400 - subtotal).toFixed(2)}</strong> more to your order and enjoy <strong>free delivery</strong>.</p>
+        </div>` : ''}
       </div>
     </div>
 
