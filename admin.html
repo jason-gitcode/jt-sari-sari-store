@@ -1402,6 +1402,7 @@ function renderOrders() {
         </div>
         ${o.deliveryFee != null ? `<div class="order-subtotal-row" style="margin-top:8px;"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
         <div class="order-pay-label">${payLabel}</div>
+        ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
     } else {
       const displayItems = o.confirmedItems || o.items || [];
@@ -1443,6 +1444,7 @@ function renderOrders() {
           <div class="order-subtotal-row"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
         <div class="order-total-row"><span>Total</span><span>₱${displayTotal.toFixed(2)}</span></div>
         <div class="order-pay-label">${payLabel}</div>
+        ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
         ${partialRefundHtml}`;
     }

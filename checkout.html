@@ -106,6 +106,12 @@
   .pay-info.show { display: block; }
   .pay-info strong { color: var(--ink); }
 
+  /* Delivery schedule */
+  .schedule-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .schedule-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; font-size: 13px; text-align: center; transition: all .15s; cursor: pointer; line-height: 1.4; }
+  .schedule-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
+  .schedule-opt.disabled { opacity: 0.35; pointer-events: none; }
+
   /* Send button */
   .send-btn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; font-size: 16px; transition: background .15s; margin-top: 4px; }
   .send-btn:hover:not(:disabled) { background: var(--accent-dark); }
@@ -196,6 +202,7 @@ async function sendDiscordNotification(order, shortId) {
     `💰 **Total: ₱${parseFloat(order.total).toFixed(2)}**`,
     `💳 ${order.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery'}`,
   ];
+  if (order.deliverySchedule) lines.push(`🕒 Delivery Schedule: ${order.deliverySchedule}`);
   if (order.notes) lines.push(`📝 Notes: ${order.notes}`);
   try {
     await fetch(DISCORD_WEBHOOK, {
@@ -275,6 +282,32 @@ let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
 let payMethod = 'cod';
 let rainMode = false;
 let storeClosed = false;
+let deliverySlot = '';
+
+const DELIVERY_SLOTS = [
+  { id: '10am-2pm', label: '10am – 2pm' },
+  { id: '2pm-6pm',  label: '2pm – 6pm'  },
+  { id: '4pm-7pm',  label: '4pm – 7pm'  },
+];
+
+function getManilaHour() {
+  const now = new Date();
+  const manilaDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  return manilaDate.getHours();
+}
+
+function getAvailableSlots() {
+  const h = getManilaHour();
+  if (h >= 6 && h < 9)  return DELIVERY_SLOTS;
+  if (h >= 9 && h < 13) return DELIVERY_SLOTS.slice(1);
+  if (h >= 13 && h < 16) return DELIVERY_SLOTS.slice(2);
+  return [];
+}
+
+function pickSlot(id) {
+  deliverySlot = id;
+  document.querySelectorAll('.schedule-opt').forEach(b => b.classList.toggle('active', b.dataset.slot === id));
+}
 
 function updateWeatherWarning() {
   const closedNotice = document.getElementById('store-closed-notice');
@@ -352,6 +385,11 @@ function init() {
   const subtotal = cartTotal();
   const fee = deliveryFee();
   const grandTotal = subtotal + fee;
+  const availSlots = getAvailableSlots();
+  const scheduleOptsHtml = DELIVERY_SLOTS.map(s => {
+    const avail = availSlots.some(a => a.id === s.id);
+    return '<button type="button" class="schedule-opt' + (avail ? '' : ' disabled') + '" data-slot="' + s.id + '" onclick="pickSlot(\'' + s.id + '\')">' + s.label + '</button>';
+  }).join('');
 
   main.innerHTML = `
     <div class="section">
@@ -438,6 +476,13 @@ function init() {
       </div>
     </div>
 
+    <div class="section">
+      <div class="section-label">Schedule Delivery</div>
+      <div class="field">
+        <div class="schedule-opts">${scheduleOptsHtml}</div>
+        <p style="font-size:12px;color:var(--muted);margin-top:6px;">Choose your preferred delivery time window.</p>
+      </div>
+    </div>
 
     <div class="store-closed-notice" id="store-closed-notice">
       <p>We sincerely apologize for the inconvenience. Our store is currently closed. Store operations are available daily from <strong>6:00 AM to 4:00 PM</strong>. We look forward to serving you during our operating hours.</p>
@@ -450,6 +495,8 @@ function init() {
     </div>
     <button class="send-btn" id="place-order-btn" onclick="placeOrder()">Place Order</button>
   `;
+
+  if (availSlots.length > 0) pickSlot(availSlots[0].id);
 
   // Restore saved pin coordinates so the picker reopens at the right spot
   if (savedAddress?.lat && savedAddress?.lng) {
@@ -550,6 +597,10 @@ async function placeOrder() {
     if (!hasError) showToast("Please enter your street.");
     hasError = true;
   }
+  if (!deliverySlot) {
+    if (!hasError) showToast("Please select a delivery schedule.");
+    hasError = true;
+  }
 
   if (hasError) return;
 
@@ -573,6 +624,7 @@ async function placeOrder() {
     customer: { name, phone },
     address: { lotBlock, subdivision, street, floor, ...(locPicked ? { lat: locLat, lng: locLon } : {}) },
     payment: payMethod,
+    deliverySchedule: deliverySlot,
     notes: document.getElementById('cust-notes').value.trim(),
     items,
     subtotal: cartTotal(),
