@@ -301,6 +301,11 @@ function getManilaHour() {
   return manilaDate.getHours();
 }
 
+function isStoreHoursClosed() {
+  const h = getManilaHour();
+  return h >= 16 || h < 6;
+}
+
 function getAvailableSlots() {
   const h = getManilaHour();
   if (h >= 6 && h < 9)  return DELIVERY_SLOTS;
@@ -320,7 +325,7 @@ function updateWeatherWarning() {
   const btn          = document.getElementById('place-order-btn');
   if (!btn) return;
 
-  if (storeClosed) {
+  if (storeClosed || isStoreHoursClosed()) {
     if (closedNotice) closedNotice.style.display = 'block';
     if (warning) warning.style.display = 'none';
     btn.disabled = true;
@@ -340,6 +345,13 @@ db.collection('settings').doc('store').onSnapshot(snap => {
   const data = snap.exists ? snap.data() : {};
   rainMode    = data.rainMode === true;
   storeClosed = data.storeClosed === true;
+  const source = data.storeClosedSource || 'auto';
+  const timeClosed = isStoreHoursClosed();
+  if (source !== 'manual' && storeClosed !== timeClosed) {
+    db.collection('settings').doc('store').set(
+      { storeClosed: timeClosed, storeClosedSource: 'auto' }, { merge: true }
+    ).catch(() => {});
+  }
   updateWeatherWarning();
 });
 

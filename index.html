@@ -723,6 +723,17 @@ const CLOSED_TICKER = {
 
 let storeClosedMode = false;
 
+function getManilaHour() {
+  const now = new Date();
+  const manilaDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  return manilaDate.getHours();
+}
+
+function isStoreHoursClosed() {
+  const h = getManilaHour();
+  return h >= 16 || h < 6;
+}
+
 function buildTicker(rainMode, storeClosed) {
   const items = [...TICKER_BASE];
   if (rainMode) items.push(RAIN_TICKER);
@@ -794,8 +805,16 @@ db.collection('settings').doc('store').onSnapshot(snap => {
   const data     = snap.exists ? snap.data() : {};
   const rainMode = data.rainMode === true;
   storeClosedMode = data.storeClosed === true;
+  const source = data.storeClosedSource || 'auto';
+  const timeClosed = isStoreHoursClosed();
+  if (source !== 'manual' && storeClosedMode !== timeClosed) {
+    db.collection('settings').doc('store').set(
+      { storeClosed: timeClosed, storeClosedSource: 'auto' }, { merge: true }
+    ).catch(() => {});
+    storeClosedMode = timeClosed;
+  }
   applyRainMode(rainMode);
-  buildTicker(rainMode, storeClosedMode);
+  buildTicker(rainMode, storeClosedMode || timeClosed);
 });
 
 /* ============================================================
