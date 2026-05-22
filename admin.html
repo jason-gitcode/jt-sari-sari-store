@@ -127,6 +127,8 @@
     .hm-item.rain-mode-btn.active:hover { background: #dbeafe; }
     .hm-item.store-closed-btn.active { color: #b91c1c; background: #fff1f2; font-weight: 600; }
     .hm-item.store-closed-btn.active:hover { background: #fee2e2; }
+    .hm-item.maintenance-mode-btn.active { color: #b45309; background: #fffbeb; font-weight: 600; }
+    .hm-item.maintenance-mode-btn.active:hover { background: #fef3c7; }
     .hm-divider { height: 1px; background: var(--line); }
     .hm-logout { color: #dc2626; }
     .hm-logout:hover { background: #fff1f2 !important; }
@@ -671,6 +673,7 @@
         <div class="hamburger-menu" id="hamburger-menu">
           <button class="hm-item rain-mode-btn" id="rain-mode-btn" onclick="toggleRainMode()">🌧️ Rain Mode</button>
           <button class="hm-item store-closed-btn" id="store-closed-btn" onclick="toggleStoreClosed()">🔒 Store Closed</button>
+          <button class="hm-item maintenance-mode-btn" id="maintenance-mode-btn" onclick="toggleMaintenanceMode()">🛠️ Maintenance Mode</button>
           <div class="hm-divider"></div>
           <button class="hm-item hm-logout" onclick="logout()">Logout</button>
         </div>
@@ -910,16 +913,20 @@ function fmt(n) {
 // ---------- RAIN MODE ----------
 let rainModeActive = false;
 let storeClosedActive = false;
+let maintenanceModeActive = false;
 
 db.collection('settings').doc('store').onSnapshot(snap => {
   const data = snap.exists ? snap.data() : {};
   rainModeActive = data.rainMode === true;
   storeClosedActive = data.storeClosed === true;
+  maintenanceModeActive = data.maintenanceMode === true;
   storeClosedSource = data.storeClosedSource || 'auto';
   const btn = document.getElementById('rain-mode-btn');
   if (btn) btn.classList.toggle('active', rainModeActive);
   const cbtn = document.getElementById('store-closed-btn');
   if (cbtn) cbtn.classList.toggle('active', storeClosedActive);
+  const mbtn = document.getElementById('maintenance-mode-btn');
+  if (mbtn) mbtn.classList.toggle('active', maintenanceModeActive);
   initAutoStoreClosed();
 });
 
@@ -945,6 +952,16 @@ async function toggleRainMode() {
   } catch (e) {
     console.error('Rain mode error:', e);
     showToast('Error updating rain mode', 'error');
+  }
+}
+
+async function toggleMaintenanceMode() {
+  maintenanceModeActive = !maintenanceModeActive;
+  try {
+    await db.collection('settings').doc('store').set({ maintenanceMode: maintenanceModeActive }, { merge: true });
+  } catch (e) {
+    console.error('Maintenance mode error:', e);
+    showToast('Error updating maintenance mode', 'error');
   }
 }
 

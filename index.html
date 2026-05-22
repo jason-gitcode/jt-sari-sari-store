@@ -77,6 +77,8 @@
   }
   .closed-ticker-item { color: #9f1239; }
   .closed-ticker-item strong { color: #9f1239; }
+  .maintenance-ticker-item { color: #92400e; }
+  .maintenance-ticker-item strong { color: #92400e; }
   .rain-cloud {
     position: absolute;
     background: rgba(255,255,255,0.55);
@@ -720,8 +722,14 @@ const CLOSED_TICKER = {
   text: 'Store Closed: Our store is currently closed. Operating hours are 6:00 AM – 4:00 PM daily. Thank you for your patience.',
   closed: true
 };
+const MAINTENANCE_TICKER = {
+  icon: '🛠️',
+  text: 'Scheduled Maintenance: Our store is temporarily closed today for maintenance and inventory replenishment. We sincerely apologize for the inconvenience.',
+  maintenance: true
+};
 
 let storeClosedMode = false;
+let maintenanceMode = false;
 
 function getManilaHour() {
   const now = new Date();
@@ -734,12 +742,13 @@ function isStoreHoursClosed() {
   return h >= 16 || h < 6;
 }
 
-function buildTicker(rainMode, storeClosed) {
+function buildTicker(rainMode, storeClosed, maintenance) {
   const items = [...TICKER_BASE];
   if (rainMode) items.push(RAIN_TICKER);
   if (storeClosed) items.push(CLOSED_TICKER);
+  if (maintenance) items.push(MAINTENANCE_TICKER);
   const oneSet = items.map(it => {
-    const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : '';
+    const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : it.maintenance ? ' maintenance-ticker-item' : '';
     return `<span class="ticker-item${cls}">${it.icon} <strong>${it.text}</strong></span>` +
            `<span class="ticker-sep">|</span>`;
   }).join('');
@@ -798,13 +807,14 @@ function applyRainMode(active) {
     const c = header.querySelector('.rain-container');
     if (c) c.remove();
   }
-  buildTicker(active, storeClosedMode);
+  buildTicker(active, storeClosedMode, maintenanceMode);
 }
 
 db.collection('settings').doc('store').onSnapshot(snap => {
   const data     = snap.exists ? snap.data() : {};
   const rainMode = data.rainMode === true;
   storeClosedMode = data.storeClosed === true;
+  maintenanceMode = data.maintenanceMode === true;
   const source = data.storeClosedSource || 'auto';
   const timeClosed = isStoreHoursClosed();
   if (source !== 'manual' && storeClosedMode !== timeClosed) {
@@ -814,7 +824,7 @@ db.collection('settings').doc('store').onSnapshot(snap => {
     storeClosedMode = timeClosed;
   }
   applyRainMode(rainMode);
-  buildTicker(rainMode, storeClosedMode || timeClosed);
+  buildTicker(rainMode, storeClosedMode || timeClosed, maintenanceMode);
 });
 
 /* ============================================================
