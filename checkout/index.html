@@ -312,6 +312,33 @@ function isStoreHoursClosed() {
   return h >= 16 || h < 6;
 }
 
+// Period-id helpers — keep in lockstep with admin.html and checkout.html
+function getCurrentPeriodId() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: 'numeric', hour12: false
+  }).formatToParts(new Date());
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  const h = parseInt(parts.find(p => p.type === 'hour').value);
+  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
+  if (h >= 16)          return `${y}-${m}-${d}-closed`;
+  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+  utc.setUTCDate(utc.getUTCDate() - 1);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+}
+
+let storeSettingsData = {};
+function getEffectiveStoreClosed() {
+  if (storeSettingsData.storeClosedSource === 'manual'
+      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
+    return storeSettingsData.storeClosed === true;
+  }
+  return isStoreHoursClosed();
+}
+
 function getAvailableSlots() {
   const h = getManilaHour();
   if (h >= 6 && h < 9)  return DELIVERY_SLOTS;
@@ -332,7 +359,7 @@ function updateWeatherWarning() {
   const btn          = document.getElementById('place-order-btn');
   if (!btn) return;
 
-  if (storeClosed || isStoreHoursClosed()) {
+  if (storeClosed) {
     if (closedNotice) closedNotice.style.display = 'block';
     if (maintNotice) maintNotice.style.display = 'none';
     if (warning) warning.style.display = 'none';
@@ -356,19 +383,22 @@ function updateWeatherWarning() {
 }
 
 db.collection('settings').doc('store').onSnapshot(snap => {
-  const data = snap.exists ? snap.data() : {};
-  rainMode    = data.rainMode === true;
-  storeClosed = data.storeClosed === true;
-  maintenanceMode = data.maintenanceMode === true;
-  const source = data.storeClosedSource || 'auto';
-  const timeClosed = isStoreHoursClosed();
-  if (source !== 'manual' && storeClosed !== timeClosed) {
-    db.collection('settings').doc('store').set(
-      { storeClosed: timeClosed, storeClosedSource: 'auto' }, { merge: true }
-    ).catch(() => {});
-  }
+  storeSettingsData = snap.exists ? snap.data() : {};
+  rainMode        = storeSettingsData.rainMode === true;
+  maintenanceMode = storeSettingsData.maintenanceMode === true;
+  storeClosed     = getEffectiveStoreClosed();
   updateWeatherWarning();
 });
+
+// Re-evaluate every minute so the Place Order button flips automatically
+// at 6am / 4pm boundaries even without a Firestore update.
+setInterval(() => {
+  const newClosed = getEffectiveStoreClosed();
+  if (newClosed !== storeClosed) {
+    storeClosed = newClosed;
+    updateWeatherWarning();
+  }
+}, 60000);
 
 function cartTotal() {
   return Object.entries(cart).reduce((sum, [key, qty]) => {

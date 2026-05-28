@@ -1145,7 +1145,7 @@
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">🔒 Store Closed <span class="mode-badge off" id="set-store-badge">OFF</span></div>
-                <div class="setting-desc">Stops checkout. Customers can browse but can&rsquo;t place orders. Also auto-toggled by store hours (6am–4pm Manila).</div>
+                <div class="setting-desc">Stops checkout. Customers can browse but can&rsquo;t place orders. Auto-closes 4pm–6am Manila; toggling here overrides the auto state for the current period only — it resets at the next 6am or 4pm boundary.</div>
               </div>
               <div class="setting-control">
                 <label class="toggle-sw">
@@ -1497,13 +1497,11 @@ let storeClosedActive = false;
 let maintenanceModeActive = false;
 
 db.collection('settings').doc('store').onSnapshot(snap => {
-  const data = snap.exists ? snap.data() : {};
-  rainModeActive = data.rainMode === true;
-  storeClosedActive = data.storeClosed === true;
-  maintenanceModeActive = data.maintenanceMode === true;
-  storeClosedSource = data.storeClosedSource || 'auto';
+  storeSettingsData = snap.exists ? snap.data() : {};
+  rainModeActive = storeSettingsData.rainMode === true;
+  maintenanceModeActive = storeSettingsData.maintenanceMode === true;
+  storeClosedActive = getEffectiveStoreClosed();
   syncOperatingModeToggles();
-  initAutoStoreClosed();
 });
 
 function syncOperatingModeToggles() {
@@ -1548,9 +1546,11 @@ async function toggleMaintenanceMode() {
 }
 
 // ---------- STORE CLOSED ----------
-let storeClosedSource = 'auto';
-let autoClosedState = null;
-let storeClosedInitialized = false;
+// Store auto-closes 4pm–6am Manila and auto-opens 6am–4pm. The admin toggle
+// can override the auto state for the CURRENT period instance only — when
+// the next 4pm/6am boundary is crossed, the override expires automatically
+// because the stored period id no longer matches the current one.
+let storeSettingsData = {};
 
 function isStoreHoursClosed() {
   const h = parseInt(new Intl.DateTimeFormat('en-PH', {
@@ -1559,41 +1559,59 @@ function isStoreHoursClosed() {
   return h >= 16 || h < 6;
 }
 
-function initAutoStoreClosed() {
-  if (storeClosedInitialized) return;
-  storeClosedInitialized = true;
-  autoClosedState = isStoreHoursClosed();
-  // On page load: sync Firestore to time-based state only if last write was not a manual override
-  if (storeClosedSource !== 'manual' && storeClosedActive !== autoClosedState) {
-    db.collection('settings').doc('store').set(
-      { storeClosed: autoClosedState, storeClosedSource: 'auto' },
-      { merge: true }
-    ).catch(e => console.error('Auto store-closed init error:', e));
+// Unique identifier for the current open/closed period in Manila time —
+// e.g. "2026-05-29-open" (today's 6am–4pm) or "2026-05-29-closed" (today's
+// 4pm onward into tomorrow's 6am). A 1am check returns YESTERDAY's -closed
+// id because that period started at yesterday's 4pm.
+function getCurrentPeriodId() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: 'numeric', hour12: false
+  }).formatToParts(new Date());
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  const h = parseInt(parts.find(p => p.type === 'hour').value);
+  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
+  if (h >= 16)          return `${y}-${m}-${d}-closed`;
+  // h < 6 — closed period started YESTERDAY 4pm
+  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+  utc.setUTCDate(utc.getUTCDate() - 1);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+}
+
+function getEffectiveStoreClosed() {
+  // Manual override applies ONLY when its period id matches the current period
+  if (storeSettingsData.storeClosedSource === 'manual'
+      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
+    return storeSettingsData.storeClosed === true;
   }
+  return isStoreHoursClosed();
 }
 
 async function toggleStoreClosed() {
-  storeClosedActive = !storeClosedActive;
+  const newClosed = !getEffectiveStoreClosed();
   try {
-    await db.collection('settings').doc('store').set(
-      { storeClosed: storeClosedActive, storeClosedSource: 'manual' },
-      { merge: true }
-    );
+    await db.collection('settings').doc('store').set({
+      storeClosed: newClosed,
+      storeClosedSource: 'manual',
+      storeClosedPeriodId: getCurrentPeriodId()
+    }, { merge: true });
   } catch (e) {
     console.error('Store closed error:', e);
     showToast('Error updating store status', 'error');
   }
 }
 
-// Only writes at time boundaries — never mid-period — prevents fighting manual toggles
+// Re-evaluate every minute so the UI flips automatically at 6am / 4pm
+// boundaries even if no Firestore write happens — the period id changes
+// and getEffectiveStoreClosed naturally falls back to the time-based state.
 setInterval(() => {
-  const shouldBeClosed = isStoreHoursClosed();
-  if (autoClosedState !== null && shouldBeClosed !== autoClosedState) {
-    autoClosedState = shouldBeClosed;
-    db.collection('settings').doc('store').set(
-      { storeClosed: shouldBeClosed, storeClosedSource: 'auto' },
-      { merge: true }
-    ).catch(e => console.error('Auto store-closed error:', e));
+  const newClosed = getEffectiveStoreClosed();
+  if (newClosed !== storeClosedActive) {
+    storeClosedActive = newClosed;
+    syncOperatingModeToggles();
   }
 }, 60000);
 

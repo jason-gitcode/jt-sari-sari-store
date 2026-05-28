@@ -742,6 +742,34 @@ function isStoreHoursClosed() {
   return h >= 16 || h < 6;
 }
 
+// Period-id helpers — keep in lockstep with admin.html and the checkout pages
+function getCurrentPeriodId() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: 'numeric', hour12: false
+  }).formatToParts(new Date());
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  const h = parseInt(parts.find(p => p.type === 'hour').value);
+  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
+  if (h >= 16)          return `${y}-${m}-${d}-closed`;
+  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+  utc.setUTCDate(utc.getUTCDate() - 1);
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+}
+
+let storeSettingsData = {};
+let lastRainMode = false;
+function getEffectiveStoreClosed() {
+  if (storeSettingsData.storeClosedSource === 'manual'
+      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
+    return storeSettingsData.storeClosed === true;
+  }
+  return isStoreHoursClosed();
+}
+
 function buildTicker(rainMode, storeClosed, maintenance) {
   const items = [...TICKER_BASE];
   if (rainMode) items.push(RAIN_TICKER);
@@ -811,21 +839,24 @@ function applyRainMode(active) {
 }
 
 db.collection('settings').doc('store').onSnapshot(snap => {
-  const data     = snap.exists ? snap.data() : {};
-  const rainMode = data.rainMode === true;
-  storeClosedMode = data.storeClosed === true;
-  maintenanceMode = data.maintenanceMode === true;
-  const source = data.storeClosedSource || 'auto';
-  const timeClosed = isStoreHoursClosed();
-  if (source !== 'manual' && storeClosedMode !== timeClosed) {
-    db.collection('settings').doc('store').set(
-      { storeClosed: timeClosed, storeClosedSource: 'auto' }, { merge: true }
-    ).catch(() => {});
-    storeClosedMode = timeClosed;
-  }
+  storeSettingsData = snap.exists ? snap.data() : {};
+  const rainMode    = storeSettingsData.rainMode === true;
+  maintenanceMode   = storeSettingsData.maintenanceMode === true;
+  storeClosedMode   = getEffectiveStoreClosed();
+  lastRainMode      = rainMode;
   applyRainMode(rainMode);
-  buildTicker(rainMode, storeClosedMode || timeClosed, maintenanceMode);
+  buildTicker(rainMode, storeClosedMode, maintenanceMode);
 });
+
+// Re-evaluate every minute so the ticker flips automatically at 6am / 4pm
+// boundaries even without a Firestore update.
+setInterval(() => {
+  const newClosed = getEffectiveStoreClosed();
+  if (newClosed !== storeClosedMode) {
+    storeClosedMode = newClosed;
+    buildTicker(lastRainMode, storeClosedMode, maintenanceMode);
+  }
+}, 60000);
 
 /* ============================================================
    🚫  Below this line is the app logic — no need to edit
