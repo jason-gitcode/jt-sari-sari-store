@@ -370,6 +370,7 @@
     .pt-data.out-of-stock .pt-stock-val { color: var(--danger); font-weight: 700; }
 
     .stock-adj { display: flex; align-items: center; gap: 6px; }
+    .stock-btn.stock-spacer { visibility: hidden; pointer-events: none; }
     .stock-btn {
       width: 22px; height: 22px;
       border-radius: var(--radius-sm); font-size: 14px; line-height: 1;
@@ -1047,10 +1048,10 @@
       </div>
 
       <div class="dash-filter-bar">
-        <button class="dash-preset-btn" data-preset="today"     onclick="setDashPreset('today')">Today</button>
+        <button class="dash-preset-btn active" data-preset="today"     onclick="setDashPreset('today')">Today</button>
         <button class="dash-preset-btn" data-preset="yesterday" onclick="setDashPreset('yesterday')">Yesterday</button>
         <button class="dash-preset-btn" data-preset="7d"        onclick="setDashPreset('7d')">Last 7 Days</button>
-        <button class="dash-preset-btn active" data-preset="30d" onclick="setDashPreset('30d')">Last 30 Days</button>
+        <button class="dash-preset-btn" data-preset="30d"        onclick="setDashPreset('30d')">Last 30 Days</button>
         <button class="dash-preset-btn" data-preset="all"       onclick="setDashPreset('all')">All Time</button>
         <div class="dash-date-range">
           <input type="date" id="dash-from" onchange="onDashDateChange()">
@@ -1826,7 +1827,7 @@ function showAdmin() {
   subscribeToProducts();
   subscribeToOrders();
   // Initialise dashboard date range so the "Last 30 Days" preset is in sync
-  setDashPreset('30d', false);
+  setDashPreset('today', false);
   setHomeGreeting();
   initSettingsUI();
   // Request browser notification permission only if the user has it enabled
@@ -2493,14 +2494,22 @@ function renderProducts() {
       const isOutOf     = stockNum !== null && stockNum === 0;
       const stockClass  = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
       const stockCell   = hasVariants
-        ? `<span class="pt-stock-val">${stockNum}</span>`
+        ? `<div class="stock-adj">
+             <span class="stock-btn stock-spacer"></span>
+             <span class="pt-stock-val">${stockNum}</span>
+             <span class="stock-btn stock-spacer"></span>
+           </div>`
         : stockNum !== null
           ? `<div class="stock-adj">
                <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
                <span class="pt-stock-val">${stockNum}</span>
                <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
              </div>`
-          : `<span class="pt-stock-val">—</span>`;
+          : `<div class="stock-adj">
+               <span class="stock-btn stock-spacer"></span>
+               <span class="pt-stock-val">—</span>
+               <span class="stock-btn stock-spacer"></span>
+             </div>`;
       const thumb = p.images && p.images.length > 0
         ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
         : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
