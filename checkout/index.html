@@ -11,6 +11,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
 <link rel="apple-touch-icon" href="newlogo.jpeg" />
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="dns-prefetch" href="https://discord.com">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -102,11 +106,28 @@
   .loc-submit { width: 100%; padding: 13px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: .5px; }
   .loc-submit:hover { background: var(--accent-dark); }
 
+  /* Fulfillment (Delivery / Pickup) */
+  .ff-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ff-opt { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; text-align: center; transition: all .15s; cursor: pointer; display: flex; flex-direction: column; gap: 1px; align-items: center; line-height: 1.25; }
+  .ff-opt:hover:not(.active) { border-color: var(--accent); }
+  .ff-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
+  .ff-opt .ff-icon { font-size: 18px; line-height: 1; }
+  .ff-opt .ff-sub { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .ff-opt.active .ff-sub { color: var(--accent-dark); }
+  .pickup-info {
+    background: #f0fdf4; border: 1px solid #bbf7d0;
+    border-radius: 8px; padding: 14px 16px;
+    font-size: 13px; color: #166534; line-height: 1.5;
+  }
+  .pickup-info strong { color: #14532d; display: block; margin-bottom: 4px; font-size: 14px; }
+  .section.is-disabled { opacity: 0.45; pointer-events: none; }
+  .section.is-disabled .section-label::after { content: ' — not required for pickup'; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+
   /* Payment */
-  .pay-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .pay-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px; text-align: center; transition: all .15s; }
+  .pay-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .pay-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px 6px; font-size: 13px; text-align: center; transition: all .15s; line-height: 1.3; }
   .pay-opt.active { border-color: var(--accent); background: #eff6ff; color: var(--accent-dark); font-weight: 600; }
-  .pay-opt.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+  .pay-opt.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
   .pay-info { margin-top: 10px; padding: 10px; background: var(--soft); border-radius: 8px; font-size: 13px; color: var(--muted); display: none; }
   .pay-info.show { display: block; }
   .pay-info strong { color: var(--ink); }
@@ -193,24 +214,28 @@ const STORE = {
 const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1500127416901959761/oOa7M12ubSvN_KDDO1uNX7nTPVBSYc_h56t0MSC4BDPGrKL3Adov0B8G5cBcw7n3DDpt';
 
 async function sendDiscordNotification(order, shortId) {
-  const addr = order.address
+  const isPickup = order.fulfillmentMethod === 'pickup';
+  const addr = (order.address && !isPickup)
     ? [order.address.lotBlock, order.address.street, order.address.subdivision, order.address.floor ? `Floor ${order.address.floor}` : ''].filter(Boolean).join(', ')
     : '—';
   const itemLines = (order.items || [])
     .map(i => `  ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}`)
     .join('\n');
+  const payLabel = order.payment === 'gcash' ? '📱 GCash'
+                 : order.payment === 'cash'  ? '💵 Cash at Pickup'
+                 : '🛵 Cash on Delivery';
   const lines = [
-    `🛒 **New Order #${shortId}**`,
+    `🛒 **New Order #${shortId}** ${isPickup ? '· 🏬 PICK-UP' : '· 🛵 DELIVERY'}`,
     ``,
     `👤 ${order.customer.name} · ${order.customer.phone}`,
-    `📍 ${addr}`,
+    isPickup ? `🏬 Pick-up at store` : `📍 ${addr}`,
     ``,
     itemLines,
     ``,
     `🧾 Subtotal: ₱${parseFloat(order.subtotal || order.total).toFixed(2)}`,
-    `🛵 Delivery: ${(order.deliveryFee || 0) === 0 ? 'Free' : '₱' + parseFloat(order.deliveryFee).toFixed(2)}`,
+    `🛵 Delivery: ${isPickup ? '—' : ((order.deliveryFee || 0) === 0 ? 'Free' : '₱' + parseFloat(order.deliveryFee).toFixed(2))}`,
     `💰 **Total: ₱${parseFloat(order.total).toFixed(2)}**`,
-    `💳 ${order.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery'}`,
+    `💳 ${payLabel}`,
   ];
   if (order.deliverySchedule) lines.push(`🕒 Delivery Schedule: ${order.deliverySchedule}`);
   if (order.notes) lines.push(`📝 Notes: ${order.notes}`);
@@ -290,6 +315,7 @@ const db = firebase.firestore();
 let PRODUCTS = [];
 let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
 let payMethod = 'cod';
+let fulfillmentMethod = 'delivery';   // 'delivery' | 'pickup'
 let rainMode = false;
 let storeClosed = false;
 let maintenanceMode = false;
@@ -485,6 +511,26 @@ function init() {
     </div>
 
     <div class="section">
+      <div class="section-label">How do you want to receive your order?</div>
+      <div class="ff-options">
+        <button type="button" class="ff-opt active" data-ff="delivery" onclick="pickFulfillment('delivery')">
+          <span class="ff-icon">🛵</span>
+          <span>Delivery</span>
+          <span class="ff-sub">We bring it to you</span>
+        </button>
+        <button type="button" class="ff-opt" data-ff="pickup" onclick="pickFulfillment('pickup')">
+          <span class="ff-icon">🏬</span>
+          <span>Pick-up</span>
+          <span class="ff-sub">You collect at the store</span>
+        </button>
+      </div>
+      <div class="pickup-info" id="pickup-info" style="display:none; margin-top:12px;">
+        <strong>Pick up at JS Mini Mart</strong>
+        Block 8 Lot 47 Phase 3 Jade St., Valle Verde Subdivision, Dasmarinas City.
+      </div>
+    </div>
+
+    <div class="section" id="delivery-address-section">
       <div class="section-label">Delivery Address</div>
       <div class="field">
         <div class="map-container">
@@ -526,8 +572,12 @@ function init() {
       <div class="section-label">Payment Method</div>
       <div class="field">
         <div class="pay-options">
-          <button type="button" class="pay-opt active" data-pay="cod" onclick="pickPay('cod')">💵 Cash on Delivery</button>
+          <button type="button" class="pay-opt disabled" data-pay="cash" onclick="pickPay('cash')">💵 Cash</button>
           <button type="button" class="pay-opt" data-pay="gcash" onclick="pickPay('gcash')">📱 GCash</button>
+          <button type="button" class="pay-opt active" data-pay="cod" onclick="pickPay('cod')">🛵 Cash on Delivery</button>
+        </div>
+        <div class="pay-info" id="pay-info-cash">
+          <strong>Cash at pickup</strong> — pay in person at the store when you collect your order.
         </div>
         <div class="pay-info show" id="pay-info-cod">
           <strong>Cash on Delivery</strong><br>
@@ -542,7 +592,7 @@ function init() {
       </div>
     </div>
 
-    <div class="section">
+    <div class="section" id="schedule-section">
       <div class="section-label">Schedule Delivery</div>
       <div class="field">
         <div class="schedule-opts">${scheduleOptsHtml}</div>
@@ -608,24 +658,75 @@ function locateMe() {
 }
 
 function pickPay(method) {
+  const btn = document.querySelector(`.pay-opt[data-pay="${method}"]`);
+  if (btn && btn.classList.contains('disabled')) return; // ignore clicks on disabled options
   payMethod = method;
   document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
   document.querySelectorAll('.pay-info').forEach(el => el.classList.remove('show'));
-  document.getElementById('pay-info-' + method).classList.add('show');
+  const info = document.getElementById('pay-info-' + method);
+  if (info) info.classList.add('show');
+}
+
+// Toggle delivery vs pickup — hides the address + schedule sections, swaps
+// which payment options are valid, and zeroes the delivery fee for pickup.
+function pickFulfillment(method) {
+  fulfillmentMethod = method;
+  document.querySelectorAll('.ff-opt').forEach(b => b.classList.toggle('active', b.dataset.ff === method));
+  const addr     = document.getElementById('delivery-address-section');
+  const sched    = document.getElementById('schedule-section');
+  const pickup   = document.getElementById('pickup-info');
+  const isPickup = method === 'pickup';
+  if (addr)   { addr.style.display   = isPickup ? 'none' : ''; }
+  if (sched)  { sched.classList.toggle('is-disabled', isPickup); }
+  if (pickup) { pickup.style.display = isPickup ? 'block' : 'none'; }
+  updatePaymentOptions();
+  refreshTotals();
+}
+
+function refreshTotals() {
+  const isPickup = fulfillmentMethod === 'pickup';
+  const subtotal = cartTotal();
+  const fee = isPickup ? 0 : deliveryFee();
+  const total = subtotal + fee;
+  const card = document.querySelector('.summary-card');
+  if (!card) return;
+  const rows = card.querySelectorAll('.summary-fee-row');
+  if (rows[1]) {
+    const label = rows[1].querySelector('span:first-child');
+    const value = rows[1].querySelector('span:last-child');
+    if (label) label.textContent = isPickup ? 'Delivery Fee (Pick-up)' : 'Delivery Fee';
+    if (value) {
+      value.className = fee === 0 ? 'free' : '';
+      value.textContent = fee === 0 ? '✓ Free' : STORE.currency + fee.toFixed(2);
+    }
+  }
+  const totalEl = card.querySelector('.summary-total__amount');
+  if (totalEl) totalEl.textContent = STORE.currency + total.toFixed(2);
+  const nudge = card.querySelector('.free-delivery-nudge');
+  if (nudge) nudge.style.display = (isPickup || fee === 0) ? 'none' : '';
 }
 
 function updatePaymentOptions() {
   const total = cartTotal();
-  const codBtn = document.querySelector('[data-pay="cod"]');
-  const note   = document.getElementById('cod-restricted-note');
-  if (!codBtn) return;
-  if (total >= 200) {
-    codBtn.classList.add('disabled');
-    if (note) note.style.display = 'block';
-    if (payMethod === 'cod') pickPay('gcash');
-  } else {
-    codBtn.classList.remove('disabled');
-    if (note) note.style.display = 'none';
+  const codBtn   = document.querySelector('[data-pay="cod"]');
+  const cashBtn  = document.querySelector('[data-pay="cash"]');
+  const note     = document.getElementById('cod-restricted-note');
+  if (!codBtn || !cashBtn) return;
+
+  const isPickup = fulfillmentMethod === 'pickup';
+  cashBtn.classList.toggle('disabled', !isPickup);
+  const codAllowedByTotal = total < 200;
+  const codAllowedByFulfill = !isPickup;
+  const codDisabled = !(codAllowedByTotal && codAllowedByFulfill);
+  codBtn.classList.toggle('disabled', codDisabled);
+  if (note) note.style.display = (!isPickup && !codAllowedByTotal) ? 'block' : 'none';
+
+  const stillValid =
+    (payMethod === 'cash'  && isPickup) ||
+    (payMethod === 'cod'   && !isPickup && codAllowedByTotal) ||
+    (payMethod === 'gcash');
+  if (!stillValid) {
+    pickPay(isPickup ? 'cash' : (codAllowedByTotal ? 'cod' : 'gcash'));
   }
 }
 
@@ -654,21 +755,24 @@ async function placeOrder() {
     if (phoneInput) phoneInput.style.borderColor = '';
   }
 
-  if (!lotBlock) {
-    if (!hasError) showToast("Please enter your Lot, Block, Street, and Phase.");
-    hasError = true;
-  }
-  if (!subdivision) {
-    if (!hasError) showToast("Please select your subdivision.");
-    hasError = true;
-  }
-  if (!street) {
-    if (!hasError) showToast("Please enter your street.");
-    hasError = true;
-  }
-  if (!deliverySlot) {
-    if (!hasError) showToast("Please select a delivery schedule.");
-    hasError = true;
+  // Address + schedule are only required for delivery
+  if (fulfillmentMethod === 'delivery') {
+    if (!lotBlock) {
+      if (!hasError) showToast("Please enter your Lot, Block, Street, and Phase.");
+      hasError = true;
+    }
+    if (!subdivision) {
+      if (!hasError) showToast("Please select your subdivision.");
+      hasError = true;
+    }
+    if (!street) {
+      if (!hasError) showToast("Please enter your street.");
+      hasError = true;
+    }
+    if (!deliverySlot) {
+      if (!hasError) showToast("Please select a delivery schedule.");
+      hasError = true;
+    }
   }
 
   if (hasError) return;
@@ -688,17 +792,23 @@ async function placeOrder() {
     return { productId: idStr, productName, qty, price, lineTotal: price * qty, variantIdx };
   }).filter(Boolean);
 
+  const isPickup = fulfillmentMethod === 'pickup';
+  const subtotalAmt = cartTotal();
+  const feeAmt = isPickup ? 0 : deliveryFee();
   const orderData = {
     status: 'pending',
+    fulfillmentMethod,
     customer: { name, phone },
-    address: { lotBlock, subdivision, street, floor, ...(locPicked ? { lat: locLat, lng: locLon } : {}) },
+    address: isPickup
+      ? null
+      : { lotBlock, subdivision, street, floor, ...(locPicked ? { lat: locLat, lng: locLon } : {}) },
     payment: payMethod,
-    deliverySchedule: deliverySlot,
+    deliverySchedule: isPickup ? null : deliverySlot,
     notes: document.getElementById('cust-notes').value.trim(),
     items,
-    subtotal: cartTotal(),
-    deliveryFee: deliveryFee(),
-    total: cartTotal() + deliveryFee(),
+    subtotal: subtotalAmt,
+    deliveryFee: feeAmt,
+    total: subtotalAmt + feeAmt,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 

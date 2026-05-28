@@ -11,6 +11,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
 <link rel="apple-touch-icon" href="newlogo.jpeg" />
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.googleapis.com">
 <style>
   /* ---------- BASE ---------- */
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -216,6 +219,7 @@
     overflow: hidden;
     display: flex; flex-direction: column;
     transition: box-shadow .15s, transform .15s;
+    position: relative;
   }
   .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
   .thumb {
@@ -227,7 +231,10 @@
     overflow: hidden;
     position: relative;
   }
-  .card-body { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .card-body {
+    padding: 8px 10px 46px 10px; /* bottom space reserved for the absolutely-positioned add button */
+    display: flex; flex-direction: column; gap: 4px; flex: 1;
+  }
   .card-name {
     font-size: 14px; font-weight: 500; line-height: 1.3;
     overflow: hidden;
@@ -236,17 +243,27 @@
   }
   .card-unit { font-size: 12px; color: var(--muted); }
   .card-bottom {
-    margin-top: auto; padding-top: 8px;
-    display: flex; align-items: flex-end; justify-content: space-between; gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+    padding-right: 38px; /* keep price clear of the corner button */
   }
-  .price { font-size: 15px; font-weight: 700; min-width: 0; }
+  .price {
+    font-size: 12px; font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
   .add-btn {
+    position: absolute;
+    right: 8px; bottom: 8px;
     background: var(--accent); color: #fff;
     width: 32px; height: 32px; border-radius: 8px;
     font-size: 18px; line-height: 1;
     display: grid; place-items: center;
     flex-shrink: 0;
     transition: background .15s;
+    box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
   }
   .add-btn:hover { background: var(--accent-dark); }
   .add-btn.in-cart { background: var(--ok); font-size: 14px; font-weight: 700; }
@@ -945,8 +962,16 @@ function showProductDetail(id) {
   const variantDiv = document.getElementById('modal-variants');
   const variantSelect = document.getElementById('variant-select');
   if (p.variants && p.variants.length > 0) {
-    const minPrice = Math.min(...p.variants.map(v => parseFloat(v.price || p.price)));
-    priceEl.textContent = STORE.currency + fmt(minPrice);
+    const variantPrices = p.variants.map(v => parseFloat(v.price || p.price));
+    const minPrice = Math.min(...variantPrices);
+    const maxPrice = Math.max(...variantPrices);
+    // Until a variant is picked, show the full range so the customer knows
+    // pricing varies (e.g. "₱200.00 – ₱239.00"). Single-price products with
+    // variants (same price across all) just show the price.
+    const rangeText = minPrice === maxPrice
+      ? STORE.currency + fmt(minPrice)
+      : STORE.currency + fmt(minPrice) + ' – ' + STORE.currency + fmt(maxPrice);
+    priceEl.textContent = rangeText;
     variantDiv.style.display = 'block';
     variantSelect.innerHTML = '<option value="">Select one</option>' + p.variants.map((v, i) => {
       const vStock = v.stock ?? null;
@@ -962,7 +987,7 @@ function showProductDetail(id) {
       if (idx !== '') {
         priceEl.textContent = STORE.currency + fmt(p.variants[idx].price || p.price);
       } else {
-        priceEl.textContent = STORE.currency + fmt(minPrice);
+        priceEl.textContent = rangeText;
       }
     };
   } else {
@@ -1074,10 +1099,20 @@ function renderProducts() {
     })();
     const atMax = ok && displayStock !== null && displayStock !== undefined && displayStock > 0 && cartQty >= displayStock;
     const btnDisabled = !ok || atMax;
+    // Compute price string + whether it's a range so the CSS can shrink it on one line
+    let priceStr, isRange = false;
+    if (p.variants && p.variants.length > 0) {
+      const vp = p.variants.map(v => parseFloat(v.price || p.price));
+      const mn = Math.min(...vp), mx = Math.max(...vp);
+      if (mn === mx) priceStr = STORE.currency + fmt(mn);
+      else { priceStr = STORE.currency + fmt(mn) + ' – ' + STORE.currency + fmt(mx); isRange = true; }
+    } else {
+      priceStr = STORE.currency + fmt(p.price);
+    }
     return `
     <div class="card" onclick="showProductDetail(${p.id})">
       <div class="thumb">
-        ${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" style="width:80%;height:80%;object-fit:contain;">` : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.2" width="44" height="44"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
+        ${p.images && p.images.length > 0 ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">` : p.image ? `<img src="${p.image}" alt="${p.name}" loading="lazy" decoding="async" style="width:80%;height:80%;object-fit:contain;">` : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.2" width="44" height="44"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
         ${!ok ? `<div style="position:absolute;top:6px;left:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;line-height:1.5;z-index:1;">OUT OF STOCK</div>` : ''}
       </div>
       <div class="card-body">
@@ -1086,10 +1121,10 @@ function renderProducts() {
         ${p.description ? `<div style="font-size:12px;color:var(--muted);margin:4px 0;">${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</div>` : ''}
         ${(displayStock === 0) ? `<div style="font-size:12px;color:#dc2626;">Out of Stock</div>` : ''}
         <div class="card-bottom">
-          <div class="price">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? STORE.currency + fmt(mn) : STORE.currency + fmt(mn) + ' – ' + STORE.currency + fmt(mx); } return STORE.currency + fmt(p.price); })()}</div>
-          <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
+          <div class="price${isRange ? ' is-range' : ''}">${priceStr}</div>
         </div>
       </div>
+      <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;box-shadow:none;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
     </div>
   `;}).join('');
 }

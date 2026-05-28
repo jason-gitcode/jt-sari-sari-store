@@ -282,10 +282,12 @@
     .products-grid {
       flex: 1; min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
     }
+    .products-main { overscroll-behavior: contain; }
     .admin-cats {
       display: flex; flex-direction: column; gap: 6px;
       width: 200px; flex-shrink: 0; padding: 4px 0;
@@ -341,10 +343,14 @@
     }
     .pt-data:last-child { border-bottom: none; }
     .pt-data:hover { background: var(--surface-2); }
-    .pt-cell { display: flex; align-items: center; }
+    .pt-cell { display: flex; align-items: center; min-width: 0; }
     .pt-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .pt-name-col { flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
-    .pt-pname { font-size: var(--fs-base); font-weight: 500; line-height: 1.3; }
+    .pt-pname {
+      font-size: var(--fs-base); font-weight: 500; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; overflow-wrap: anywhere; word-break: break-word;
+    }
     .pt-pmeta { font-size: var(--fs-sm); color: var(--muted); }
     .pt-stock { font-size: var(--fs-sm); }
     .pt-price-col { font-size: var(--fs-sm); font-weight: 600; }
@@ -429,6 +435,15 @@
     [data-theme="dark"] .order-status-badge.pending   { color: #fcd34d; }
     [data-theme="dark"] .order-status-badge.confirmed { color: #4ade80; }
     [data-theme="dark"] .order-status-badge.refunded  { color: #f87171; }
+    .order-fulfillment-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em;
+      background: var(--accent-soft); color: var(--accent-strong);
+    }
+    .order-fulfillment-badge.pickup {
+      background: #ecfdf5; color: #047857;
+    }
+    [data-theme="dark"] .order-fulfillment-badge.pickup { background: rgba(16,185,129,0.18); color: #6ee7b7; }
     .order-time-label { font-size: var(--fs-sm); color: var(--muted); margin-left: auto; }
     .order-card-body { padding: 14px 16px; }
     .order-cust { font-size: var(--fs-base); font-weight: 600; margin-bottom: 2px; }
@@ -896,46 +911,51 @@
         width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden;
         flex-wrap: nowrap; padding: 4px 0 6px; gap: 6px; flex-shrink: 0;
       }
-      .products-main { overflow-y: auto; overflow-x: auto; }
+      .products-main { overflow-y: auto; overflow-x: auto; overscroll-behavior: contain; }
       .products-grid {
         display: grid;
-        grid-template-columns: 28px 52px 1fr 84px 90px 50px 50px;
+        grid-template-columns: 36px 64px minmax(220px, 1fr) 92px 110px 60px 60px;
         column-gap: 0;
-        min-width: 680px;
+        min-width: 900px;
         overflow: visible;
         border-left: none; border-right: none; border-radius: 0;
         flex: unset; min-height: unset;
         background: var(--surface);
+        overscroll-behavior: contain;
       }
       .pt-row { display: contents; }
       .pt-row .pt-cell {
         display: flex; align-items: center;
-        padding: 8px 6px;
+        padding: 10px 8px;
         border-bottom: 1px solid var(--line);
         background: inherit;
         min-width: 0;
       }
-      .pt-row .pt-cell:first-child { padding-left: 8px; }
-      .pt-row .pt-cell:last-child  { padding-right: 8px; }
+      .pt-row .pt-cell:first-child { padding-left: 10px; }
+      .pt-row .pt-cell:last-child  { padding-right: 10px; }
       .pt-data:last-child .pt-cell { border-bottom: none; }
       .pt-head .pt-cell {
         background: var(--surface-2);
-        font-size: 10px; letter-spacing: 0.02em;
+        font-size: 10px; letter-spacing: 0.03em;
         position: sticky; top: 0; z-index: 1;
       }
       .pt-row .pt-name-col {
         align-items: flex-start; flex-direction: column; justify-content: center;
-        padding-left: 8px; padding-right: 10px;
+        gap: 2px; padding-left: 10px; padding-right: 12px;
       }
       .pt-pname {
-        font-size: var(--fs-sm); line-height: 1.3;
-        white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+        font-size: var(--fs-sm); line-height: 1.35;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        overflow: hidden; overflow-wrap: anywhere; word-break: break-word;
       }
-      .pt-pmeta { display: none; }
+      .pt-pmeta {
+        display: block; font-size: 10px; color: var(--muted);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+      }
       .pt-stock { font-size: var(--fs-xs); }
-      .pt-price-col { font-size: var(--fs-xs); font-weight: 600; }
-      .pt-edit-col .edit-btn { padding: 4px 6px; font-size: var(--fs-xs); }
-      .stock-btn { width: 18px; height: 18px; font-size: 12px; }
+      .pt-price-col { font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+      .pt-edit-col .edit-btn { padding: 5px 8px; font-size: var(--fs-xs); }
+      .stock-btn { width: 22px; height: 22px; font-size: 13px; }
       .chip-group { width: auto; flex-shrink: 0; }
       .admin-chip { flex: initial; text-align: center; }
       .form-grid { grid-template-columns: 1fr; }
@@ -1007,10 +1027,10 @@
       </div>
 
       <div class="dash-filter-bar">
-        <button class="dash-preset-btn active" data-preset="30d" onclick="setDashPreset('30d')">Last 30 Days</button>
-        <button class="dash-preset-btn" data-preset="7d"        onclick="setDashPreset('7d')">Last 7 Days</button>
         <button class="dash-preset-btn" data-preset="today"     onclick="setDashPreset('today')">Today</button>
         <button class="dash-preset-btn" data-preset="yesterday" onclick="setDashPreset('yesterday')">Yesterday</button>
+        <button class="dash-preset-btn" data-preset="7d"        onclick="setDashPreset('7d')">Last 7 Days</button>
+        <button class="dash-preset-btn active" data-preset="30d" onclick="setDashPreset('30d')">Last 30 Days</button>
         <button class="dash-preset-btn" data-preset="all"       onclick="setDashPreset('all')">All Time</button>
         <div class="dash-date-range">
           <input type="date" id="dash-from" onchange="onDashDateChange()">
@@ -1931,21 +1951,26 @@ function copyOrder(orderId, btn) {
   if (!o) return;
 
   const shortId  = o.orderId.slice(-6).toUpperCase();
+  const isPickup = o.fulfillmentMethod === 'pickup';
   const time     = formatOrderTime(o.createdAt);
-  const addr     = o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—';
+  const addr     = isPickup
+    ? '🏬 Pick-up at store'
+    : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
   const fee      = parseFloat(o.deliveryFee ?? 0);
-  const feeStr   = fee === 0 ? 'Free' : `₱${fee.toFixed(2)}`;
-  const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
+  const feeStr   = isPickup ? '—' : (fee === 0 ? 'Free' : `₱${fee.toFixed(2)}`);
+  const payLabel = o.payment === 'gcash' ? '📱 GCash'
+                 : o.payment === 'cash'  ? '💵 Cash at Pickup'
+                 : '🛵 Cash on Delivery';
 
   const confirmed    = o.confirmedItems || o.items || [];
   const displaySub   = confirmed.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
-  const displayTotal = displaySub + fee;
+  const displayTotal = displaySub + (isPickup ? 0 : fee);
 
   const unchecked      = o.uncheckedItems || [];
   const uncheckedTotal = unchecked.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
 
   let t = '';
-  t += `#${shortId} - ${o.status.toUpperCase()} - ${time}\n`;
+  t += `#${shortId} - ${o.status.toUpperCase()} - ${isPickup ? 'PICK-UP' : 'DELIVERY'} - ${time}\n`;
   t += `\n`;
   t += `${o.customer?.name || '—'} · ${o.customer?.phone || '—'}\n`;
   t += `${addr}\n`;
@@ -1991,9 +2016,17 @@ function renderOrders() {
 
   list.innerHTML = filtered.map(o => {
     const shortId  = o.orderId.slice(-6).toUpperCase();
-    const addr     = o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—';
-    const pinHtml  = (o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps?q=${o.address.lat},${o.address.lng}" target="_blank" title="Open in Google Maps">📍</a>` : '';
-    const payLabel = o.payment === 'gcash' ? '📱 GCash' : '💵 Cash on Delivery';
+    const isPickup = o.fulfillmentMethod === 'pickup';
+    const addr     = isPickup
+      ? '🏬 Pick-up at store'
+      : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
+    const pinHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps?q=${o.address.lat},${o.address.lng}" target="_blank" title="Open in Google Maps">📍</a>` : '';
+    const payLabel = o.payment === 'gcash' ? '📱 GCash'
+                   : o.payment === 'cash'  ? '💵 Cash at Pickup'
+                   : '🛵 Cash on Delivery';
+    const fulfBadge = isPickup
+      ? `<span class="order-fulfillment-badge pickup">🏬 Pick-up</span>`
+      : `<span class="order-fulfillment-badge">🛵 Delivery</span>`;
     const fee      = parseFloat(o.deliveryFee ?? 0);
     const feeStr   = fee === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + fee.toFixed(2);
 
@@ -2090,6 +2123,7 @@ function renderOrders() {
         <div class="order-card-header">
           <span class="order-id-label">#${shortId}</span>
           <span class="order-status-badge ${o.status}">${o.status}</span>
+          ${fulfBadge}
           <span class="order-time-label">${formatOrderTime(o.createdAt)}</span>
         </div>
         <div class="order-card-body">
@@ -2448,7 +2482,7 @@ function renderProducts() {
              </div>`
           : `<span class="pt-stock-val">—</span>`;
       const thumb = p.images && p.images.length > 0
-        ? `<img src="${p.images[0]}" alt="${p.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
+        ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
         : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
       return `
         <div class="pt-row pt-data ${stockClass}">
