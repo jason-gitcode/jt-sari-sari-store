@@ -464,6 +464,22 @@
     font-size: 12px; color: #bbb;
   }
 
+  /* ---------- iPad / tablet — 4 columns so names + prices have room ---------- */
+  @media (min-width: 601px) and (max-width: 1100px) {
+    .grid {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .card { max-width: none; min-height: 0; }
+    .card-name { font-size: 15px; }
+    .card-unit { font-size: 12px; }
+    .price { font-size: 14px; }
+    .add-btn { width: 34px; height: 34px; font-size: 18px; }
+    .card-bottom { padding-right: 42px; }
+    .card-body { padding: 10px 12px 50px 12px; }
+  }
+
   /* ---------- MOBILE ---------- */
   @media (max-width: 600px) {
     .info-bar { font-size: 11px; padding: 5px 0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -508,10 +524,20 @@
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 10px;
       justify-content: start;
+      align-items: start;        /* cards take their natural height — no stretch gap */
     }
     .card { max-width: 100%; min-height: 0; }
     .thumb { font-size: 40px; }
-    .card-body { padding: 10px; }
+    .card-body {
+      padding: 8px 10px 44px 10px;  /* keep room for the corner add button */
+      gap: 2px;
+    }
+    .card-bottom {
+      margin-top: 6px;            /* small, deliberate gap between unit and price */
+      padding-top: 0;
+      padding-right: 38px;
+    }
+    .add-btn { width: 30px; height: 30px; right: 6px; bottom: 6px; }
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
     .footer-inner { grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 16px 16px 12px; }
   }

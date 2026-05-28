@@ -1,4 +1,4 @@
-const CACHE = 'sari-sari-v9';
+const CACHE = 'sari-sari-v10';
 const PRECACHE = [
   '/jt-sari-sari-store/',
   '/jt-sari-sari-store/index.html',
