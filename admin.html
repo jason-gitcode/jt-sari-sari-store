@@ -898,30 +898,41 @@
       .settings-grid { grid-template-columns: 1fr; }
       .settings-nav { position: relative; flex-direction: row; flex-wrap: wrap; overflow-x: auto; }
     }
-    @media (max-width: 600px) {
-      header { padding: 10px 14px; height: 56px; }
-      .brand-title { font-size: var(--fs-base); }
-      .brand-sub { display: none; }
-      .container { padding: 14px 12px 20px; }
-      .tabs { width: 100%; overflow-x: auto; }
-      .tab-btn { padding: 6px 12px; }
-      .page-title { font-size: var(--fs-lg); }
-      .products-layout { flex-direction: column; overflow-y: auto; }
-      .admin-cats {
-        width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden;
-        flex-wrap: nowrap; padding: 4px 0 6px; gap: 6px; flex-shrink: 0;
+    /* ---------- iPad + smaller: products table becomes a single horizontally-scrollable grid ----------
+       Only the products section changes here. The rest of the admin (forms, charts, settings)
+       keeps its desktop layout down to phone widths. */
+    @media (max-width: 1100px) {
+      .products-layout {
+        flex-direction: column;
+        gap: 12px;
+        overflow: hidden;  /* the inner products-main is the ONE scroller — no nested scroll */
       }
-      .products-main { overflow-y: auto; overflow-x: auto; overscroll-behavior: contain; }
+      .admin-cats {
+        width: 100%; flex-direction: row;
+        overflow-x: auto; overflow-y: hidden;
+        flex-wrap: nowrap;
+        padding: 4px 0 6px; gap: 6px;
+        flex-shrink: 0;
+        overscroll-behavior-x: contain;
+      }
+      .chip-group { width: auto; flex-shrink: 0; }
+      .admin-chip { flex: initial; text-align: center; }
+
+      .products-main {
+        flex: 1 1 0; min-height: 0;
+        overflow: auto;                         /* the ONLY scroll container for the table */
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;       /* smooth momentum on iOS */
+      }
       .products-grid {
         display: grid;
-        grid-template-columns: 36px 64px minmax(220px, 1fr) 92px 110px 60px 60px;
+        grid-template-columns: 36px 64px minmax(240px, 1fr) 110px 120px 70px 64px;
         column-gap: 0;
-        min-width: 900px;
-        overflow: visible;
+        min-width: 920px;                       /* forces horizontal scroll on iPad / phone */
+        overflow: visible;                      /* don't double-scroll */
         border-left: none; border-right: none; border-radius: 0;
         flex: unset; min-height: unset;
         background: var(--surface);
-        overscroll-behavior: contain;
       }
       .pt-row { display: contents; }
       .pt-row .pt-cell {
@@ -930,6 +941,7 @@
         border-bottom: 1px solid var(--line);
         background: inherit;
         min-width: 0;
+        min-height: 56px;                       /* lock row height so the layout doesn't jitter while scrolling */
       }
       .pt-row .pt-cell:first-child { padding-left: 10px; }
       .pt-row .pt-cell:last-child  { padding-right: 10px; }
@@ -938,6 +950,7 @@
         background: var(--surface-2);
         font-size: 10px; letter-spacing: 0.03em;
         position: sticky; top: 0; z-index: 1;
+        min-height: 36px;
       }
       .pt-row .pt-name-col {
         align-items: flex-start; flex-direction: column; justify-content: center;
@@ -946,7 +959,7 @@
       .pt-pname {
         font-size: var(--fs-sm); line-height: 1.35;
         display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-        overflow: hidden; overflow-wrap: anywhere; word-break: break-word;
+        overflow: hidden; overflow-wrap: break-word; word-break: normal;
       }
       .pt-pmeta {
         display: block; font-size: 10px; color: var(--muted);
@@ -956,8 +969,15 @@
       .pt-price-col { font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
       .pt-edit-col .edit-btn { padding: 5px 8px; font-size: var(--fs-xs); }
       .stock-btn { width: 22px; height: 22px; font-size: 13px; }
-      .chip-group { width: auto; flex-shrink: 0; }
-      .admin-chip { flex: initial; text-align: center; }
+    }
+    @media (max-width: 600px) {
+      header { padding: 10px 14px; height: 56px; }
+      .brand-title { font-size: var(--fs-base); }
+      .brand-sub { display: none; }
+      .container { padding: 14px 12px 20px; }
+      .tabs { width: 100%; overflow-x: auto; }
+      .tab-btn { padding: 6px 12px; }
+      .page-title { font-size: var(--fs-lg); }
       .form-grid { grid-template-columns: 1fr; }
       .variant-item { grid-template-columns: 1fr auto; }
       .variant-item .v-field-name  { grid-column: 1; }
