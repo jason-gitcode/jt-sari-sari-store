@@ -478,6 +478,12 @@
       display: inline-flex; align-items: center; gap: 4px;
       margin: 0 8px; flex-shrink: 0;
       font-variant-numeric: tabular-nums;
+      width: 86px; justify-content: center;  /* fixed width keeps the column aligned across rows */
+    }
+    .item-line-total {
+      flex-shrink: 0;
+      width: 72px; text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     .item-qty-adj button {
       width: 22px; height: 22px;
