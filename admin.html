@@ -474,6 +474,23 @@
     .order-section-label.confirmed-label { color: var(--ok); }
     .item-check-label { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0; }
     .item-check { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--ok); cursor: pointer; }
+    .item-qty-adj {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin: 0 8px; flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .item-qty-adj button {
+      width: 22px; height: 22px;
+      border-radius: 4px; font-size: 13px; line-height: 1;
+      background: var(--surface); border: 1px solid var(--line);
+      display: grid; place-items: center; padding: 0;
+      color: var(--ink-soft);
+      transition: background .15s, border-color .15s;
+    }
+    .item-qty-adj button:hover { background: var(--surface-3); border-color: var(--line-strong); color: var(--ink); }
+    .item-qty-adj button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .item-qty-val { min-width: 18px; text-align: center; font-size: 13px; font-weight: 700; color: var(--ink); }
+    .item-qty-val.reduced { color: var(--warn); }  /* warn-color when admin has trimmed qty from the customer's original */
     .confirmed-list { margin-bottom: 0; }
     .confirmed-list .order-item-row { background: var(--ok-soft); }
     .order-total-pending { display: flex; justify-content: space-between; font-size: var(--fs-sm); color: var(--muted); margin-top: 4px; margin-bottom: 2px; }
@@ -2056,14 +2073,23 @@ function renderOrders() {
     if (o.status === 'pending') {
       const items = o.items || [];
       const allTotal = items.reduce((s, it) => s + parseFloat(it.lineTotal), 0);
-      const itemsHtml = items.map((item, i) => `
-        <div class="order-item-row" data-idx="${i}" data-price="${parseFloat(item.lineTotal)}">
+      const itemsHtml = items.map((item, i) => {
+        const origQty   = parseInt(item.qty) || 0;
+        const unitPrice = origQty > 0 ? parseFloat(item.lineTotal) / origQty : parseFloat(item.price || 0);
+        return `
+        <div class="order-item-row" data-idx="${i}" data-price="${parseFloat(item.lineTotal)}" data-original-qty="${origQty}" data-current-qty="${origQty}" data-unit-price="${unitPrice}">
           <label class="item-check-label">
             <input type="checkbox" class="item-check" onchange="toggleItemConfirm(this,'${o.orderId}',${i})">
-            <span>${item.qty}× ${item.productName}</span>
+            <span>${item.productName}</span>
           </label>
-          <span>₱${parseFloat(item.lineTotal).toFixed(2)}</span>
-        </div>`).join('');
+          <div class="item-qty-adj">
+            <button type="button" title="Decrease quantity" onclick="adjustOrderItemQty('${o.orderId}',${i},-1)">−</button>
+            <span class="item-qty-val">${origQty}</span>
+            <button type="button" title="Increase quantity" onclick="adjustOrderItemQty('${o.orderId}',${i},1)">+</button>
+          </div>
+          <span class="item-line-total">₱${parseFloat(item.lineTotal).toFixed(2)}</span>
+        </div>`;
+      }).join('');
 
       bodyHtml = `
         <div class="order-section-label">Items — check when available</div>
@@ -2177,6 +2203,46 @@ function toggleItemConfirm(checkbox, orderId, idx) {
   recalcOrderTotals(orderId);
 }
 
+// Increment / decrement the qty admin will fulfil for a single line on a
+// pending order. Goes between 0 and the customer's original qty. Updates the
+// row's data-price + the line-total cell, then nudges the running totals.
+// At 0 with the checkbox still ticked, we auto-uncheck so the row drops back
+// into "Items — check when available" and the diff lands in the refund list.
+function adjustOrderItemQty(orderId, idx, delta) {
+  const row = document.querySelector(`#pending-items-${orderId} .order-item-row[data-idx="${idx}"]`)
+           || document.querySelector(`#confirmed-items-${orderId} .order-item-row[data-idx="${idx}"]`);
+  if (!row) return;
+
+  const originalQty = parseInt(row.dataset.originalQty) || 0;
+  const unitPrice   = parseFloat(row.dataset.unitPrice) || 0;
+  let qty = parseInt(row.dataset.currentQty);
+  if (isNaN(qty)) qty = originalQty;
+  qty = Math.max(0, Math.min(originalQty, qty + delta));
+
+  row.dataset.currentQty = qty;
+  const newLine = unitPrice * qty;
+  row.dataset.price = newLine;
+
+  const qtyEl = row.querySelector('.item-qty-val');
+  if (qtyEl) {
+    qtyEl.textContent = qty;
+    qtyEl.classList.toggle('reduced', qty < originalQty);
+  }
+  const priceEl = row.querySelector('.item-line-total');
+  if (priceEl) priceEl.textContent = '₱' + newLine.toFixed(2);
+
+  // If a confirmed row hits 0, drop it back to pending — that's "fully unavailable".
+  const checkbox = row.querySelector('.item-check');
+  const inConfirmed = !!row.closest(`#confirmed-items-${orderId}`);
+  if (qty === 0 && inConfirmed && checkbox && checkbox.checked) {
+    checkbox.checked = false;
+    toggleItemConfirm(checkbox, orderId, idx);
+    return; // toggleItemConfirm already calls recalcOrderTotals
+  }
+
+  recalcOrderTotals(orderId);
+}
+
 function recalcOrderTotals(orderId) {
   const pendingRows   = document.querySelectorAll(`#pending-items-${orderId} .order-item-row`);
   const confirmedRows = document.querySelectorAll(`#confirmed-items-${orderId} .order-item-row`);
@@ -2198,9 +2264,40 @@ async function confirmOrder(orderId) {
     return;
   }
 
-  const confirmedIndices = new Set(confirmedRows.map(r => parseInt(r.dataset.idx)));
-  const confirmedItems  = (order.items || []).filter((_, i) => confirmedIndices.has(i));
-  const uncheckedItems  = (order.items || []).filter((_, i) => !confirmedIndices.has(i));
+  // Build confirmedItems + uncheckedItems from the live DOM state so the
+  // admin's per-line qty adjustments take effect:
+  //   - checked row, current qty = original  → fully confirmed
+  //   - checked row, current qty < original  → confirmed at current qty,
+  //                                            shortfall added to refund list
+  //   - unchecked row                        → full original item to refund list
+  const confirmedItems = [];
+  const uncheckedItems = [];
+  (order.items || []).forEach((origItem, i) => {
+    const row = document.querySelector(`#confirmed-items-${orderId} .order-item-row[data-idx="${i}"]`)
+             || document.querySelector(`#pending-items-${orderId} .order-item-row[data-idx="${i}"]`);
+    const origQty   = parseInt(origItem.qty) || 0;
+    const unitPrice = origQty > 0 ? parseFloat(origItem.lineTotal) / origQty : parseFloat(origItem.price || 0);
+    const isInConfirmed = !!(row && row.closest(`#confirmed-items-${orderId}`));
+    const currentQty = row ? Math.max(0, Math.min(origQty, parseInt(row.dataset.currentQty) || 0)) : origQty;
+
+    if (isInConfirmed && currentQty > 0) {
+      confirmedItems.push({
+        ...origItem,
+        qty: currentQty,
+        lineTotal: unitPrice * currentQty
+      });
+      if (currentQty < origQty) {
+        const refundQty = origQty - currentQty;
+        uncheckedItems.push({
+          ...origItem,
+          qty: refundQty,
+          lineTotal: unitPrice * refundQty
+        });
+      }
+    } else {
+      uncheckedItems.push(origItem);
+    }
+  });
 
   try {
     const batch = db.batch();
