@@ -1066,9 +1066,11 @@ function clearSearch() {
 // ---------- CATEGORIES ----------
 function renderCategories() {
   const wrap = document.getElementById('categories');
-  // Mirror admin exactly: categories derived from products in product-id order
+  // Mirror admin exactly: categories derived from products in product-id order.
+  // Hidden products (admin → Products → HIDE toggle ON) are skipped so the
+  // category list and chip counts only reflect what's actually shoppable.
   const catSet = new Set();
-  PRODUCTS.forEach(p => { if (p.category) catSet.add(p.category); });
+  PRODUCTS.forEach(p => { if (p.category && p.hidden !== true) catSet.add(p.category); });
   const cats = ['All', ...[...catSet].sort()];
   if (activeCategory !== 'All' && !cats.includes(activeCategory)) activeCategory = 'All';
   wrap.innerHTML = cats.map(cat =>
@@ -1084,7 +1086,12 @@ function pickCategory(cat) {
 // ---------- PRODUCTS ----------
 function renderProducts() {
   const grid = document.getElementById('products');
-  let list = PRODUCTS.filter(p => activeCategory === "All" || p.category === activeCategory);
+  // Hidden products never appear in the storefront grid, even when their
+  // category is selected or they match the active search term. PRODUCTS
+  // itself stays untouched so cart resolution for items already in cart
+  // (added before the admin hid them) keeps working at checkout.
+  let list = PRODUCTS.filter(p => p.hidden !== true)
+                     .filter(p => activeCategory === "All" || p.category === activeCategory);
   if (searchTerm) {
     list = list.filter(p => {
       const text = `${p.name} ${p.description || ''}`.toLowerCase();

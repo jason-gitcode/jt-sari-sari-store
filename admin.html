@@ -328,7 +328,7 @@
     /* ---------- PRODUCT TABLE ---------- */
     .pt-row {
       display: grid;
-      grid-template-columns: 36px 56px 1fr 110px 110px 70px 70px;
+      grid-template-columns: 36px 56px 1fr 110px 110px 70px 70px 70px;
       align-items: center;
       gap: 12px;
       padding: 11px 16px;
@@ -363,6 +363,9 @@
     }
     .pt-edit-col .edit-btn:hover { background: var(--surface-3); color: var(--ink); border-color: var(--line-strong); }
     .pt-avail-col { justify-content: center; }
+    .pt-hide-col  { justify-content: center; }
+    .toggle-sw.is-hide input:checked + .toggle-sl { background: var(--warn); }
+    .pt-data.is-hidden { opacity: 0.55; }
 
     .pt-data.low-stock   { background: var(--warn-soft); }
     .pt-data.out-of-stock { background: var(--danger-soft); }
@@ -754,7 +757,8 @@
     .dash-card-value.blue  { color: var(--accent); }
     .dash-card-value.amber { color: var(--warn); }
 
-    .dash-charts-row { display: grid; grid-template-columns: 320px 1fr; gap: 14px; margin-bottom: 18px; flex-shrink: 0; }
+    .dash-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; flex-shrink: 0; }
+    .dash-chart-full { margin-bottom: 18px; flex-shrink: 0; }
     .dash-chart-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
     .dash-chart-box h3 { font-size: var(--fs-md); font-weight: 600; margin: 0 0 14px; color: var(--ink); }
     .dash-chart-canvas { position: relative; height: 240px; }
@@ -784,6 +788,23 @@
       display: inline-flex; align-items: center; gap: 6px;
     }
     .dash-export-btn:hover { opacity: 0.9; }
+    .dash-export-btn--ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    .dash-export-btn--ghost:hover { background: var(--surface-2); opacity: 1; }
+    .dash-export-btn:disabled { opacity: 0.6; cursor: wait; }
+
+    /* Sortable column headers on the Inventory ranking table */
+    .dash-table th.sortable { cursor: pointer; user-select: none; transition: background .12s, color .12s; }
+    .dash-table th.sortable:hover { background: var(--surface-3); color: var(--ink); }
+    .dash-table th.sortable .sort-ind {
+      display: inline-block; margin-left: 4px;
+      font-size: 9px; opacity: 0.35;
+      font-weight: 700; line-height: 1;
+    }
+    .dash-table th.sortable.active { color: var(--ink); }
+    .dash-table th.sortable.active .sort-ind { opacity: 1; color: var(--accent); }
+    .dash-table th.sortable:not(.active) .sort-ind::after { content: '⇅'; }
+    .dash-table th.sortable.active.desc .sort-ind::after { content: '▼'; }
+    .dash-table th.sortable.active.asc  .sort-ind::after { content: '▲'; }
 
     .dash-table-wrap {
       max-height: 540px;
@@ -950,9 +971,9 @@
       }
       .products-grid {
         display: grid;
-        grid-template-columns: 36px 64px minmax(240px, 1fr) 110px 120px 70px 64px;
+        grid-template-columns: 36px 64px minmax(240px, 1fr) 110px 120px 70px 64px 64px;
         column-gap: 0;
-        min-width: 920px;                       /* forces horizontal scroll on iPad / phone */
+        min-width: 990px;                       /* forces horizontal scroll on iPad / phone */
         overflow: visible;                      /* don't double-scroll */
         border-left: none; border-right: none; border-radius: 0;
         flex: unset; min-height: unset;
@@ -1091,20 +1112,25 @@
           <div class="dash-chart-canvas"><canvas id="cat-chart"></canvas></div>
         </div>
         <div class="dash-chart-box">
-          <h3>📈 Confirmed Orders &amp; Revenue by Day</h3>
-          <div class="dash-chart-canvas"><canvas id="daily-chart"></canvas></div>
+          <h3>🛍️ Products Sold by Category <span style="font-weight:400;color:var(--muted);font-size:12px;">(for selected period)</span></h3>
+          <div class="dash-chart-canvas"><canvas id="sold-cat-chart"></canvas></div>
         </div>
+      </div>
+      <div class="dash-chart-box dash-chart-full">
+        <h3>📈 Confirmed Orders &amp; Revenue by Day</h3>
+        <div class="dash-chart-canvas"><canvas id="daily-chart"></canvas></div>
       </div>
 
       <div class="dash-section">
         <div class="dash-section-header">
           <div>
-            <h3>🏆 All Items Ranked by Sales</h3>
+            <h3>📦 Inventory — All Items Ranked by Sales</h3>
             <div class="sub" id="items-ranked-sub">Click a row to view item analytics.</div>
           </div>
           <div class="dash-section-actions">
             <input type="search" id="dash-item-search" class="dash-search-inline" placeholder="Search items…" oninput="filterDashItems(this.value)">
-            <button class="dash-export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+            <button class="dash-export-btn dash-export-btn--ghost" onclick="exportPDF()" id="export-pdf-btn">⬇ Export as PDF</button>
+            <button class="dash-export-btn" onclick="exportCSV()">⬇ Export as CSV</button>
           </div>
         </div>
         <div class="dash-table-wrap">
@@ -1112,13 +1138,13 @@
             <thead>
               <tr>
                 <th>#</th>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Unit Price</th>
-                <th>Cost per Item</th>
-                <th>Qty Sold</th>
-                <th>Revenue</th>
-                <th>Profit</th>
+                <th class="sortable"        data-sort="name"     onclick="sortItemsTable('name')">Product <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="category" onclick="sortItemsTable('category')">Category <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="price"    onclick="sortItemsTable('price')">Unit Price <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="cost"     onclick="sortItemsTable('cost')">Cost per Item <span class="sort-ind"></span></th>
+                <th class="sortable active" data-sort="qty"      onclick="sortItemsTable('qty')">Qty Sold <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="revenue"  onclick="sortItemsTable('revenue')">Revenue <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="profit"   onclick="sortItemsTable('profit')">Profit <span class="sort-ind"></span></th>
               </tr>
             </thead>
             <tbody id="top-items-tbody"></tbody>
@@ -2549,6 +2575,20 @@ async function toggleAvailability(id, available) {
   }
 }
 
+// When ON, the product disappears from the storefront entirely
+// (filtered out of the grid + category counts + search results).
+// Default is OFF (visible) — no migration needed for existing docs
+// because hidden === true is the only condition that hides.
+async function toggleHidden(id, hidden) {
+  try {
+    await db.collection('products').doc(String(id)).update({ hidden });
+    showToast(hidden ? 'Product hidden from storefront' : 'Product visible on storefront', 'success');
+  } catch (err) {
+    console.error('Toggle hidden error:', err);
+    showToast('Error updating visibility', 'error');
+  }
+}
+
 function renderProducts() {
   let filtered = products;
   if (adminActiveCategory !== 'All') {
@@ -2586,9 +2626,11 @@ function renderProducts() {
       <div class="pt-cell">Price</div>
       <div class="pt-cell"></div>
       <div class="pt-cell">Available</div>
+      <div class="pt-cell">Hide</div>
     </div>
     ${filtered.map(p => {
       const available   = p.available !== false;
+      const isHidden    = p.hidden === true;
       const hasVariants = p.variants && p.variants.length > 0;
       const stockNum    = hasVariants
         ? p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
@@ -2617,7 +2659,7 @@ function renderProducts() {
         ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
         : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
       return `
-        <div class="pt-row pt-data ${stockClass}">
+        <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}">
           <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
           <div class="pt-cell">${thumb}</div>
           <div class="pt-cell pt-name-col">
@@ -2630,6 +2672,12 @@ function renderProducts() {
           <div class="pt-cell pt-avail-col">
             <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
               <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
+              <span class="toggle-sl"></span>
+            </label>
+          </div>
+          <div class="pt-cell pt-hide-col">
+            <label class="toggle-sw is-hide" title="${isHidden ? 'Show this product on the storefront' : 'Hide this product from the storefront'}">
+              <input type="checkbox" ${isHidden ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleHidden(${p.id}, this.checked)" />
               <span class="toggle-sl"></span>
             </label>
           </div>
@@ -3062,12 +3110,19 @@ auth.onAuthStateChanged(user => {
 // ============================================================
 let dashFromDate     = null;
 let dashToDate       = null;
-let catChartInst     = null;
+let catChartInst       = null;
+let soldByCatChartInst = null;
 let dailyChartInst   = null;
 let itemChartInst    = null;
 let dashSelectedItem = null;
 let cachedSortedItems = [];
 let dashItemSearchTerm = '';
+// Inventory ranking table — current sort column + direction.
+// Default = qty descending (highest sellers on top), same as the rank column
+// has always shown. Clicking a column header toggles direction; clicking a
+// different column resets to its own sensible default direction.
+let itemsSortKey = 'qty';
+let itemsSortDir = 'desc';
 
 function manilaDateStr(d) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
@@ -3121,6 +3176,38 @@ function filterOrdersByDate(arr) {
     return true;
   });
 }
+
+// Chart.js plugin: draws a percentage label on each doughnut slice. Tiny
+// slices (<4%) are skipped so the chart doesn't end up cluttered with
+// overlapping labels. The label sits at the slice's tooltipPosition (the
+// midpoint of the arc) with a soft shadow so it stays readable on every
+// fill colour, light or dark.
+const percentLabelsPlugin = {
+  id: 'percentLabels',
+  afterDatasetsDraw(chart) {
+    const ctx  = chart.ctx;
+    const meta = chart.getDatasetMeta(0);
+    if (!meta || !meta.data) return;
+    const data = chart.data.datasets[0].data;
+    const total = data.reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+    if (total === 0) return;
+    meta.data.forEach((arc, i) => {
+      const value = parseFloat(data[i]) || 0;
+      const pct   = (value / total) * 100;
+      if (pct < 4) return;
+      const pos = arc.tooltipPosition();
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = 3;
+      ctx.font = 'bold 11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pct.toFixed(0) + '%', pos.x, pos.y);
+      ctx.restore();
+    });
+  }
+};
 
 function chartColors() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -3203,6 +3290,7 @@ function renderDashboard() {
   }
 
   renderCatChart();
+  renderSoldByCategoryChart(conf);
   renderDailyChart(fil);
   renderTopItems(conf);
   if (dashSelectedItem) renderItemDetail(dashSelectedItem);
@@ -3212,60 +3300,193 @@ function renderCatChart() {
   const cnt = {};
   products.forEach(p => { cnt[p.category || 'Uncategorized'] = (cnt[p.category || 'Uncategorized'] || 0) + 1; });
   const labels = Object.keys(cnt).sort();
-  const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899',
-                  '#14b8a6','#f97316','#06b6d4','#84cc16','#6366f1','#d946ef','#0ea5e9'];
+  const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899',
+                   '#14b8a6','#f97316','#06b6d4','#84cc16','#6366f1','#d946ef','#0ea5e9'];
+  // Stable category→colour map keyed by the full catalogue's alphabetical
+  // position so the same category shows the same colour across both charts.
+  const catalogCats = [...new Set(products.map(p => p.category || 'Uncategorized'))].sort();
+  const colourFor = cat => {
+    const idx = catalogCats.indexOf(cat);
+    return idx >= 0 ? PALETTE[idx % PALETTE.length] : PALETTE[catalogCats.length % PALETTE.length];
+  };
   const c = chartColors();
   if (catChartInst) catChartInst.destroy();
   catChartInst = new Chart(document.getElementById('cat-chart'), {
     type: 'doughnut',
     data: { labels, datasets: [{ data: labels.map(l => cnt[l]),
-      backgroundColor: COLORS.slice(0, labels.length), borderWidth: 2, borderColor: c.cardBg }] },
+      backgroundColor: labels.map(colourFor), borderWidth: 2, borderColor: c.cardBg }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 6, color: c.text } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} items` } }
+        tooltip: { callbacks: { label: ctx => {
+          const total = ctx.dataset.data.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+          const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : '0.0';
+          return ` ${ctx.label}: ${ctx.raw} items (${pct}%)`;
+        }}}
       }
-    }
+    },
+    plugins: [percentLabelsPlugin]
   });
 }
 
-function renderDailyChart(filteredOrders) {
-  let days = [];
-  if (dashFromDate && dashToDate) {
-    let cur = new Date(dashFromDate + 'T00:00:00');
-    const end = new Date(dashToDate + 'T00:00:00');
-    while (cur <= end) { days.push(manilaDateStr(cur)); cur.setDate(cur.getDate() + 1); }
-  } else {
-    const s = new Set(filteredOrders.map(o => getOrderDateStr(o)).filter(Boolean));
-    days = [...s].sort();
-  }
-  const cntMap = {}; const revMap = {};
-  days.forEach(d => { cntMap[d] = 0; revMap[d] = 0; });
-  filteredOrders.filter(o => o.status === 'confirmed').forEach(o => {
-    const d = getOrderDateStr(o);
-    if (d && cntMap[d] !== undefined) { cntMap[d]++; revMap[d] += parseFloat(o.total || 0); }
+// Doughnut: quantity sold per category for the currently-selected period.
+// Walks confirmed orders' line items, looks up each item's category via
+// productId, and sums qty. Recolours from the same palette as renderCatChart
+// so categories that exist in both charts share the same slice colour.
+function renderSoldByCategoryChart(confirmedOrders) {
+  const cnt = {};
+  (confirmedOrders || []).forEach(o => {
+    (o.confirmedItems || o.items || []).forEach(item => {
+      const prod = products.find(p => String(p.id) === String(item.productId));
+      const cat  = prod?.category || 'Uncategorized';
+      cnt[cat] = (cnt[cat] || 0) + (parseInt(item.qty) || 0);
+    });
   });
-  const labels = days.map(d => { const [,m,dy] = d.split('-'); return `${m}/${dy}`; });
+  const labels  = Object.keys(cnt).sort();
+  const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899',
+                   '#14b8a6','#f97316','#06b6d4','#84cc16','#6366f1','#d946ef','#0ea5e9'];
+  // Build a stable category→colour map from the full product catalogue so
+  // "Beverages" is always the same colour across both doughnuts.
+  const catalogCats = [...new Set(products.map(p => p.category || 'Uncategorized'))].sort();
+  const colourFor = cat => {
+    const idx = catalogCats.indexOf(cat);
+    return idx >= 0 ? PALETTE[idx % PALETTE.length] : PALETTE[catalogCats.length % PALETTE.length];
+  };
   const c = chartColors();
+  if (soldByCatChartInst) { soldByCatChartInst.destroy(); soldByCatChartInst = null; }
+
+  const canvas = document.getElementById('sold-cat-chart');
+  if (!canvas) return;
+
+  if (labels.length === 0) {
+    // No sales in the selected period — paint a centred "no data" message
+    const ctx = canvas.getContext('2d');
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * window.devicePixelRatio;
+    canvas.height = h * window.devicePixelRatio;
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = c.text;
+    ctx.font = '500 13px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No products sold in this period', w / 2, h / 2);
+    return;
+  }
+
+  soldByCatChartInst = new Chart(canvas, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: labels.map(l => cnt[l]),
+      backgroundColor: labels.map(colourFor), borderWidth: 2, borderColor: c.cardBg }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 6, color: c.text } },
+        tooltip: { callbacks: { label: ctx => {
+          const total = ctx.dataset.data.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+          const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : '0.0';
+          return ` ${ctx.label}: ${ctx.raw} sold (${pct}%)`;
+        }}}
+      }
+    },
+    plugins: [percentLabelsPlugin]
+  });
+}
+
+// Extract the Manila hour-of-day (0..23) from a Firestore timestamp. Used
+// when the user picks a single-day range so the chart can bucket orders by
+// hour instead of squashing the entire day into one bar.
+function getOrderManilaHour(o) {
+  if (!o.createdAt) return null;
+  const d = o.createdAt.toDate ? o.createdAt.toDate() : new Date((o.createdAt.seconds || 0) * 1000);
+  return parseInt(new Intl.DateTimeFormat('en-PH', {
+    hour: 'numeric', hour12: false, timeZone: 'Asia/Manila'
+  }).format(d));
+}
+
+// Format an hour-of-day (0..23) as a compact 12-hour label, e.g.
+// 0 → "12a", 11 → "11a", 12 → "12p", 23 → "11p".
+function fmtHourLabel(h) {
+  const suffix = h < 12 ? 'a' : 'p';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return hh + suffix;
+}
+
+function renderDailyChart(filteredOrders) {
+  const c = chartColors();
+  const confirmed = filteredOrders.filter(o => o.status === 'confirmed');
+
+  // Single-day selection (e.g. Today, Yesterday, or a hand-picked one-day
+  // range) → bucket by hour-of-day so the chart shows the day's rhythm.
+  const isSingleDay = !!(dashFromDate && dashToDate && dashFromDate === dashToDate);
+  let labels, ordersData, revenueData, xTitle;
+
+  if (isSingleDay) {
+    const hourCnt = new Array(24).fill(0);
+    const hourRev = new Array(24).fill(0);
+    confirmed.forEach(o => {
+      if (getOrderDateStr(o) !== dashFromDate) return;
+      const h = getOrderManilaHour(o);
+      if (h === null || isNaN(h)) return;
+      hourCnt[h] += 1;
+      hourRev[h] += parseFloat(o.total || 0);
+    });
+    labels      = Array.from({ length: 24 }, (_, h) => fmtHourLabel(h));
+    ordersData  = hourCnt;
+    revenueData = hourRev;
+    xTitle      = `Hour (Manila) — ${dashFromDate}`;
+  } else {
+    // Multi-day range (or "All Time") → bucket by date as before.
+    let days = [];
+    if (dashFromDate && dashToDate) {
+      let cur = new Date(dashFromDate + 'T00:00:00');
+      const end = new Date(dashToDate + 'T00:00:00');
+      while (cur <= end) { days.push(manilaDateStr(cur)); cur.setDate(cur.getDate() + 1); }
+    } else {
+      const s = new Set(filteredOrders.map(o => getOrderDateStr(o)).filter(Boolean));
+      days = [...s].sort();
+    }
+    const cntMap = {}; const revMap = {};
+    days.forEach(d => { cntMap[d] = 0; revMap[d] = 0; });
+    confirmed.forEach(o => {
+      const d = getOrderDateStr(o);
+      if (d && cntMap[d] !== undefined) { cntMap[d]++; revMap[d] += parseFloat(o.total || 0); }
+    });
+    labels      = days.map(d => { const [,m,dy] = d.split('-'); return `${m}/${dy}`; });
+    ordersData  = days.map(d => cntMap[d]);
+    revenueData = days.map(d => revMap[d]);
+    xTitle      = '';
+  }
+
   if (dailyChartInst) dailyChartInst.destroy();
   dailyChartInst = new Chart(document.getElementById('daily-chart'), {
     type: 'bar',
     data: { labels, datasets: [
-      { label: 'Orders', data: days.map(d => cntMap[d]), backgroundColor: 'rgba(59,130,246,0.75)',
+      { label: 'Orders', data: ordersData, backgroundColor: 'rgba(59,130,246,0.75)',
         borderRadius: 4, yAxisID: 'y' },
-      { label: 'Revenue (₱)', data: days.map(d => revMap[d]), type: 'line',
+      { label: 'Revenue (₱)', data: revenueData, type: 'line',
         borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
         tension: 0.35, yAxisID: 'y1', pointRadius: 3, borderWidth: 2 }
     ]},
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { font: { size: 11 }, color: c.text } } },
+      plugins: {
+        legend: { labels: { font: { size: 11 }, color: c.text } },
+        tooltip: { callbacks: { title: items => {
+          if (!items.length) return '';
+          return isSingleDay ? `Hour: ${items[0].label}` : items[0].label;
+        }}}
+      },
       scales: {
         y:  { position: 'left',  beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 }, color: c.text }, grid: { color: c.grid } },
         y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
               ticks: { font: { size: 10 }, color: c.text, callback: v => '₱' + v } },
-        x:  { ticks: { font: { size: 10 }, color: c.text, maxTicksLimit: 20 }, grid: { color: c.grid } }
+        x:  {
+          ticks: { font: { size: 10 }, color: c.text, maxTicksLimit: isSingleDay ? 24 : 20 },
+          grid: { color: c.grid },
+          title: xTitle ? { display: true, text: xTitle, color: c.text, font: { size: 10 } } : { display: false }
+        }
       }
     }
   });
@@ -3321,17 +3542,76 @@ function renderTopItems(confirmedOrders) {
   renderItemsTable();
 }
 
+// Toggle the inventory ranking table's sort. Same key clicked twice flips
+// direction; switching key resets to that column's natural starting
+// direction (text columns asc A→Z, numeric columns desc high→low).
+function sortItemsTable(key) {
+  if (itemsSortKey === key) {
+    itemsSortDir = itemsSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    itemsSortKey = key;
+    itemsSortDir = (key === 'name' || key === 'category') ? 'asc' : 'desc';
+  }
+  renderItemsTable();
+}
+
+// Project a row into the value used by its sort key. Missing values sort
+// last in either direction.
+function getSortValue(item, key) {
+  const prod = products.find(p => p.name === item.name);
+  const cost = getItemCost(item);
+  switch (key) {
+    case 'name':     return item.name || '';
+    case 'category': return prod?.category || '';
+    case 'price':    return prod?.price != null ? parseFloat(prod.price) : null;
+    case 'cost':     return cost; // null when not set
+    case 'qty':      return item.qty || 0;
+    case 'revenue':  return item.revenue || 0;
+    case 'profit':   return cost === null ? null : item.revenue - cost * item.qty;
+    default:         return 0;
+  }
+}
+
 function renderItemsTable() {
   const tbody = document.getElementById('top-items-tbody');
   if (!tbody) return;
   const sub = document.getElementById('items-ranked-sub');
 
-  let list = cachedSortedItems;
+  // Apply current sort to a copy of the cached items list. Nulls bubble to
+  // the bottom regardless of direction so missing-cost rows don't pollute
+  // the top of "lowest cost" or "lowest profit" views.
+  const dir = itemsSortDir === 'asc' ? 1 : -1;
+  const sorted = cachedSortedItems.slice().sort((a, b) => {
+    const av = getSortValue(a, itemsSortKey);
+    const bv = getSortValue(b, itemsSortKey);
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;   // nulls always last
+    if (bv === null) return -1;
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return dir * String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' });
+    }
+    return dir * (av - bv);
+  });
+
+  // Reflect sort state on the column headers
+  document.querySelectorAll('.dash-table th.sortable').forEach(th => {
+    const isActive = th.dataset.sort === itemsSortKey;
+    th.classList.toggle('active', isActive);
+    th.classList.toggle('asc',    isActive && itemsSortDir === 'asc');
+    th.classList.toggle('desc',   isActive && itemsSortDir === 'desc');
+  });
+
+  let list = sorted;
   if (dashItemSearchTerm) {
     list = list.filter(i => i.name.toLowerCase().includes(dashItemSearchTerm));
   }
 
   const missingCount = cachedSortedItems.filter(i => getItemCost(i) === null).length;
+  const sortLabelMap = {
+    name: 'name (A–Z)', category: 'category', price: 'unit price',
+    cost: 'cost per item', qty: 'quantity sold', revenue: 'revenue', profit: 'profit'
+  };
+  const sortLabel = (sortLabelMap[itemsSortKey] || 'quantity sold') + ' ' + (itemsSortDir === 'desc' ? '(high → low)' : '(low → high)');
 
   if (sub) {
     if (cachedSortedItems.length === 0) {
@@ -3339,7 +3619,7 @@ function renderItemsTable() {
     } else {
       const base = dashItemSearchTerm
         ? `Showing ${list.length} of ${cachedSortedItems.length} item${cachedSortedItems.length === 1 ? '' : 's'}`
-        : `${cachedSortedItems.length} item${cachedSortedItems.length === 1 ? '' : 's'} sorted by quantity sold`;
+        : `${cachedSortedItems.length} item${cachedSortedItems.length === 1 ? '' : 's'} sorted by ${sortLabel}`;
       const missingNote = missingCount > 0
         ? ` · ${missingCount} item${missingCount === 1 ? '' : 's'} missing cost (excluded from Profit)`
         : '';
@@ -3352,10 +3632,9 @@ function renderItemsTable() {
     return;
   }
 
-  tbody.innerHTML = list.map(item => {
+  tbody.innerHTML = list.map((item, viewIdx) => {
     const prod = products.find(p => p.name === item.name);
-    const rank = cachedSortedItems.findIndex(x => x.name === item.name);
-    const rankCls = rank === 0 ? 'gold' : rank === 1 ? 'silver' : rank === 2 ? 'bronze' : '';
+    const rankCls = viewIdx === 0 ? 'gold' : viewIdx === 1 ? 'silver' : viewIdx === 2 ? 'bronze' : '';
     const safeN = item.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const cost = getItemCost(item);
     const costCell = cost === null ? '<span style="color:var(--muted)">—</span>' : '₱' + fmt(cost);
@@ -3368,7 +3647,7 @@ function renderItemsTable() {
       profitCell = `<span style="color:${cls};font-weight:600">₱${fmt(profit)}</span>`;
     }
     return `<tr class="clickable" onclick="openDashItemDetail('${safeN}')">
-      <td><span class="dash-rank ${rankCls}">${rank + 1}</span></td>
+      <td><span class="dash-rank ${rankCls}">${viewIdx + 1}</span></td>
       <td style="font-weight:600">${item.name}</td>
       <td style="color:var(--muted)">${prod?.category || '—'}</td>
       <td>${prod?.price ? '₱' + fmt(prod.price) : '—'}</td>
@@ -3492,6 +3771,132 @@ function exportCSV() {
   a.href = url; a.download = `jsminimart-sales-${from}-to-${to}.csv`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// Lazy-load a script and resolve when it's parsed. Skips re-injection if a
+// matching <script> is already present (e.g. user clicked Export PDF twice).
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[data-extlib="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.dataset.extlib = src;
+    s.onload  = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+// Export the inventory ranking table as a PDF. Uses the same row set as
+// exportCSV (sold items first, then any catalogue products with zero sales),
+// loads jsPDF + autoTable lazily on first click so it doesn't bloat first
+// paint, and stamps a header with the active period + generated timestamp.
+async function exportPDF() {
+  const btn = document.getElementById('export-pdf-btn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparing PDF…'; }
+  try {
+    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js');
+
+    const fil  = filterOrdersByDate(orders);
+    const conf = fil.filter(o => o.status === 'confirmed');
+    const map  = buildItemSalesMap(conf);
+    const sold = Object.entries(map).map(([name, v]) => ({ name, ...v }))
+                  .sort((a, b) => b.qty - a.qty);
+
+    const productBaseCost = p => {
+      if (p.cost !== null && p.cost !== undefined && p.cost !== '') {
+        const n = parseFloat(p.cost);
+        if (!isNaN(n)) return n;
+      }
+      return null;
+    };
+
+    const rows = [];
+    const inSold = new Set();
+    let rankN = 1;
+    sold.forEach(item => {
+      const prod = products.find(p => p.name === item.name);
+      const cost = getItemCost(item);
+      const profit = cost === null ? null : item.revenue - cost * item.qty;
+      rows.push([
+        rankN++, item.name, prod?.category || '—', prod?.unit || '—',
+        prod?.price != null ? 'P' + fmt(prod.price) : '—',
+        cost === null ? '—' : 'P' + fmt(cost),
+        item.qty,
+        'P' + fmt(item.revenue),
+        profit === null ? '—' : 'P' + fmt(profit)
+      ]);
+      inSold.add(item.name);
+    });
+    products.filter(p => !inSold.has(p.name)).forEach(p => {
+      const c = productBaseCost(p);
+      rows.push([
+        rankN++, p.name, p.category || '—', p.unit || '—',
+        p.price != null ? 'P' + fmt(p.price) : '—',
+        c === null ? '—' : 'P' + fmt(c),
+        0, 'P0.00', c === null ? '—' : 'P0.00'
+      ]);
+    });
+
+    const from = document.getElementById('dash-from').value || '';
+    const to   = document.getElementById('dash-to').value   || '';
+    const periodLabel = (!from && !to) ? 'All time'
+                       : (from === to)  ? from
+                       : `${from || '…'} → ${to || '…'}`;
+    const generatedAt = new Date().toLocaleString('en-PH', {
+      timeZone: 'Asia/Manila',
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text('JS Mini Mart — Inventory Ranked by Sales', 40, 40);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Period: ${periodLabel}    ·    Generated: ${generatedAt}`, 40, 58);
+
+    doc.autoTable({
+      startY: 72,
+      head: [['#', 'Product', 'Category', 'Unit', 'Unit Price', 'Cost', 'Qty Sold', 'Revenue', 'Profit']],
+      body: rows,
+      styles: { font: 'helvetica', fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 30 },   // #
+        1: { halign: 'left',   cellWidth: 200 },  // Product
+        2: { halign: 'left',   cellWidth: 110 },  // Category
+        3: { halign: 'left',   cellWidth: 60 },   // Unit
+        4: { halign: 'left',   cellWidth: 70 },   // Unit Price
+        5: { halign: 'left',   cellWidth: 70 },   // Cost
+        6: { halign: 'center', cellWidth: 60 },   // Qty Sold
+        7: { halign: 'left',   cellWidth: 80, textColor: [22, 101, 52] }, // Revenue
+        8: { halign: 'left',   cellWidth: 80 }    // Profit
+      },
+      didDrawPage: data => {
+        const ps = doc.internal.pageSize;
+        doc.setFontSize(8); doc.setTextColor(150);
+        doc.text(`Page ${doc.internal.getCurrentPageInfo().pageNumber}`, ps.getWidth() - 60, ps.getHeight() - 20);
+      }
+    });
+
+    const fname = `jsminimart-inventory-${from || 'all'}-to-${to || 'time'}.pdf`;
+    doc.save(fname);
+  } catch (e) {
+    console.error('Export PDF error:', e);
+    showToast('Error generating PDF — check your connection', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig || '⇩ Export as PDF'; }
+  }
 }
 
 // ============================================================
