@@ -355,10 +355,11 @@
   .totals { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 13px; }
   .totals.grand { font-size: 14px; font-weight: 700; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
   .checkout-btn {
-    width: 100%; padding: 9px;
+    width: 100%; padding: 14px;          /* +50% vertical heft */
     background: var(--accent); color: #fff;
     border-radius: var(--radius);
-    font-weight: 600; font-size: 14px;
+    font-weight: 700; font-size: 21px;   /* 14px → 21px (+50%) */
+    letter-spacing: 0.01em;
     transition: background .15s;
   }
   .checkout-btn:hover { background: var(--accent-dark); }
