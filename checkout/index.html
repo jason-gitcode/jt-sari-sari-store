@@ -983,16 +983,41 @@ db.collection('products').get().then(snapshot => {
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   let locMap = null, locMarker = null;
   let locLat = 14.3025, locLon = 120.9437;
   let locPicked = false;
   let locSearchTimer = null;
 
-  function openLocPicker() {
+  // Leaflet (~150KB) only loads when the customer actually opens the
+  // location picker, instead of on every checkout page load. Most orders
+  // ship to a saved address so the picker is rarely opened — this saves
+  // an extra script download + parse on the critical path.
+  let __leafletLoadingPromise = null;
+  function ensureLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (__leafletLoadingPromise) return __leafletLoadingPromise;
+    __leafletLoadingPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.async = true;
+      s.onload  = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load map library'));
+      document.head.appendChild(s);
+    });
+    return __leafletLoadingPromise;
+  }
+
+  async function openLocPicker() {
     document.getElementById('loc-overlay').classList.add('open');
     document.body.style.overflow = 'hidden';
+    try {
+      await ensureLeaflet();
+    } catch (e) {
+      showToast('Map library failed to load. Check your connection.');
+      closeLocPicker();
+      return;
+    }
     setTimeout(() => {
       if (!locMap) initLocMap();
       else locMap.invalidateSize();

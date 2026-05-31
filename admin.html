@@ -343,6 +343,11 @@
     }
     .pt-data:last-child { border-bottom: none; }
     .pt-data:hover { background: var(--surface-2); }
+    /* Off-screen data rows skip paint + layout until they scroll close to
+       the viewport. With 850+ rows the rendering cost was the main reason
+       admin scrolling felt heavy. contain-intrinsic-size reserves a 64px
+       row so the scrollbar stays stable as cells materialise. */
+    .pt-data { content-visibility: auto; contain-intrinsic-size: auto 64px; }
     .pt-cell { display: flex; align-items: center; min-width: 0; }
     .pt-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .pt-name-col { flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
@@ -1039,7 +1044,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -2485,9 +2490,16 @@ function switchTab(tab, reset = true) {
 }
 
 // ---------- PRODUCTS ----------
+// Debounced search — batch keystrokes into ~180ms windows so typing in a
+// 1000-product table doesn't trigger a full re-filter+re-render on every
+// keypress. Filter happens once when typing pauses.
+let __adminSearchDebounce = 0;
 function setSearchTerm(value) {
-  searchTerm = value.trim().toLowerCase();
-  renderProducts();
+  clearTimeout(__adminSearchDebounce);
+  __adminSearchDebounce = setTimeout(() => {
+    searchTerm = value.trim().toLowerCase();
+    renderProducts();
+  }, 180);
 }
 
 function renderAdminCategories() {

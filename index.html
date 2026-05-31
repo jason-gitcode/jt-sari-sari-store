@@ -220,6 +220,12 @@
     display: flex; flex-direction: column;
     transition: box-shadow .15s, transform .15s;
     position: relative;
+    /* Skip rendering off-screen cards entirely until they scroll close to
+       the viewport — browser only pays layout + paint cost for what's
+       visible. contain-intrinsic-size reserves a placeholder so the
+       scrollbar doesn't jump as cards materialise. */
+    content-visibility: auto;
+    contain-intrinsic-size: 220px 240px;
   }
   .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
   .thumb {
@@ -927,10 +933,15 @@ function init() {
   renderCart();
   document.getElementById('products').innerHTML = '<div class="empty">Loading products…</div>';
 
+  // Debounce: don't re-render against 850+ products on every keystroke —
+  // batch typed input into ~180ms windows so "tuna" runs one filter+render
+  // pass instead of four.
+  let __searchDebounce = 0;
   document.getElementById('search-input').addEventListener('input', (e) => {
-    searchTerm = e.target.value.toLowerCase();
-    document.getElementById('search-clear').style.display = searchTerm ? 'inline' : 'none';
-    renderProducts();
+    const v = e.target.value.toLowerCase();
+    document.getElementById('search-clear').style.display = v ? 'inline' : 'none';
+    clearTimeout(__searchDebounce);
+    __searchDebounce = setTimeout(() => { searchTerm = v; renderProducts(); }, 180);
   });
 
   // ESC closes modals
