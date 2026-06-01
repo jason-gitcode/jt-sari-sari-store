@@ -1,4 +1,10 @@
 {
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": ".",
     "ignore": [
@@ -16,6 +22,7 @@
       "CNAME",
       "**/*.mp4",
       "**/*.md",
+      "**/*.rules",
       "ScreenRecording_*"
     ],
     "redirects": [

@@ -1,0 +1,54 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+
+    function isSignedIn() {
+      return request.auth != null
+          && request.auth.token.email_verified == true;
+    }
+
+    function isSuperadmin() {
+      return isSignedIn()
+          && request.auth.token.email in [
+               'aws.jason.b.tubilag@gmail.com',
+               'jason.b.tubilag@gmail.com',
+               'manilynp07@gmail.com'
+             ];
+    }
+
+    function isOwner(tid) {
+      return isSignedIn()
+          && firestore.exists(/databases/(default)/documents/tenants/$(tid))
+          && request.auth.token.email in
+             firestore.get(/databases/(default)/documents/tenants/$(tid)).data.ownerEmails;
+    }
+
+    function isOwnerOrSuper(tid) {
+      return isSuperadmin() || isOwner(tid);
+    }
+
+    // ============================================================
+    // TENANT-SCOPED PATHS
+    // ============================================================
+
+    match /tenants/{tid}/{allPaths=**} {
+      // Public read for product images, etc.
+      allow read: if true;
+      // Only owners (or super) can upload/delete tenant assets
+      allow write: if isOwnerOrSuper(tid)
+                   && (request.resource == null
+                       || request.resource.size < 5 * 1024 * 1024);
+    }
+
+    // ============================================================
+    // DEFAULT DENY for everything else (only superadmin)
+    // ============================================================
+    match /{allPaths=**} {
+      allow read, write: if isSuperadmin();
+    }
+  }
+}
