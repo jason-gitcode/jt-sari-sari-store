@@ -200,6 +200,24 @@
           <div class="help">Lowercase letters, numbers, and hyphens. 3–32 characters. Must start with a letter.</div>
         </div>
 
+        <div class="field">
+          <label for="store-pickup-address">Store address (for pickup)</label>
+          <textarea class="input" id="store-pickup-address" rows="2" placeholder="e.g. Block 8 Lot 47 Phase 3 Jade St., Valle Verde Subdivision, Dasmariñas City." maxlength="300" required></textarea>
+          <div class="help">Customers see this on the checkout page when they choose pickup.</div>
+        </div>
+
+        <div class="field">
+          <label for="store-gcash-name">GCash account name</label>
+          <input class="input" id="store-gcash-name" type="text" placeholder="e.g. Jason T. (Jason Tubilag)" maxlength="100" required />
+          <div class="help">Shown to customers paying via GCash. Best to use the exact name on your GCash account so customers know what to look for.</div>
+        </div>
+
+        <div class="field">
+          <label for="store-gcash-number">GCash phone number</label>
+          <input class="input" id="store-gcash-number" type="tel" placeholder="09XXXXXXXXX" maxlength="11" minlength="11" pattern="09[0-9]{9}" required inputmode="numeric" />
+          <div class="help">11 digits, starts with 09. This is where customers send GCash payments.</div>
+        </div>
+
         <button type="submit" id="submit-btn" class="btn btn-primary">Create my store</button>
 
         <div id="status" class="status"></div>
@@ -302,10 +320,13 @@ async function submitForm(e) {
   const btn = document.getElementById('submit-btn');
   const name = document.getElementById('store-name').value.trim();
   const slug = slugInput.value.trim().toLowerCase();
+  const pickupAddress = document.getElementById('store-pickup-address').value.trim();
+  const gcashAccountName = document.getElementById('store-gcash-name').value.trim();
+  const gcashNumber = document.getElementById('store-gcash-number').value.trim();
   btn.disabled = true;
   btn.textContent = 'Creating your store...';
   try {
-    const result = await createTenant({ name, slug });
+    const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber });
     const r = result.data;
     document.getElementById('success-name').textContent = r.name;
     const seededEl = document.getElementById('success-seeded');

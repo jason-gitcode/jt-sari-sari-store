@@ -452,7 +452,17 @@ tdoc('settings', 'store').onSnapshot(snap => {
   maintenanceMode = storeSettingsData.maintenanceMode === true;
   storeClosed     = getEffectiveStoreClosed();
   updateWeatherWarning();
+  applyTenantStoreConfig();
 });
+// Apply tenant-specific store info to the UI (pickup address, store name)
+function applyTenantStoreConfig() {
+  const storeName = storeSettingsData.storeName || STORE.name || '';
+  const pickup = storeSettingsData.pickupAddress || '';
+  const pickupBox = document.getElementById('pickup-info');
+  if (pickupBox) {
+    pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}`;
+  }
+}
 
 // Re-evaluate every minute so the Place Order button flips automatically
 // at 6am / 4pm boundaries even without a Firestore update.
@@ -563,8 +573,7 @@ function init() {
         </button>
       </div>
       <div class="pickup-info" id="pickup-info" style="display:none; margin-top:12px;">
-        <strong>Pick up at JS Mini Mart</strong>
-        Block 8 Lot 47 Phase 3 Jade St., Valle Verde Subdivision, Dasmarinas City.
+        <strong>Pick up at the store</strong>
       </div>
     </div>
 
@@ -942,14 +951,16 @@ async function placeOrder() {
 
 function showOrderConfirmation(orderId, payment) {
   const shortId = orderId.slice(-6).toUpperCase();
+  const gcashAccount = storeSettingsData.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || '';
+  const gcashNum = storeSettingsData.gcashNumber || STORE.gcashNumber || '';
   const gcashHtml = payment === 'gcash' ? `
     <div class="confirm-gcash-box">
       <h3>📱 GCash Payment Required</h3>
       <p>Send payment to:</p>
-      <p style="margin-top:6px;"><strong>${STORE.gcashDisplayName || STORE.gcashName}</strong></p>
+      <p style="margin-top:6px;"><strong>${gcashAccount}</strong></p>
       <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
-        <strong>${STORE.gcashNumber}</strong>
-        <button onclick="navigator.clipboard.writeText('${STORE.gcashNumber}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
+        <strong>${gcashNum}</strong>
+        <button onclick="navigator.clipboard.writeText('${gcashNum}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
       </p>
       <p style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
         <span>Order No. <strong>#${shortId}</strong></span>

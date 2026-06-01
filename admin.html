@@ -1226,6 +1226,7 @@
       <div class="settings-grid">
         <aside class="settings-nav">
           <button class="active" data-settings-nav="modes" onclick="goToSettingsSection('modes')">Operating Modes</button>
+          <button data-settings-nav="store-info" onclick="goToSettingsSection('store-info')">Store Info</button>
           <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
           <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
           <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
@@ -1274,6 +1275,47 @@
                   <input type="checkbox" id="set-maint-mode" onclick="toggleMaintenanceMode()" />
                   <span class="toggle-sl"></span>
                 </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="set-store-info">
+            <h3>Store Info</h3>
+            <div class="section-sub">Address customers see for pickup, and the GCash account they send payments to.</div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">Store name</div>
+                <div class="setting-desc">Displayed at the top of your storefront and in pickup instructions.</div>
+                <input type="text" id="si-store-name" maxlength="100" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">Pickup address</div>
+                <div class="setting-desc">Shown to customers who choose pickup at checkout.</div>
+                <textarea id="si-pickup-address" rows="2" maxlength="300" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;"></textarea>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">GCash account name</div>
+                <div class="setting-desc">Name customers will see when paying via GCash.</div>
+                <input type="text" id="si-gcash-name" maxlength="100" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">GCash phone number</div>
+                <div class="setting-desc">11 digits, starts with 09.</div>
+                <input type="tel" id="si-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-desc" id="si-status" style="font-size:12px;color:var(--muted);min-height:18px;"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="si-save-btn" onclick="saveStoreInfo()">Save changes</button>
               </div>
             </div>
           </section>
@@ -1654,7 +1696,42 @@ tdoc('settings', 'store').onSnapshot(snap => {
   maintenanceModeActive = storeSettingsData.maintenanceMode === true;
   storeClosedActive = getEffectiveStoreClosed();
   syncOperatingModeToggles();
+  syncStoreInfoForm();
 });
+
+function syncStoreInfoForm() {
+  const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };
+  f('si-store-name', storeSettingsData.storeName);
+  f('si-pickup-address', storeSettingsData.pickupAddress);
+  f('si-gcash-name', storeSettingsData.gcashAccountName);
+  f('si-gcash-number', storeSettingsData.gcashNumber);
+}
+
+async function saveStoreInfo() {
+  const status = document.getElementById('si-status');
+  const btn = document.getElementById('si-save-btn');
+  const storeName = document.getElementById('si-store-name').value.trim();
+  const pickupAddress = document.getElementById('si-pickup-address').value.trim();
+  const gcashAccountName = document.getElementById('si-gcash-name').value.trim();
+  const gcashNumber = document.getElementById('si-gcash-number').value.trim();
+  if (storeName.length < 2) { status.textContent = 'Store name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
+  if (pickupAddress.length < 5) { status.textContent = 'Pickup address must be at least 5 characters.'; status.style.color = '#dc2626'; return; }
+  if (gcashAccountName.length < 2) { status.textContent = 'GCash account name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
+  if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.style.color = '#dc2626'; return; }
+  btn.disabled = true; btn.textContent = 'Saving...';
+  status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
+  try {
+    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
 
 function syncOperatingModeToggles() {
   const setStore = document.getElementById('set-store-closed');

@@ -72,6 +72,33 @@ function validateName(raw) {
   return name;
 }
 
+function validatePickupAddress(raw) {
+  const v = String(raw || '').trim();
+  if (v.length < 5 || v.length > 300) {
+    throw new HttpsError('invalid-argument',
+      'Pickup address must be 5–300 characters.');
+  }
+  return v;
+}
+
+function validateGcashAccountName(raw) {
+  const v = String(raw || '').trim();
+  if (v.length < 2 || v.length > 100) {
+    throw new HttpsError('invalid-argument',
+      'GCash account name must be 2–100 characters.');
+  }
+  return v;
+}
+
+function validateGcashNumber(raw) {
+  const v = String(raw || '').trim();
+  if (!/^09\d{9}$/.test(v)) {
+    throw new HttpsError('invalid-argument',
+      'GCash number must be 11 digits starting with 09.');
+  }
+  return v;
+}
+
 exports.createTenant = onCall(async (request) => {
   // ---------- AUTH ----------
   if (!request.auth) {
@@ -92,6 +119,9 @@ exports.createTenant = onCall(async (request) => {
   const data = request.data || {};
   const slug = validateSlug(data.slug);
   const name = validateName(data.name);
+  const pickupAddress = validatePickupAddress(data.pickupAddress);
+  const gcashAccountName = validateGcashAccountName(data.gcashAccountName);
+  const gcashNumber = validateGcashNumber(data.gcashNumber);
 
   // ---------- PER-EMAIL TENANT CAP ----------
   // Note: this check is racy under high-concurrency parallel calls from the
@@ -125,13 +155,18 @@ exports.createTenant = onCall(async (request) => {
     });
   });
 
-  // ---------- SEED MINIMAL SETTINGS DOC ----------
-  // So the storefront has *something* to read on day 1.
+  // ---------- SEED SETTINGS DOC ----------
+  // Tenant-facing configuration that the (anonymous) storefront and
+  // checkout pages read. Editable later via admin → Settings.
   await ref.collection('settings').doc('store').set({
     storeClosed: false,
     rainMode: false,
     maintenanceMode: false,
-    storeClosedSource: 'auto'
+    storeClosedSource: 'auto',
+    storeName: name,
+    pickupAddress,
+    gcashAccountName,
+    gcashNumber
   });
 
   // ---------- COPY STARTER PACK PRODUCTS ----------
