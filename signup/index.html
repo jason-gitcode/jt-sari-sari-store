@@ -243,6 +243,13 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+// SESSION persistence: each tab keeps its own auth state. Without this,
+// signing in/out in another tab broadcasts via localStorage and kicks
+// THIS tab's onAuthStateChanged listener, which jumps the form back to
+// Step 1 mid-typing. SESSION isolates per-tab.
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(err => {
+  console.warn('[signup] Could not set SESSION persistence:', err);
+});
 const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
 
