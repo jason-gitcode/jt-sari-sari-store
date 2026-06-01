@@ -2050,9 +2050,9 @@ async function runSeedStarterPack() {
         if (Array.isArray(clean.variants)) {
           clean.variants = clean.variants.map(v => ({ ...v, stock: null }));
         }
-        // Image URLs reference jsminimart's Storage paths; new tenants won't
-        // have them. Strip so new admins start with text-only emoji entries.
-        if (Array.isArray(clean.images)) clean.images = [];
+        // Images stay as-is. They're stored as inline base64 data URIs on the
+        // product doc (see compressImage in admin), so they're self-contained
+        // and copy perfectly between tenants.
         batch.set(db.collection('starter_pack').doc(p.id), clean);
         ops++;
         if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
