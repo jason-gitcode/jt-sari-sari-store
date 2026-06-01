@@ -211,9 +211,10 @@
   <div id="step-success" class="hidden">
     <div class="step-title">🎉 Your store is ready!</div>
     <div class="step-body">
-      <p style="font-size: 15px; margin-bottom: 16px;">
+      <p style="font-size: 15px; margin-bottom: 6px;">
         <strong id="success-name"></strong> is now live.
       </p>
+      <p id="success-seeded" style="font-size: 13px; color: var(--muted); margin-bottom: 16px;"></p>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Storefront (share this with customers):</p>
       <a id="success-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 14px;">—</a>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Admin (manage your products + orders):</p>
@@ -296,6 +297,12 @@ async function submitForm(e) {
     const result = await createTenant({ name, slug });
     const r = result.data;
     document.getElementById('success-name').textContent = r.name;
+    const seededEl = document.getElementById('success-seeded');
+    if (seededEl) {
+      seededEl.textContent = (r.starterPackCopied > 0)
+        ? `Pre-loaded with ${r.starterPackCopied} starter products — you can edit, hide, or add more in the admin.`
+        : 'Your store starts with an empty catalog. Add products from the admin.';
+    }
     const storeLink = document.getElementById('success-url');
     storeLink.href = r.url;
     storeLink.textContent = r.url;

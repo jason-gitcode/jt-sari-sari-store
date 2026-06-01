@@ -107,10 +107,39 @@ exports.createTenant = onCall(async (request) => {
     storeClosedSource: 'auto'
   });
 
+  // ---------- COPY STARTER PACK PRODUCTS ----------
+  // The root /starter_pack collection is curated by superadmin via the
+  // "Seed Starter Pack" button in admin. If it's empty (i.e. no pack
+  // seeded yet), new tenants start with an empty catalog — fine for pilot.
+  let starterPackCopied = 0;
+  try {
+    const pack = await db.collection('starter_pack').get();
+    if (!pack.empty) {
+      const productsCol = ref.collection('products');
+      let batch = db.batch();
+      let ops = 0;
+      for (const doc of pack.docs) {
+        batch.set(productsCol.doc(doc.id), doc.data());
+        ops++;
+        if (ops >= 400) {
+          await batch.commit();
+          batch = db.batch();
+          ops = 0;
+        }
+      }
+      if (ops > 0) await batch.commit();
+      starterPackCopied = pack.size;
+    }
+  } catch (err) {
+    // Don't fail tenant creation if starter pack copy fails — log and move on.
+    console.error('starter_pack copy failed for tenant', slug, err);
+  }
+
   return {
     slug,
     name,
     url: `https://jsminimart.com/${slug}/`,
-    adminUrl: `https://jsminimart.com/${slug}/admin/`
+    adminUrl: `https://jsminimart.com/${slug}/admin/`,
+    starterPackCopied
   };
 });

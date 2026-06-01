@@ -1370,6 +1370,16 @@
                 <button class="btn-logout-settings" id="migrate-btn" onclick="runTenantMigration()">Run Migration</button>
               </div>
             </div>
+            <div class="setting-row" id="seed-pack-row" style="display:none;">
+              <div class="setting-info">
+                <div class="setting-title">📦 Seed Starter Pack <span style="font-size:11px;font-weight:400;color:var(--muted);">superadmin only</span></div>
+                <div class="setting-desc">Pick 80 random available products from this store and write them to the root <code>starter_pack/*</code> collection. <code>createTenant</code> copies these into every new tenant's catalog. Overwrites any existing pack. Run once after curating your inventory.</div>
+                <div class="setting-desc" id="seed-pack-status" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed Starter Pack</button>
+              </div>
+            </div>
           </section>
 
         </div>
@@ -1981,6 +1991,85 @@ async function runTenantMigration() {
     status.style.color = '#dc2626';
     btn.disabled = false;
     btn.textContent = 'Retry Migration';
+  }
+}
+
+// ============================================================
+// SEED STARTER PACK (superadmin only; copies a random sample of
+// this tenant's products into the root /starter_pack collection,
+// which the createTenant Cloud Function uses to seed new tenants)
+// ============================================================
+async function runSeedStarterPack() {
+  const btn = document.getElementById('seed-pack-btn');
+  const status = document.getElementById('seed-pack-status');
+  const PACK_SIZE = 80;
+  if (!confirm(`Pick ${PACK_SIZE} random available products from this store and write them to /starter_pack/*?\n\nNew tenants will receive these as their starting catalog. Overwrites any existing starter pack.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Seeding...';
+  status.style.color = 'var(--muted)';
+  status.textContent = 'Reading products...';
+  try {
+    if (!TENANT_ID) throw new Error('No tenant in URL.');
+    const srcSnap = await tcol('products').get();
+    const candidates = srcSnap.docs
+      .map(d => ({ id: d.id, data: d.data() }))
+      .filter(p => p.data.available !== false && p.data.hidden !== true);
+    if (candidates.length === 0) throw new Error('No available products to sample from.');
+
+    // Fisher-Yates shuffle, take first PACK_SIZE
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    const picked = candidates.slice(0, PACK_SIZE);
+    status.textContent = `Picked ${picked.length} of ${candidates.length} available products. Clearing old pack...`;
+
+    // Wipe existing starter_pack
+    const existingSnap = await db.collection('starter_pack').get();
+    {
+      let batch = db.batch();
+      let ops = 0;
+      for (const d of existingSnap.docs) {
+        batch.delete(d.ref);
+        ops++;
+        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+      if (ops > 0) await batch.commit();
+    }
+    status.textContent = `Cleared ${existingSnap.size} old entries. Writing new pack...`;
+
+    // Write new pack — strip stock + images, normalize to clean starter state
+    {
+      let batch = db.batch();
+      let ops = 0;
+      for (const p of picked) {
+        const clean = { ...p.data };
+        clean.stock = null;
+        clean.available = true;
+        clean.hidden = false;
+        if (Array.isArray(clean.variants)) {
+          clean.variants = clean.variants.map(v => ({ ...v, stock: null }));
+        }
+        // Image URLs reference jsminimart's Storage paths; new tenants won't
+        // have them. Strip so new admins start with text-only emoji entries.
+        if (Array.isArray(clean.images)) clean.images = [];
+        batch.set(db.collection('starter_pack').doc(p.id), clean);
+        ops++;
+        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+      if (ops > 0) await batch.commit();
+    }
+
+    status.style.color = '#16a34a';
+    status.textContent = `✅ Seeded ${picked.length} products to /starter_pack/* (sampled from ${candidates.length} available).`;
+    btn.textContent = 'Re-seed Pack';
+    btn.disabled = false;
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : String(err));
+    btn.disabled = false;
+    btn.textContent = 'Retry Seed';
   }
 }
 
@@ -3281,6 +3370,11 @@ auth.onAuthStateChanged(async user => {
       const count = (auth_result.reason === 'superadmin' ? SUPERADMIN_EMAILS.length : TENANT_OWNER_EMAILS.length);
       const label = (auth_result.reason === 'superadmin' ? 'superadmin' : 'owner');
       aec.textContent = `${count} ${label}${count === 1 ? '' : 's'}`;
+    }
+    // Reveal superadmin-only tools.
+    if (auth_result.reason === 'superadmin') {
+      const seedRow = document.getElementById('seed-pack-row');
+      if (seedRow) seedRow.style.display = '';
     }
   } else {
     const msg = ({

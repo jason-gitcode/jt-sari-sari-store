@@ -101,6 +101,14 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // STARTER PACK (root-level seed catalog used by createTenant)
+    // ============================================================
+    match /starter_pack/{pid} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // ============================================================
     // DEFAULT DENY for everything else (including legacy root paths
     // /products, /orders, /settings left behind after migration)
     // ============================================================
