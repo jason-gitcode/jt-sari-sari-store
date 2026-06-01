@@ -15,6 +15,17 @@ const db = getFirestore();
 // allowing them would break the site for that tenant.
 //
 // `jsminimart` is also reserved per Jason's instruction (existing seed tenant).
+// Superadmin emails — bypass the per-email tenant cap. Keep in sync with
+// firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
+const SUPERADMIN_EMAILS = new Set([
+  'aws.jason.b.tubilag@gmail.com',
+  'jason.b.tubilag@gmail.com',
+  'manilynp07@gmail.com'
+]);
+
+// Max tenants a single non-superadmin email can create. Pilot default = 3.
+const MAX_TENANTS_PER_EMAIL = 3;
+
 const RESERVED_SLUGS = new Set([
   'admin', 'admin.html',
   'checkout', 'checkout.html',
@@ -80,6 +91,20 @@ exports.createTenant = onCall(async (request) => {
   const data = request.data || {};
   const slug = validateSlug(data.slug);
   const name = validateName(data.name);
+
+  // ---------- PER-EMAIL TENANT CAP ----------
+  // Note: this check is racy under high-concurrency parallel calls from the
+  // same user; acceptable for pilot scale (sari-sari store SaaS).
+  if (!SUPERADMIN_EMAILS.has(email)) {
+    const existing = await db.collection('tenants')
+      .where('createdByEmail', '==', email)
+      .limit(MAX_TENANTS_PER_EMAIL + 1)
+      .get();
+    if (existing.size >= MAX_TENANTS_PER_EMAIL) {
+      throw new HttpsError('resource-exhausted',
+        `You've already created ${existing.size} stores with this email. The limit is ${MAX_TENANTS_PER_EMAIL}. Please use a different account or contact support.`);
+    }
+  }
 
   // ---------- CREATE (transactional uniqueness check) ----------
   const ref = db.collection('tenants').doc(slug);

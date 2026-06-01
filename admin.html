@@ -2016,13 +2016,24 @@ async function runSeedStarterPack() {
       .filter(p => p.data.available !== false && p.data.hidden !== true);
     if (candidates.length === 0) throw new Error('No available products to sample from.');
 
-    // Fisher-Yates shuffle, take first PACK_SIZE
-    for (let i = candidates.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-    }
-    const picked = candidates.slice(0, PACK_SIZE);
-    status.textContent = `Picked ${picked.length} of ${candidates.length} available products. Clearing old pack...`;
+    // Prefer products that actually have photos; fall back to emoji-only
+    // products if there aren't enough with images.
+    const withImages = candidates.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0);
+    const withoutImages = candidates.filter(p => !Array.isArray(p.data.images) || p.data.images.length === 0);
+    const shuffle = arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    };
+    shuffle(withImages);
+    shuffle(withoutImages);
+    const picked = [
+      ...withImages.slice(0, PACK_SIZE),
+      ...withoutImages.slice(0, Math.max(0, PACK_SIZE - withImages.length))
+    ];
+    const pickedWithImages = picked.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0).length;
+    status.textContent = `Picked ${picked.length} products (${pickedWithImages} with photos, ${picked.length - pickedWithImages} emoji-only) from ${candidates.length} available. Clearing old pack...`;
 
     // Wipe existing starter_pack
     const existingSnap = await db.collection('starter_pack').get();
@@ -2061,7 +2072,7 @@ async function runSeedStarterPack() {
     }
 
     status.style.color = '#16a34a';
-    status.textContent = `✅ Seeded ${picked.length} products to /starter_pack/* (sampled from ${candidates.length} available).`;
+    status.textContent = `✅ Seeded ${picked.length} products to /starter_pack/* — ${pickedWithImages} with photos, ${picked.length - pickedWithImages} emoji-only.`;
     btn.textContent = 'Re-seed Pack';
     btn.disabled = false;
   } catch (err) {
