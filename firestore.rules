@@ -98,6 +98,11 @@ service cloud.firestore {
         allow read, update, delete: if isOwnerOrSuper(tid);
         allow create: if isValidOrderCreate();
       }
+
+      // ---------- suppliers: private to the tenant's owners; never customer-facing
+      match /suppliers/{sid} {
+        allow read, write: if isOwnerOrSuper(tid);
+      }
     }
 
     // ============================================================

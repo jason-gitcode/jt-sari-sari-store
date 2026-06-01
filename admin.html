@@ -217,6 +217,19 @@
     #orders-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 32px; }
+    #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 32px; }
+    .supplier-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .supplier-card label.supp-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .supplier-card .supp-input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink); box-sizing: border-box; }
+    .supplier-card textarea.supp-input { min-height: 50px; resize: vertical; }
+    .supplier-card .supp-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .supplier-card .supp-cell { flex: 1; min-width: 200px; }
+    .supplier-card .supp-cat-list { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
+    .supplier-card .supp-cat-list label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
+    .supplier-card .supp-footer { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+    .supplier-card .supp-status { font-size: 12px; color: var(--muted); margin-right: auto; }
+    .supplier-card .supp-del-btn { background: transparent; border: 1px solid #fecaca; color: var(--danger); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .supplier-card .supp-del-btn:hover { background: #fee2e2; }
 
     /* ---------- PAGE HEADER ---------- */
     .page-header {
@@ -1090,6 +1103,7 @@
       <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">🏠 Home</button>
       <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">📋 Orders<span class="order-badge" id="order-badge" style="display:none;"></span></button>
       <button class="tab-btn" data-tab="products" onclick="switchTab('products')">📦 Products</button>
+      <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">🏭 Suppliers</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -1217,6 +1231,20 @@
           <div class="products-grid" id="products-list"></div>
         </div>
       </div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div class="tab-panel" id="suppliers-tab">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Suppliers</div>
+          <div class="page-subtitle">Track your suppliers, their contacts, and when they deliver to you.</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn-add-product" onclick="addSupplier()">+ Add Supplier</button>
+        </div>
+      </div>
+      <div id="suppliers-list" style="display:flex;flex-direction:column;gap:12px;padding:8px 0 32px;"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -2413,6 +2441,8 @@ let searchTerm = '';
 let currentImages = [];
 let unsubscribeProducts = null;
 let unsubscribeOrders = null;
+let unsubscribeSuppliers = null;
+let suppliers = [];
 let adminActiveCategory = 'All';
 let ordersFilter = 'all';
 
@@ -2514,8 +2544,9 @@ async function login() {
 }
 
 function logout() {
-  if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
-  if (unsubscribeOrders)   { unsubscribeOrders();   unsubscribeOrders   = null; }
+  if (unsubscribeProducts)  { unsubscribeProducts();  unsubscribeProducts  = null; }
+  if (unsubscribeOrders)    { unsubscribeOrders();    unsubscribeOrders    = null; }
+  if (unsubscribeSuppliers) { unsubscribeSuppliers(); unsubscribeSuppliers = null; }
   auth.signOut();
   resetForm();
 }
@@ -2682,6 +2713,7 @@ function showAdmin() {
   document.getElementById('admin-area').style.display = 'flex';
   subscribeToProducts();
   subscribeToOrders();
+  subscribeToSuppliers();
   // Initialise dashboard date range so the "Last 30 Days" preset is in sync
   setDashPreset('today', false);
   setHomeGreeting();
@@ -2725,6 +2757,148 @@ function subscribeToOrders() {
       }
       isFirstLoad = false;
     }, err => console.error('Orders listener error:', err));
+}
+
+// ============================================================
+// SUPPLIERS
+// ============================================================
+function subscribeToSuppliers() {
+  if (unsubscribeSuppliers) unsubscribeSuppliers();
+  unsubscribeSuppliers = tcol('suppliers').onSnapshot(snapshot => {
+    suppliers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    suppliers.sort((a, b) => (a.businessName || '').localeCompare(b.businessName || ''));
+    renderSuppliers();
+  }, err => console.error('Suppliers listener error:', err));
+}
+
+function getProductCategories() {
+  const set = new Set();
+  (products || []).forEach(p => { if (p.category) set.add(p.category); });
+  return [...set].sort();
+}
+
+function escAttr(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+function escText(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function renderSuppliers() {
+  const list = document.getElementById('suppliers-list');
+  if (!list) return;
+  if (suppliers.length === 0) {
+    list.innerHTML = `<div style="text-align:center;padding:48px 16px;color:var(--muted);">
+      <div style="font-size:48px;margin-bottom:12px;">🏭</div>
+      <div style="font-size:14px;">No suppliers yet.</div>
+      <div style="font-size:12px;margin-top:4px;">Click "+ Add Supplier" above to add your first one.</div>
+    </div>`;
+    return;
+  }
+  const cats = getProductCategories();
+  list.innerHTML = suppliers.map(s => renderSupplierCard(s, cats)).join('');
+}
+
+function renderSupplierCard(s, allCats) {
+  const selected = new Set(Array.isArray(s.categories) ? s.categories : []);
+  const catChecks = allCats.length > 0
+    ? `<div class="supp-cat-list">${allCats.map(c => `
+        <label><input type="checkbox" class="supp-cat" data-cat="${escAttr(c)}" ${selected.has(c) ? 'checked' : ''} /> ${escText(c)}</label>
+      `).join('')}</div>`
+    : '<span style="font-size:12px;color:var(--muted);">Add some products first to define categories.</span>';
+  return `
+    <div class="supplier-card" data-supplier-id="${escAttr(s.id)}">
+      <div class="supp-row">
+        <div class="supp-cell">
+          <label class="supp-label">Business name</label>
+          <input type="text" class="supp-input" data-field="businessName" value="${escAttr(s.businessName)}" placeholder="e.g. ABC Trading" />
+        </div>
+        <div class="supp-cell">
+          <label class="supp-label">Contact person</label>
+          <input type="text" class="supp-input" data-field="contactPerson" value="${escAttr(s.contactPerson)}" placeholder="e.g. Maria Santos" />
+        </div>
+      </div>
+      <div class="supp-row">
+        <div class="supp-cell">
+          <label class="supp-label">Contact number</label>
+          <input type="text" class="supp-input" data-field="contactNumber" value="${escAttr(s.contactNumber)}" placeholder="e.g. 09171234567" />
+        </div>
+        <div class="supp-cell">
+          <label class="supp-label">Next delivery / schedule</label>
+          <input type="datetime-local" class="supp-input" data-field="schedule" value="${escAttr(s.schedule)}" />
+        </div>
+      </div>
+      <div>
+        <label class="supp-label">Address</label>
+        <textarea class="supp-input" data-field="address" rows="2" placeholder="Supplier's address">${escText(s.address)}</textarea>
+      </div>
+      <div>
+        <label class="supp-label">Categories supplied</label>
+        ${catChecks}
+      </div>
+      <div class="supp-footer">
+        <span class="supp-status"></span>
+        <button class="supp-del-btn" onclick="deleteSupplier('${escAttr(s.id)}')">Delete</button>
+        <button class="btn-logout-settings" onclick="saveSupplier('${escAttr(s.id)}')">Save</button>
+      </div>
+    </div>
+  `;
+}
+
+async function addSupplier() {
+  try {
+    await tcol('suppliers').add({
+      businessName: '',
+      contactPerson: '',
+      contactNumber: '',
+      address: '',
+      schedule: '',
+      categories: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Snapshot listener will pick it up and render. Then scroll to the new
+    // card so the user can start typing immediately.
+    setTimeout(() => {
+      const list = document.getElementById('suppliers-list');
+      if (list) list.scrollTop = list.scrollHeight;
+    }, 200);
+  } catch (err) {
+    console.error(err);
+    showToast('Error adding supplier: ' + (err && err.message ? err.message : err), 'error');
+  }
+}
+
+async function saveSupplier(id) {
+  const card = document.querySelector(`.supplier-card[data-supplier-id="${id}"]`);
+  if (!card) return;
+  const data = {};
+  card.querySelectorAll('.supp-input').forEach(el => {
+    data[el.dataset.field] = (el.value || '').trim();
+  });
+  data.categories = Array.from(card.querySelectorAll('.supp-cat:checked')).map(cb => cb.dataset.cat);
+
+  const status = card.querySelector('.supp-status');
+  status.textContent = 'Saving...';
+  status.style.color = 'var(--muted)';
+  try {
+    await tdoc('suppliers', id).set(data, { merge: true });
+    status.textContent = '✅ Saved';
+    status.style.color = '#16a34a';
+    // Fade out the saved indicator after a moment.
+    setTimeout(() => { if (status) status.textContent = ''; }, 2500);
+  } catch (err) {
+    console.error(err);
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+    status.style.color = '#dc2626';
+  }
+}
+
+async function deleteSupplier(id) {
+  const sup = suppliers.find(s => s.id === id);
+  const name = (sup && sup.businessName) ? sup.businessName : 'this supplier';
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  try {
+    await tdoc('suppliers', id).delete();
+  } catch (err) {
+    console.error(err);
+    showToast('Error deleting supplier: ' + (err && err.message ? err.message : err), 'error');
+  }
 }
 
 function notifyNewOrder(order, orderId) {
