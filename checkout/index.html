@@ -903,9 +903,14 @@ async function placeOrder() {
             if (!item || v.stock === null || v.stock === undefined) return v;
             return { ...v, stock: Math.max(0, v.stock - item.qty) };
           });
-          upd.variants = newVariants;
-          // Mark unavailable only when every variant is depleted
-          if (newVariants.every(v => (v.stock ?? 0) === 0)) upd.available = false;
+          // Skip the write entirely if nothing changed — avoids a no-op
+          // update that could trip Firestore rules' diff check.
+          const variantsChanged = JSON.stringify(newVariants) !== JSON.stringify(data.variants || []);
+          if (variantsChanged) upd.variants = newVariants;
+          // Mark unavailable only when every TRACKED variant is depleted.
+          // Variants with null/undefined stock are *untracked*, not exhausted.
+          const tracked = newVariants.filter(v => v.stock !== null && v.stock !== undefined);
+          if (tracked.length > 0 && tracked.every(v => v.stock === 0)) upd.available = false;
         }
         if (plainItems.length > 0 && data.stock !== null && data.stock !== undefined) {
           const totalQty = plainItems.reduce((s, it) => s + it.qty, 0);
