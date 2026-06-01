@@ -16,7 +16,19 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="dns-prefetch" href="https://www.googleapis.com">
+<script>
+  // Sync URL → root class so the jsminimart logo is hidden BEFORE the
+  // header paints on any other tenant. Avoids a "JS Mini Mart" flash
+  // when loading e.g. /ggssminimart/.
+  (function () {
+    var parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts[0] && parts[0] !== 'jsminimart') {
+      document.documentElement.classList.add('no-default-logo');
+    }
+  })();
+</script>
 <style>
+  html.no-default-logo .logo { display: none !important; }
   /* ---------- BASE ---------- */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -887,7 +899,6 @@ function getEffectiveStoreClosed() {
 }
 
 function buildTicker(rainMode, storeClosed, maintenance) {
-  const deliveryOn   = storeSettingsData.deliveryEnabled !== false;
   const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
   const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
   const freeDelOn    = storeSettingsData.freeDeliveryEnabled !== false;
@@ -899,23 +910,22 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   const hoursLong  = `${fmtHour12Long(oH)} – ${fmtHour12Long(cH)}`;
 
   const items = [];
-  // "Delivering to:" — only if delivery on, areas feature on, and areas listed.
-  if (deliveryOn && areasOn && areas.length > 0) {
+  // Each item is governed by its own feature toggle. The master "Offer
+  // delivery" toggle no longer gates these — that matches the admin UX
+  // where the per-feature badges reflect the per-feature toggles directly.
+  if (areasOn && areas.length > 0) {
     items.push({ icon: '📍', text: 'Delivering to: ' + areas.join(' · ') });
   }
-  // Always show open hours.
   items.push({ icon: '🕐', text: `Open ${hoursShort} daily` });
-  // Free-delivery threshold — only if delivery on and feature on.
-  if (deliveryOn && freeDelOn && threshold > 0) {
+  if (freeDelOn && threshold > 0) {
     items.push({ icon: '🛵', text: `Free delivery on orders min. Php ${threshold}` });
   }
-  // Delivery windows — only if delivery on, schedules feature on, and windows configured.
-  if (deliveryOn && schedulesOn && schedules.length > 0) {
+  if (schedulesOn && schedules.length > 0) {
     const labels = schedules.map(s => `${fmtTime12Short(s.start)}–${fmtTime12Short(s.end)}`);
     items.push({ icon: '🕒', text: `Delivery windows: ${labels.join(' · ')}` });
   }
 
-  if (rainMode && deliveryOn) items.push(RAIN_TICKER);
+  if (rainMode) items.push(RAIN_TICKER);
   if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} daily. Thank you for your patience.` });
   if (maintenance) items.push(MAINTENANCE_TICKER);
   if (offlineMode) items.push(OFFLINE_TICKER);
