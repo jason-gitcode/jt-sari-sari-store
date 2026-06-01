@@ -476,15 +476,20 @@ function applyTenantStoreConfig() {
   // Locate via a more specific selector — the section that contains .ff-options.
   const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
   if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  const sched = document.getElementById('schedule-section');
   if (!deliveryOn) {
     if (fulfillmentMethod !== 'pickup') {
       fulfillmentMethod = 'pickup';
     }
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
-    const sched = document.getElementById('schedule-section');
-    if (sched) sched.classList.add('is-disabled');
+    // Delivery is off entirely — hide schedule completely (not just greyed).
+    if (sched) sched.style.display = 'none';
     if (pickupBox) pickupBox.style.display = 'block';
+  } else {
+    // Delivery is on — make sure the schedule section is visible (pickFulfillment
+    // will toggle the is-disabled greying separately when customer picks pickup).
+    if (sched) sched.style.display = '';
   }
 
   // Hide / show individual payment-method buttons based on admin toggles.

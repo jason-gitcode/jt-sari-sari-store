@@ -467,13 +467,15 @@ function applyTenantStoreConfig() {
   const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
   const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
   if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  const sched = document.getElementById('schedule-section');
   if (!deliveryOn) {
     if (fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
-    const sched = document.getElementById('schedule-section');
-    if (sched) sched.classList.add('is-disabled');
+    if (sched) sched.style.display = 'none';
     if (pickupBox) pickupBox.style.display = 'block';
+  } else {
+    if (sched) sched.style.display = '';
   }
   const setPayVisible = (key, on) => {
     const btn = document.querySelector(`[data-pay="${key}"]`);
