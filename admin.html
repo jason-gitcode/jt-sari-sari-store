@@ -968,6 +968,10 @@
       }
       .chip-group { width: auto; flex-shrink: 0; }
       .admin-chip { flex: initial; text-align: center; }
+      /* In the horizontal narrow layout, the "All" chip (no delete button)
+         must NOT stretch to 100% width — let it size to its content so the
+         other category chips share the row. */
+      .admin-chip:not(.with-del) { width: auto; flex: initial; }
 
       .products-main {
         flex: 1 1 0; min-height: 0;
