@@ -1227,6 +1227,7 @@
         <aside class="settings-nav">
           <button class="active" data-settings-nav="modes" onclick="goToSettingsSection('modes')">Operating Modes</button>
           <button data-settings-nav="store-info" onclick="goToSettingsSection('store-info')">Store Info</button>
+          <button data-settings-nav="service" onclick="goToSettingsSection('service')">Service &amp; Payment</button>
           <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
           <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
           <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
@@ -1316,6 +1317,63 @@
               </div>
               <div class="setting-control">
                 <button class="btn-logout-settings" id="si-save-btn" onclick="saveStoreInfo()">Save changes</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="set-service">
+            <h3>Service &amp; Payment</h3>
+            <div class="section-sub">Control whether you offer delivery and which payment methods customers can pick at checkout.</div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">🛵 Offer delivery <span class="mode-badge off" id="set-delivery-badge">OFF</span></div>
+                <div class="setting-desc">When off, the checkout hides the delivery / pickup picker and the address fields, treats every order as pickup, and disables Cash on Delivery automatically.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-delivery-enabled" onclick="toggleServiceOption('deliveryEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">💵 Accept Cash (at pickup) <span class="mode-badge off" id="set-pay-cash-badge">OFF</span></div>
+                <div class="setting-desc">Pay-in-person at the store. Only relevant for pickup orders.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-pay-cash-enabled" onclick="toggleServiceOption('payCashEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">📱 Accept GCash <span class="mode-badge off" id="set-pay-gcash-badge">OFF</span></div>
+                <div class="setting-desc">GCash transfer. Available for both pickup and delivery. Configure your account name + number in <strong>Store Info</strong>.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-pay-gcash-enabled" onclick="toggleServiceOption('payGcashEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">🛵 Accept Cash on Delivery <span class="mode-badge off" id="set-pay-cod-badge">OFF</span></div>
+                <div class="setting-desc">Pay-on-receipt for delivery orders. Auto-disabled if "Offer delivery" is off, regardless of this toggle.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-pay-cod-enabled" onclick="toggleServiceOption('payCodEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
               </div>
             </div>
           </section>
@@ -1697,7 +1755,58 @@ tdoc('settings', 'store').onSnapshot(snap => {
   storeClosedActive = getEffectiveStoreClosed();
   syncOperatingModeToggles();
   syncStoreInfoForm();
+  syncServiceToggles();
 });
+
+// Service & Payment toggle handlers
+async function toggleServiceOption(field, value) {
+  // Guard: don't let admin disable ALL payment methods
+  if (field.startsWith('pay') && value === false) {
+    const others = ['payCashEnabled', 'payGcashEnabled', 'payCodEnabled'].filter(k => k !== field);
+    const anyOtherOn = others.some(k => storeSettingsData[k] !== false);
+    if (!anyOtherOn) {
+      alert('At least one payment method must stay enabled. Turn another method on first before disabling this one.');
+      // revert the checkbox visual state
+      syncServiceToggles();
+      return;
+    }
+  }
+  try {
+    await tdoc('settings', 'store').set({ [field]: value }, { merge: true });
+    showToast('Updated.', 'success');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to update: ' + (err && err.message ? err.message : err));
+    syncServiceToggles();
+  }
+}
+
+function syncServiceToggles() {
+  // Default true if field absent (preserves existing tenants' behaviour)
+  const fields = {
+    'set-delivery-enabled':  storeSettingsData.deliveryEnabled  !== false,
+    'set-pay-cash-enabled':  storeSettingsData.payCashEnabled   !== false,
+    'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
+    'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false
+  };
+  for (const id in fields) {
+    const el = document.getElementById(id);
+    if (el) el.checked = fields[id];
+  }
+  const badges = {
+    'set-delivery-badge':   fields['set-delivery-enabled'],
+    'set-pay-cash-badge':   fields['set-pay-cash-enabled'],
+    'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
+    'set-pay-cod-badge':    fields['set-pay-cod-enabled']
+  };
+  for (const id in badges) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.textContent = badges[id] ? 'ON' : 'OFF';
+    el.classList.toggle('on', badges[id]);
+    el.classList.toggle('off', !badges[id]);
+  }
+}
 
 function syncStoreInfoForm() {
   const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };

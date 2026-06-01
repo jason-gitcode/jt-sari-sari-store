@@ -461,6 +461,29 @@ function applyTenantStoreConfig() {
   if (pickupBox) {
     pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}`;
   }
+  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  const cashOn     = storeSettingsData.payCashEnabled  !== false;
+  const gcashOn    = storeSettingsData.payGcashEnabled !== false;
+  const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
+  const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
+  if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  if (!deliveryOn) {
+    if (fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
+    const addr = document.getElementById('delivery-address-section');
+    if (addr) addr.style.display = 'none';
+    const sched = document.getElementById('schedule-section');
+    if (sched) sched.classList.add('is-disabled');
+    if (pickupBox) pickupBox.style.display = 'block';
+  }
+  const setPayVisible = (key, on) => {
+    const btn = document.querySelector(`[data-pay="${key}"]`);
+    if (btn) btn.style.display = on ? '' : 'none';
+  };
+  setPayVisible('cash',  cashOn);
+  setPayVisible('gcash', gcashOn);
+  setPayVisible('cod',   codOn);
+  refreshTotals();
+  updatePaymentOptions();
 }
 
 // Re-evaluate every minute so the Place Order button flips automatically
@@ -689,6 +712,9 @@ function init() {
     phoneErr.style.display = bad ? 'block' : 'none';
     this.style.borderColor  = bad ? '#dc2626' : '';
   });
+
+  // Apply tenant settings to the freshly-rendered DOM.
+  applyTenantStoreConfig();
 }
 
 function locateMe() {
@@ -763,29 +789,40 @@ function updatePaymentOptions() {
   const total = cartTotal();
   const codBtn   = document.querySelector('[data-pay="cod"]');
   const cashBtn  = document.querySelector('[data-pay="cash"]');
+  const gcashBtn = document.querySelector('[data-pay="gcash"]');
   const note     = document.getElementById('cod-restricted-note');
-  if (!codBtn || !cashBtn) return;
+  if (!codBtn || !cashBtn || !gcashBtn) return;
+
+  const deliveryEnabled = storeSettingsData.deliveryEnabled !== false;
+  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false;
+  const gcashAdminOn = storeSettingsData.payGcashEnabled !== false;
+  const codAdminOn   = storeSettingsData.payCodEnabled   !== false && deliveryEnabled;
 
   const isPickup = fulfillmentMethod === 'pickup';
 
-  // Cash is for in-person pickup only
-  cashBtn.classList.toggle('disabled', !isPickup);
-  // Cash on Delivery is for delivery only, AND only for small orders
+  // Cash is for in-person pickup only, and only if admin allows
+  cashBtn.classList.toggle('disabled', !isPickup || !cashAdminOn);
+  // Cash on Delivery is for delivery only, only for small orders, only if admin allows
   const codAllowedByTotal = total < 200;
   const codAllowedByFulfill = !isPickup;
-  const codDisabled = !(codAllowedByTotal && codAllowedByFulfill);
+  const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);
   codBtn.classList.toggle('disabled', codDisabled);
 
-  // Bubble the ₱200+ COD note only when delivery is selected
-  if (note) note.style.display = (!isPickup && !codAllowedByTotal) ? 'block' : 'none';
+  // Bubble the ₱200+ COD note only when delivery is selected AND COD is admin-allowed
+  if (note) note.style.display = (!isPickup && codAdminOn && !codAllowedByTotal) ? 'block' : 'none';
 
   // If the currently selected method has just become invalid, pick a sensible default
+  const cashValid  = isPickup && cashAdminOn;
+  const codValid   = !isPickup && codAllowedByTotal && codAdminOn;
+  const gcashValid = gcashAdminOn;
   const stillValid =
-    (payMethod === 'cash'  && isPickup) ||
-    (payMethod === 'cod'   && !isPickup && codAllowedByTotal) ||
-    (payMethod === 'gcash');
+    (payMethod === 'cash'  && cashValid) ||
+    (payMethod === 'cod'   && codValid)  ||
+    (payMethod === 'gcash' && gcashValid);
   if (!stillValid) {
-    pickPay(isPickup ? 'cash' : (codAllowedByTotal ? 'cod' : 'gcash'));
+    if (cashValid)       pickPay('cash');
+    else if (codValid)   pickPay('cod');
+    else if (gcashValid) pickPay('gcash');
   }
 }
 

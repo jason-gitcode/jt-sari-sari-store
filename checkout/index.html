@@ -454,7 +454,7 @@ tdoc('settings', 'store').onSnapshot(snap => {
   updateWeatherWarning();
   applyTenantStoreConfig();
 });
-// Apply tenant-specific store info to the UI (pickup address, store name)
+// Apply tenant-specific store info + service settings to the UI
 function applyTenantStoreConfig() {
   const storeName = storeSettingsData.storeName || STORE.name || '';
   const pickup = storeSettingsData.pickupAddress || '';
@@ -462,6 +462,42 @@ function applyTenantStoreConfig() {
   if (pickupBox) {
     pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}`;
   }
+
+  // Service & payment toggles. Defaults true if field is missing.
+  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  const cashOn     = storeSettingsData.payCashEnabled  !== false;
+  const gcashOn    = storeSettingsData.payGcashEnabled !== false;
+  const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
+
+  // When delivery is disabled: hide the fulfillment picker entirely, hide
+  // the delivery address + schedule sections, force pickup, always show
+  // the pickup-info box.
+  const ffSection = document.querySelector('.section .section-label')?.parentElement; // first section with that label
+  // Locate via a more specific selector — the section that contains .ff-options.
+  const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
+  if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  if (!deliveryOn) {
+    if (fulfillmentMethod !== 'pickup') {
+      fulfillmentMethod = 'pickup';
+    }
+    const addr = document.getElementById('delivery-address-section');
+    if (addr) addr.style.display = 'none';
+    const sched = document.getElementById('schedule-section');
+    if (sched) sched.classList.add('is-disabled');
+    if (pickupBox) pickupBox.style.display = 'block';
+  }
+
+  // Hide / show individual payment-method buttons based on admin toggles.
+  const setPayVisible = (key, on) => {
+    const btn = document.querySelector(`[data-pay="${key}"]`);
+    if (btn) btn.style.display = on ? '' : 'none';
+  };
+  setPayVisible('cash',  cashOn);
+  setPayVisible('gcash', gcashOn);
+  setPayVisible('cod',   codOn);
+
+  refreshTotals();
+  updatePaymentOptions();
 }
 
 // Re-evaluate every minute so the Place Order button flips automatically
@@ -690,6 +726,11 @@ function init() {
     phoneErr.style.display = bad ? 'block' : 'none';
     this.style.borderColor  = bad ? '#dc2626' : '';
   });
+
+  // Apply tenant settings to the freshly-rendered DOM. The settings snapshot
+  // may have already fired before init() ran (and silently no-op'd on missing
+  // selectors); calling this here guarantees the toggle state is reflected.
+  applyTenantStoreConfig();
 }
 
 function locateMe() {
@@ -757,23 +798,41 @@ function updatePaymentOptions() {
   const total = cartTotal();
   const codBtn   = document.querySelector('[data-pay="cod"]');
   const cashBtn  = document.querySelector('[data-pay="cash"]');
+  const gcashBtn = document.querySelector('[data-pay="gcash"]');
   const note     = document.getElementById('cod-restricted-note');
-  if (!codBtn || !cashBtn) return;
+  if (!codBtn || !cashBtn || !gcashBtn) return;
+
+  // Admin-level enable flags (default true if missing on settings doc).
+  const deliveryEnabled = storeSettingsData.deliveryEnabled !== false;
+  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false;
+  const gcashAdminOn = storeSettingsData.payGcashEnabled !== false;
+  const codAdminOn   = storeSettingsData.payCodEnabled   !== false && deliveryEnabled;
 
   const isPickup = fulfillmentMethod === 'pickup';
-  cashBtn.classList.toggle('disabled', !isPickup);
+
+  // Visual "disabled" state inside the (already-visible) button. Buttons
+  // that are admin-disabled entirely are hidden by applyTenantStoreConfig.
+  cashBtn.classList.toggle('disabled', !isPickup || !cashAdminOn);
   const codAllowedByTotal = total < 200;
   const codAllowedByFulfill = !isPickup;
-  const codDisabled = !(codAllowedByTotal && codAllowedByFulfill);
+  const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);
   codBtn.classList.toggle('disabled', codDisabled);
-  if (note) note.style.display = (!isPickup && !codAllowedByTotal) ? 'block' : 'none';
+  if (note) note.style.display = (!isPickup && codAdminOn && !codAllowedByTotal) ? 'block' : 'none';
 
+  // Re-pick payment method if the current one is no longer valid.
+  const cashValid  = isPickup && cashAdminOn;
+  const codValid   = !isPickup && codAllowedByTotal && codAdminOn;
+  const gcashValid = gcashAdminOn;
   const stillValid =
-    (payMethod === 'cash'  && isPickup) ||
-    (payMethod === 'cod'   && !isPickup && codAllowedByTotal) ||
-    (payMethod === 'gcash');
+    (payMethod === 'cash'  && cashValid) ||
+    (payMethod === 'cod'   && codValid)  ||
+    (payMethod === 'gcash' && gcashValid);
   if (!stillValid) {
-    pickPay(isPickup ? 'cash' : (codAllowedByTotal ? 'cod' : 'gcash'));
+    // Preference order: pickup → Cash; delivery → COD; else GCash.
+    if (cashValid)       pickPay('cash');
+    else if (codValid)   pickPay('cod');
+    else if (gcashValid) pickPay('gcash');
+    // (if none valid, leave UI as-is; Place Order will surface the error.)
   }
 }
 

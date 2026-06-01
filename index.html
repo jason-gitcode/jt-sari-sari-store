@@ -856,8 +856,15 @@ function getEffectiveStoreClosed() {
 }
 
 function buildTicker(rainMode, storeClosed, maintenance) {
-  const items = [...TICKER_BASE];
-  if (rainMode) items.push(RAIN_TICKER);
+  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  // Strip delivery-related ticker entries when delivery is disabled. Also
+  // drop the rain advisory in that case — it's about delivery delays.
+  const items = TICKER_BASE.filter(it => {
+    if (deliveryOn) return true;
+    const t = (it.text || '').toLowerCase();
+    return !(t.includes('deliver') || it.icon === '📍' || it.icon === '🛵');
+  });
+  if (rainMode && deliveryOn) items.push(RAIN_TICKER);
   if (storeClosed) items.push(CLOSED_TICKER);
   if (maintenance) items.push(MAINTENANCE_TICKER);
   const oneSet = items.map(it => {

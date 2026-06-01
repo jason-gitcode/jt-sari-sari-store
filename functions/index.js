@@ -166,7 +166,12 @@ exports.createTenant = onCall(async (request) => {
     storeName: name,
     pickupAddress,
     gcashAccountName,
-    gcashNumber
+    gcashNumber,
+    // Service & payment defaults — new tenants start with everything ON.
+    deliveryEnabled: true,
+    payCashEnabled: true,
+    payGcashEnabled: true,
+    payCodEnabled: true
   });
 
   // ---------- COPY STARTER PACK PRODUCTS ----------
