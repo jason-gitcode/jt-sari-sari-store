@@ -1917,6 +1917,9 @@ async function login() {
   btn.textContent = 'Signing in…';
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
+    // Show the Google account chooser instead of silently using the
+    // most-recently-used account (helps when multiple admins share a device).
+    provider.setCustomParameters({ prompt: 'select_account' });
     await auth.signInWithPopup(provider);
   } catch (e) {
     err.textContent = 'Sign-in failed. Please try again.';

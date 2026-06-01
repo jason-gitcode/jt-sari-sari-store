@@ -274,6 +274,10 @@ function showStep(id) {
 document.getElementById('signin-btn').addEventListener('click', async () => {
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
+    // Force Google to show the account chooser instead of auto-selecting
+    // the most-recently-used account. Lets users sign up multiple stores
+    // with different Google accounts from the same browser.
+    provider.setCustomParameters({ prompt: 'select_account' });
     await auth.signInWithPopup(provider);
   } catch (err) {
     console.error(err);
