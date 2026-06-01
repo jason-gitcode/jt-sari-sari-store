@@ -812,9 +812,15 @@ const MAINTENANCE_TICKER = {
   text: 'Scheduled Maintenance: Our store is temporarily closed today for maintenance and inventory replenishment. We sincerely apologize for the inconvenience.',
   maintenance: true
 };
+const OFFLINE_TICKER = {
+  icon: '📦',
+  text: 'Online ordering is temporarily unavailable for scheduled maintenance and inventory replenishment. Our physical store remains open to serve you.',
+  offline: true
+};
 
 let storeClosedMode = false;
 let maintenanceMode = false;
+let offlineMode = false;
 
 function getManilaHour() {
   const now = new Date();
@@ -867,6 +873,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   if (rainMode && deliveryOn) items.push(RAIN_TICKER);
   if (storeClosed) items.push(CLOSED_TICKER);
   if (maintenance) items.push(MAINTENANCE_TICKER);
+  if (offlineMode) items.push(OFFLINE_TICKER);
   const oneSet = items.map(it => {
     const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : it.maintenance ? ' maintenance-ticker-item' : '';
     return `<span class="ticker-item${cls}">${it.icon} <strong>${it.text}</strong></span>` +
@@ -934,6 +941,7 @@ tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   const rainMode    = storeSettingsData.rainMode === true;
   maintenanceMode   = storeSettingsData.maintenanceMode === true;
+  offlineMode       = storeSettingsData.offlineMode === true;
   storeClosedMode   = getEffectiveStoreClosed();
   lastRainMode      = rainMode;
   applyRainMode(rainMode);

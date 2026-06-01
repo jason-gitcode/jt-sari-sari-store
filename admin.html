@@ -1278,6 +1278,19 @@
                 </label>
               </div>
             </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">📦 Offline Mode <span class="mode-badge off" id="set-offline-badge">OFF</span></div>
+                <div class="setting-desc">Disables online ordering at checkout while leaving the storefront browseable. Use during scheduled maintenance, inventory restocking, or any time you need to pause online orders while keeping the physical store open. Customers see a notice with your store address.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-offline-mode" onclick="toggleOfflineMode()" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
           </section>
 
           <section class="settings-section" id="set-store-info">
@@ -1742,16 +1755,18 @@ if (window.matchMedia) {
 }
 
 // ============================================================
-// OPERATING MODES (rain / store closed / maintenance)
+// OPERATING MODES (rain / store closed / maintenance / offline)
 // ============================================================
 let rainModeActive = false;
 let storeClosedActive = false;
 let maintenanceModeActive = false;
+let offlineModeActive = false;
 
 tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   rainModeActive = storeSettingsData.rainMode === true;
   maintenanceModeActive = storeSettingsData.maintenanceMode === true;
+  offlineModeActive = storeSettingsData.offlineMode === true;
   storeClosedActive = getEffectiveStoreClosed();
   syncOperatingModeToggles();
   syncStoreInfoForm();
@@ -1860,12 +1875,15 @@ function syncOperatingModeToggles() {
   const setStore = document.getElementById('set-store-closed');
   const setRain  = document.getElementById('set-rain-mode');
   const setMaint = document.getElementById('set-maint-mode');
+  const setOffline = document.getElementById('set-offline-mode');
   if (setStore) setStore.checked = storeClosedActive;
   if (setRain)  setRain.checked  = rainModeActive;
   if (setMaint) setMaint.checked = maintenanceModeActive;
+  if (setOffline) setOffline.checked = offlineModeActive;
   const sb = document.getElementById('set-store-badge');
   const rb = document.getElementById('set-rain-badge');
   const mb = document.getElementById('set-maint-badge');
+  const ob = document.getElementById('set-offline-badge');
   const set = (el, on) => {
     if (!el) return;
     el.textContent = on ? 'ON' : 'OFF';
@@ -1875,6 +1893,7 @@ function syncOperatingModeToggles() {
   set(sb, storeClosedActive);
   set(rb, rainModeActive);
   set(mb, maintenanceModeActive);
+  set(ob, offlineModeActive);
 }
 
 async function toggleRainMode() {
@@ -1884,6 +1903,17 @@ async function toggleRainMode() {
   } catch (e) {
     console.error('Rain mode error:', e);
     showToast('Error updating rain mode', 'error');
+  }
+}
+
+async function toggleOfflineMode() {
+  offlineModeActive = !offlineModeActive;
+  try {
+    await tdoc('settings', 'store').set({ offlineMode: offlineModeActive }, { merge: true });
+  } catch (e) {
+    console.error('Offline mode error:', e);
+    showToast('Error updating offline mode', 'error');
+    offlineModeActive = !offlineModeActive;
   }
 }
 
