@@ -46,10 +46,10 @@
       { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" },
       { "source": "/checkout", "type": 302, "destination": "/jsminimart/checkout/" },
       { "source": "/checkout/", "type": 302, "destination": "/jsminimart/checkout/" },
-      { "source": "/checkout/index.html", "type": 302, "destination": "/jsminimart/checkout/" },
-      { "source": "/signup", "type": 302, "destination": "/signup/" }
+      { "source": "/checkout/index.html", "type": 302, "destination": "/jsminimart/checkout/" }
     ],
     "rewrites": [
+      { "source": "/signup", "destination": "/signup/index.html" },
       { "source": "/signup/**", "destination": "/signup/index.html" },
       { "source": "/*/admin", "destination": "/admin.html" },
       { "source": "/*/admin/", "destination": "/admin.html" },
