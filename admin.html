@@ -1783,8 +1783,9 @@ async function toggleServiceOption(field, value) {
 
 function syncServiceToggles() {
   // Default true if field absent (preserves existing tenants' behaviour)
+  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
   const fields = {
-    'set-delivery-enabled':  storeSettingsData.deliveryEnabled  !== false,
+    'set-delivery-enabled':  deliveryOn,
     'set-pay-cash-enabled':  storeSettingsData.payCashEnabled   !== false,
     'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
     'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false
@@ -1793,11 +1794,24 @@ function syncServiceToggles() {
     const el = document.getElementById(id);
     if (el) el.checked = fields[id];
   }
+  // COD is gated by delivery — when delivery is off, disable the COD toggle
+  // and dim its row, but DON'T overwrite payCodEnabled on the doc so the
+  // user's COD preference is restored when delivery is turned back on.
+  const codInput = document.getElementById('set-pay-cod-enabled');
+  if (codInput) {
+    codInput.disabled = !deliveryOn;
+    const codRow = codInput.closest('.setting-row');
+    if (codRow) {
+      codRow.style.opacity = deliveryOn ? '' : '0.45';
+      codRow.title = deliveryOn ? '' : 'Cash on Delivery is auto-disabled while "Offer delivery" is off.';
+    }
+  }
   const badges = {
     'set-delivery-badge':   fields['set-delivery-enabled'],
     'set-pay-cash-badge':   fields['set-pay-cash-enabled'],
     'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
-    'set-pay-cod-badge':    fields['set-pay-cod-enabled']
+    // Effective COD state shown in the badge — false when delivery is off.
+    'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn
   };
   for (const id in badges) {
     const el = document.getElementById(id);
