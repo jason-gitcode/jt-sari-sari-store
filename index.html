@@ -577,7 +577,7 @@
         <div class="footer-section">
           <h4>🕐 Store Hours</h4>
           <p>Monday – Sunday</p>
-          <p>6:00 AM – 4:00 PM</p>
+          <p id="footer-hours">6:00 AM – 4:00 PM</p>
         </div>
         <div class="footer-section">
           <h4>🛵 Delivery Times</h4>
@@ -828,9 +828,23 @@ function getManilaHour() {
   return manilaDate.getHours();
 }
 
+let storeSettingsData = {};
+
+function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
+function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+function fmtHour12Short(h) {
+  if (h === 0) return '12am'; if (h < 12) return `${h}am`;
+  if (h === 12) return '12pm'; return `${h - 12}pm`;
+}
+function fmtHour12Long(h) {
+  if (h === 0) return '12:00 AM'; if (h < 12) return `${h}:00 AM`;
+  if (h === 12) return '12:00 PM'; return `${h - 12}:00 PM`;
+}
+
 function isStoreHoursClosed() {
   const h = getManilaHour();
-  return h >= 16 || h < 6;
+  const o = getOpenHour(), c = getCloseHour();
+  return (o < c) ? (h < o || h >= c) : (h >= c && h < o);
 }
 
 // Period-id helpers — keep in lockstep with admin.html and the checkout pages
@@ -844,14 +858,18 @@ function getCurrentPeriodId() {
   const m = parts.find(p => p.type === 'month').value;
   const d = parts.find(p => p.type === 'day').value;
   const h = parseInt(parts.find(p => p.type === 'hour').value);
-  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
-  if (h >= 16)          return `${y}-${m}-${d}-closed`;
-  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
-  utc.setUTCDate(utc.getUTCDate() - 1);
-  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  const o = getOpenHour(), c = getCloseHour();
+  if (o < c) {
+    if (h >= o && h < c) return `${y}-${m}-${d}-open`;
+    if (h >= c)          return `${y}-${m}-${d}-closed`;
+    const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+    utc.setUTCDate(utc.getUTCDate() - 1);
+    return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  } else {
+    if (h >= c && h < o) return `${y}-${m}-${d}-closed`;
+    return `${y}-${m}-${d}-open`;
+  }
 }
-
-let storeSettingsData = {};
 let lastRainMode = false;
 function getEffectiveStoreClosed() {
   if (storeSettingsData.storeClosedSource === 'manual'
@@ -863,17 +881,29 @@ function getEffectiveStoreClosed() {
 
 function buildTicker(rainMode, storeClosed, maintenance) {
   const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  const oH = getOpenHour(), cH = getCloseHour();
+  const hoursShort = `${fmtHour12Short(oH)}–${fmtHour12Short(cH)}`;
+  const hoursLong  = `${fmtHour12Long(oH)} – ${fmtHour12Long(cH)}`;
   // Strip delivery-related ticker entries when delivery is disabled. Also
   // drop the rain advisory in that case — it's about delivery delays.
-  const items = TICKER_BASE.filter(it => {
-    if (deliveryOn) return true;
-    const t = (it.text || '').toLowerCase();
-    return !(t.includes('deliver') || it.icon === '📍' || it.icon === '🛵');
-  });
+  const items = TICKER_BASE
+    .map(it => {
+      // Patch the hours-specific ticker entry with the tenant's configured hours.
+      if (it.icon === '🕐') return { ...it, text: `Open ${hoursShort} daily` };
+      return it;
+    })
+    .filter(it => {
+      if (deliveryOn) return true;
+      const t = (it.text || '').toLowerCase();
+      return !(t.includes('deliver') || it.icon === '📍' || it.icon === '🛵');
+    });
   if (rainMode && deliveryOn) items.push(RAIN_TICKER);
-  if (storeClosed) items.push(CLOSED_TICKER);
+  if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} daily. Thank you for your patience.` });
   if (maintenance) items.push(MAINTENANCE_TICKER);
   if (offlineMode) items.push(OFFLINE_TICKER);
+  // Also keep the footer hours in sync.
+  const footHours = document.getElementById('footer-hours');
+  if (footHours) footHours.textContent = hoursLong;
   const oneSet = items.map(it => {
     const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : it.maintenance ? ' maintenance-ticker-item' : '';
     return `<span class="ticker-item${cls}">${it.icon} <strong>${it.text}</strong></span>` +

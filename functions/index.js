@@ -171,7 +171,10 @@ exports.createTenant = onCall(async (request) => {
     deliveryEnabled: true,
     payCashEnabled: true,
     payGcashEnabled: true,
-    payCodEnabled: true
+    payCodEnabled: true,
+    // Operating hours (Manila time, 24h). Tenant edits these in admin → Store Info.
+    storeOpenHour: 6,
+    storeCloseHour: 16
   });
 
   // ---------- COPY STARTER PACK PRODUCTS ----------

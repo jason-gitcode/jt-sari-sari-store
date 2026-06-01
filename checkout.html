@@ -375,9 +375,17 @@ function getManilaHour() {
   return manilaDate.getHours();
 }
 
+function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
+function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+function fmtHour12Long(h) {
+  if (h === 0) return '12:00 AM'; if (h < 12) return `${h}:00 AM`;
+  if (h === 12) return '12:00 PM'; return `${h - 12}:00 PM`;
+}
+
 function isStoreHoursClosed() {
   const h = getManilaHour();
-  return h >= 16 || h < 6;
+  const o = getOpenHour(), c = getCloseHour();
+  return (o < c) ? (h < o || h >= c) : (h >= c && h < o);
 }
 
 // Period-id helpers — keep in lockstep with admin.html and checkout/index.html
@@ -391,11 +399,17 @@ function getCurrentPeriodId() {
   const m = parts.find(p => p.type === 'month').value;
   const d = parts.find(p => p.type === 'day').value;
   const h = parseInt(parts.find(p => p.type === 'hour').value);
-  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
-  if (h >= 16)          return `${y}-${m}-${d}-closed`;
-  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
-  utc.setUTCDate(utc.getUTCDate() - 1);
-  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  const o = getOpenHour(), c = getCloseHour();
+  if (o < c) {
+    if (h >= o && h < c) return `${y}-${m}-${d}-open`;
+    if (h >= c)          return `${y}-${m}-${d}-closed`;
+    const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+    utc.setUTCDate(utc.getUTCDate() - 1);
+    return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  } else {
+    if (h >= c && h < o) return `${y}-${m}-${d}-closed`;
+    return `${y}-${m}-${d}-open`;
+  }
 }
 
 let storeSettingsData = {};
@@ -476,6 +490,8 @@ function applyTenantStoreConfig() {
   }
   const offlineAddrEl = document.getElementById('offline-address');
   if (offlineAddrEl) offlineAddrEl.textContent = pickup || (storeName ? storeName : 'our store');
+  const closedHoursEl = document.getElementById('closed-hours');
+  if (closedHoursEl) closedHoursEl.textContent = `${fmtHour12Long(getOpenHour())} to ${fmtHour12Long(getCloseHour())}`;
   const deliveryOn = storeSettingsData.deliveryEnabled !== false;
   const cashOn     = storeSettingsData.payCashEnabled  !== false;
   const gcashOn    = storeSettingsData.payGcashEnabled !== false;
@@ -693,7 +709,7 @@ function init() {
       <p>📦 <strong>Online Ordering Temporarily Unavailable:</strong> We are currently not accepting online orders due to scheduled maintenance and inventory replenishment. We sincerely apologize for any inconvenience this may cause and appreciate your patience. Our physical store remains open to serve you — please visit us at <strong id="offline-address">our store</strong>.</p>
     </div>
     <div class="store-closed-notice" id="store-closed-notice">
-      <p>We sincerely apologize for the inconvenience. Our store is currently closed. Store operations are available daily from <strong>6:00 AM to 4:00 PM</strong>. We look forward to serving you during our operating hours.</p>
+      <p>We sincerely apologize for the inconvenience. Our store is currently closed. Store operations are available daily from <strong id="closed-hours">6:00 AM to 4:00 PM</strong>. We look forward to serving you during our operating hours.</p>
     </div>
     <div class="weather-warning" id="weather-warning">
       <label class="weather-check-label">

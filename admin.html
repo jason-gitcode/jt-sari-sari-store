@@ -1248,7 +1248,7 @@
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">🔒 Store Closed <span class="mode-badge off" id="set-store-badge">OFF</span></div>
-                <div class="setting-desc">Stops checkout. Customers can browse but can&rsquo;t place orders. Auto-closes 4pm–6am Manila; toggling here overrides the auto state for the current period only — it resets at the next 6am or 4pm boundary.</div>
+                <div class="setting-desc" id="set-store-closed-desc">Stops checkout. Customers can browse but can&rsquo;t place orders. Auto-closes outside Operating Hours (set in Store Info); toggling here overrides the auto state for the current period only — it resets at the next opening or closing boundary.</div>
               </div>
               <div class="setting-control">
                 <label class="toggle-sw">
@@ -1327,6 +1327,22 @@
                 <div class="setting-title">GCash phone number</div>
                 <div class="setting-desc">11 digits, starts with 09.</div>
                 <input type="tel" id="si-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">Operating hours (Manila time)</div>
+                <div class="setting-desc">Daily opening &amp; closing time. The storefront auto-closes outside this window and ticker labels update automatically.</div>
+                <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+                  <div style="flex:1;min-width:140px;">
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Opens at</label>
+                    <select id="si-open-hour" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);"></select>
+                  </div>
+                  <div style="flex:1;min-width:140px;">
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Closes at</label>
+                    <select id="si-close-hour" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);"></select>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="setting-row">
@@ -1842,12 +1858,40 @@ function syncServiceToggles() {
   }
 }
 
+function fmtHour12(h) {
+  if (h === 0) return '12 AM (midnight)';
+  if (h < 12) return `${h} AM`;
+  if (h === 12) return '12 PM (noon)';
+  return `${h - 12} PM`;
+}
+
+function ensureHourSelectsPopulated() {
+  const populate = (id) => {
+    const el = document.getElementById(id);
+    if (!el || el.options.length > 0) return;
+    let html = '';
+    for (let h = 0; h < 24; h++) {
+      html += `<option value="${h}">${fmtHour12(h)}</option>`;
+    }
+    el.innerHTML = html;
+  };
+  populate('si-open-hour');
+  populate('si-close-hour');
+}
+
 function syncStoreInfoForm() {
+  ensureHourSelectsPopulated();
   const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };
   f('si-store-name', storeSettingsData.storeName);
   f('si-pickup-address', storeSettingsData.pickupAddress);
   f('si-gcash-name', storeSettingsData.gcashAccountName);
   f('si-gcash-number', storeSettingsData.gcashNumber);
+  const openH  = (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6;
+  const closeH = (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16;
+  const oh = document.getElementById('si-open-hour');
+  const ch = document.getElementById('si-close-hour');
+  if (oh && document.activeElement !== oh) oh.value = String(openH);
+  if (ch && document.activeElement !== ch) ch.value = String(closeH);
 }
 
 async function saveStoreInfo() {
@@ -1857,14 +1901,19 @@ async function saveStoreInfo() {
   const pickupAddress = document.getElementById('si-pickup-address').value.trim();
   const gcashAccountName = document.getElementById('si-gcash-name').value.trim();
   const gcashNumber = document.getElementById('si-gcash-number').value.trim();
+  const storeOpenHour  = parseInt(document.getElementById('si-open-hour').value, 10);
+  const storeCloseHour = parseInt(document.getElementById('si-close-hour').value, 10);
   if (storeName.length < 2) { status.textContent = 'Store name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
   if (pickupAddress.length < 5) { status.textContent = 'Pickup address must be at least 5 characters.'; status.style.color = '#dc2626'; return; }
   if (gcashAccountName.length < 2) { status.textContent = 'GCash account name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
   if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.style.color = '#dc2626'; return; }
+  if (!Number.isInteger(storeOpenHour) || storeOpenHour < 0 || storeOpenHour > 23) { status.textContent = 'Opening hour invalid.'; status.style.color = '#dc2626'; return; }
+  if (!Number.isInteger(storeCloseHour) || storeCloseHour < 0 || storeCloseHour > 23) { status.textContent = 'Closing hour invalid.'; status.style.color = '#dc2626'; return; }
+  if (storeOpenHour === storeCloseHour) { status.textContent = 'Opening and closing hour must differ.'; status.style.color = '#dc2626'; return; }
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber }, { merge: true });
+    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
   } catch (err) {
@@ -1939,17 +1988,22 @@ async function toggleMaintenanceMode() {
 // because the stored period id no longer matches the current one.
 let storeSettingsData = {};
 
+function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
+function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+
 function isStoreHoursClosed() {
   const h = parseInt(new Intl.DateTimeFormat('en-PH', {
     hour: 'numeric', hour12: false, timeZone: 'Asia/Manila'
   }).format(new Date()));
-  return h >= 16 || h < 6;
+  const o = getOpenHour(), c = getCloseHour();
+  // Same-day window (o < c): closed when outside [o, c)
+  // Overnight window (o > c, e.g. 22→6): closed when inside [c, o)
+  return (o < c) ? (h < o || h >= c) : (h >= c && h < o);
 }
 
 // Unique identifier for the current open/closed period in Manila time —
-// e.g. "2026-05-29-open" (today's 6am–4pm) or "2026-05-29-closed" (today's
-// 4pm onward into tomorrow's 6am). A 1am check returns YESTERDAY's -closed
-// id because that period started at yesterday's 4pm.
+// e.g. "2026-05-29-open" or "2026-05-29-closed". Window may be same-day
+// (open ≤ close) or overnight (open > close).
 function getCurrentPeriodId() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Manila',
@@ -1960,12 +2014,19 @@ function getCurrentPeriodId() {
   const m = parts.find(p => p.type === 'month').value;
   const d = parts.find(p => p.type === 'day').value;
   const h = parseInt(parts.find(p => p.type === 'hour').value);
-  if (h >= 6 && h < 16) return `${y}-${m}-${d}-open`;
-  if (h >= 16)          return `${y}-${m}-${d}-closed`;
-  // h < 6 — closed period started YESTERDAY 4pm
-  const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
-  utc.setUTCDate(utc.getUTCDate() - 1);
-  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  const o = getOpenHour(), c = getCloseHour();
+  if (o < c) {
+    if (h >= o && h < c) return `${y}-${m}-${d}-open`;
+    if (h >= c)          return `${y}-${m}-${d}-closed`;
+    // h < o — closed period started YESTERDAY at c
+    const utc = new Date(`${y}-${m}-${d}T00:00:00Z`);
+    utc.setUTCDate(utc.getUTCDate() - 1);
+    return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2,'0')}-${String(utc.getUTCDate()).padStart(2,'0')}-closed`;
+  } else {
+    // Overnight window: closed [c, o), open otherwise
+    if (h >= c && h < o) return `${y}-${m}-${d}-closed`;
+    return `${y}-${m}-${d}-open`;
+  }
 }
 
 function getEffectiveStoreClosed() {
