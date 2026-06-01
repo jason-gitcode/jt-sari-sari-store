@@ -29,6 +29,10 @@
 </script>
 <style>
   html.no-default-logo .logo { display: none !important; }
+  /* Also blank the hardcoded "JS Mini Mart" <h1> until settings snapshot
+     replaces it with the tenant's real storeName. */
+  html.no-default-logo #store-name { visibility: hidden; }
+  html.no-default-logo #store-tag  { visibility: hidden; }
   /* ---------- BASE ---------- */
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -1006,11 +1010,20 @@ tdoc('settings', 'store').onSnapshot(snap => {
   buildTicker(rainMode, storeClosedMode, maintenanceMode);
   // Apply tenant-specific display name dynamically.
   const dynName = storeSettingsData.storeName;
+  const nameEl = document.getElementById('store-name');
+  const tagEl  = document.getElementById('store-tag');
   if (dynName) {
-    const el = document.getElementById('store-name');
-    if (el) el.textContent = dynName;
+    if (nameEl) nameEl.textContent = dynName;
     document.title = dynName;
+  } else if (nameEl && TENANT_ID && TENANT_ID !== 'jsminimart') {
+    // Fallback so the header isn't permanently blank if the tenant hasn't
+    // saved a Store Info name yet.
+    nameEl.textContent = TENANT_ID;
   }
+  // Restore visibility (CSS hid these via the no-default-logo class to
+  // prevent the JS Mini Mart flash for non-jsminimart tenants).
+  if (nameEl) nameEl.style.visibility = 'visible';
+  if (tagEl)  tagEl.style.visibility  = 'visible';
 });
 
 // Re-evaluate every minute so the ticker flips automatically at 6am / 4pm

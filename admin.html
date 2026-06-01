@@ -1922,18 +1922,24 @@ function applyTenantBranding() {
   // synthesise initials for the brand mark.
   if (TENANT_ID === 'jsminimart') return;
   const name = (storeSettingsData.storeName || '').trim();
+  // Fall back to the slug so the header isn't permanently blank for a
+  // tenant who signed up but hasn't saved Store Info yet.
+  const displayName = name || (TENANT_ID || 'Store');
+  const initials = displayName.slice(0, 2).toUpperCase();
   const titleEl = document.querySelector('.brand-title');
   const markEl  = document.querySelector('.brand-mark');
   if (titleEl) {
-    titleEl.textContent = name || 'Store';
-    titleEl.style.visibility = '';
+    titleEl.textContent = displayName;
+    // Explicit 'visible' beats the CSS rule that hides the element by
+    // default (visibility:hidden has lower specificity than an inline
+    // visibility: visible value).
+    titleEl.style.visibility = 'visible';
   }
   if (markEl) {
-    markEl.textContent = name ? name.slice(0, 2).toUpperCase() : '·';
-    markEl.style.visibility = '';
+    markEl.textContent = initials;
+    markEl.style.visibility = 'visible';
   }
-  // Also align the document title with the tenant.
-  if (name) document.title = `${name} — Admin`;
+  document.title = `${displayName} — Admin`;
 }
 
 // Service & Payment toggle handlers
