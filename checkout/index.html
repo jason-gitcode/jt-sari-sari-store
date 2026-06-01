@@ -924,18 +924,7 @@ async function placeOrder() {
       }
       console.log('[checkout] Transaction body completed, awaiting server commit');
     });
-    console.log('[checkout] Server commit OK. Verifying order doc exists at', orderRef.path);
-    // Verify the doc actually exists on the server after transaction returns.
-    try {
-      const verify = await orderRef.get({ source: 'server' });
-      console.log('[checkout] Server verify exists=', verify.exists, 'data=', verify.data());
-      if (!verify.exists) {
-        throw new Error('Transaction reported success but order doc not found at ' + orderRef.path);
-      }
-    } catch (verifyErr) {
-      console.error('[checkout] Verify failed:', verifyErr);
-      throw verifyErr;
-    }
+    console.log('[checkout] Server commit OK. Order written to', orderRef.path);
 
     const shortId = orderRef.id.slice(-6).toUpperCase();
     sendDiscordNotification(orderData, shortId).catch(() => {});
