@@ -840,6 +840,13 @@ function fmtHour12Long(h) {
   if (h === 0) return '12:00 AM'; if (h < 12) return `${h}:00 AM`;
   if (h === 12) return '12:00 PM'; return `${h - 12}:00 PM`;
 }
+function fmtTime12Short(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+}
 
 function isStoreHoursClosed() {
   const h = getManilaHour();
@@ -880,23 +887,34 @@ function getEffectiveStoreClosed() {
 }
 
 function buildTicker(rainMode, storeClosed, maintenance) {
-  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  const deliveryOn   = storeSettingsData.deliveryEnabled !== false;
+  const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
+  const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
+  const freeDelOn    = storeSettingsData.freeDeliveryEnabled !== false;
+  const threshold    = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  const schedulesOn  = storeSettingsData.schedulesEnabled !== false;
+  const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
   const oH = getOpenHour(), cH = getCloseHour();
   const hoursShort = `${fmtHour12Short(oH)}–${fmtHour12Short(cH)}`;
   const hoursLong  = `${fmtHour12Long(oH)} – ${fmtHour12Long(cH)}`;
-  // Strip delivery-related ticker entries when delivery is disabled. Also
-  // drop the rain advisory in that case — it's about delivery delays.
-  const items = TICKER_BASE
-    .map(it => {
-      // Patch the hours-specific ticker entry with the tenant's configured hours.
-      if (it.icon === '🕐') return { ...it, text: `Open ${hoursShort} daily` };
-      return it;
-    })
-    .filter(it => {
-      if (deliveryOn) return true;
-      const t = (it.text || '').toLowerCase();
-      return !(t.includes('deliver') || it.icon === '📍' || it.icon === '🛵');
-    });
+
+  const items = [];
+  // "Delivering to:" — only if delivery on, areas feature on, and areas listed.
+  if (deliveryOn && areasOn && areas.length > 0) {
+    items.push({ icon: '📍', text: 'Delivering to: ' + areas.join(' · ') });
+  }
+  // Always show open hours.
+  items.push({ icon: '🕐', text: `Open ${hoursShort} daily` });
+  // Free-delivery threshold — only if delivery on and feature on.
+  if (deliveryOn && freeDelOn && threshold > 0) {
+    items.push({ icon: '🛵', text: `Free delivery on orders min. Php ${threshold}` });
+  }
+  // Delivery windows — only if delivery on, schedules feature on, and windows configured.
+  if (deliveryOn && schedulesOn && schedules.length > 0) {
+    const labels = schedules.map(s => `${fmtTime12Short(s.start)}–${fmtTime12Short(s.end)}`);
+    items.push({ icon: '🕒', text: `Delivery windows: ${labels.join(' · ')}` });
+  }
+
   if (rainMode && deliveryOn) items.push(RAIN_TICKER);
   if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} daily. Thank you for your patience.` });
   if (maintenance) items.push(MAINTENANCE_TICKER);
@@ -1364,7 +1382,12 @@ function cartTotal() {
     return sum + price * qty;
   }, 0);
 }
-function deliveryFee() { return cartTotal() >= 400 ? 0 : 45; }
+function deliveryFee() {
+  const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+  const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  if (freeOn && cartTotal() >= threshold) return 0;
+  return 45;
+}
 function cartCount() {
   return Object.values(cart).reduce((a, b) => a + b, 0);
 }

@@ -563,7 +563,12 @@ function cartTotal() {
     return sum + price * qty;
   }, 0);
 }
-function deliveryFee() { return cartTotal() >= 400 ? 0 : 45; }
+function deliveryFee() {
+  const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+  const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  if (freeOn && cartTotal() >= threshold) return 0;
+  return 45;
+}
 
 
 function init() {
@@ -619,10 +624,15 @@ function init() {
           <span>Grand Total</span>
           <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
         </div>
-        ${fee > 0 ? `<div class="free-delivery-nudge">
-          <div class="free-delivery-nudge-track"><div class="free-delivery-nudge-fill" style="width:${Math.min(100,(subtotal/400)*100).toFixed(1)}%"></div></div>
-          <p class="free-delivery-nudge-text">Add <strong>₱${(400 - subtotal).toFixed(2)}</strong> more to your order and enjoy <strong>free delivery</strong>.</p>
-        </div>` : ''}
+        ${(() => {
+          const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+          const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+          if (!freeOn || fee === 0 || subtotal >= threshold) return '';
+          return `<div class="free-delivery-nudge">
+            <div class="free-delivery-nudge-track"><div class="free-delivery-nudge-fill" style="width:${Math.min(100,(subtotal/threshold)*100).toFixed(1)}%"></div></div>
+            <p class="free-delivery-nudge-text">Add <strong>₱${(threshold - subtotal).toFixed(2)}</strong> more to your order and enjoy <strong>free delivery</strong>.</p>
+          </div>`;
+        })()}
       </div>
     </div>
 
@@ -841,7 +851,10 @@ function refreshTotals() {
   if (totalEl) totalEl.textContent = STORE.currency + total.toFixed(2);
   // Hide free-delivery nudge for pickup (irrelevant) — show otherwise
   const nudge = card.querySelector('.free-delivery-nudge');
-  if (nudge) nudge.style.display = (isPickup || fee === 0) ? 'none' : '';
+  if (nudge) {
+    const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+    nudge.style.display = (!freeOn || isPickup || fee === 0) ? 'none' : '';
+  }
 }
 
 function updatePaymentOptions() {

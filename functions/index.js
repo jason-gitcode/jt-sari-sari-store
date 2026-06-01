@@ -181,7 +181,12 @@ exports.createTenant = onCall(async (request) => {
       { start: '10:00', end: '14:00' },
       { start: '14:00', end: '18:00' },
       { start: '16:00', end: '19:00' }
-    ]
+    ],
+    // Free delivery promotion + delivery areas list — both toggleable.
+    freeDeliveryEnabled: true,
+    freeDeliveryThreshold: 400,
+    deliveryAreasEnabled: true,
+    deliveryAreas: []
   });
 
   // ---------- COPY STARTER PACK PRODUCTS ----------
