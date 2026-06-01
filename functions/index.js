@@ -23,8 +23,9 @@ const SUPERADMIN_EMAILS = new Set([
   'manilynp07@gmail.com'
 ]);
 
-// Max tenants a single non-superadmin email can create. Pilot default = 3.
-const MAX_TENANTS_PER_EMAIL = 3;
+// Max tenants a single non-superadmin email can create. Pilot default = 1.
+// Industry standard for free SaaS tiers; easier to relax later than tighten.
+const MAX_TENANTS_PER_EMAIL = 1;
 
 const RESERVED_SLUGS = new Set([
   'admin', 'admin.html',
@@ -101,8 +102,9 @@ exports.createTenant = onCall(async (request) => {
       .limit(MAX_TENANTS_PER_EMAIL + 1)
       .get();
     if (existing.size >= MAX_TENANTS_PER_EMAIL) {
+      const noun = MAX_TENANTS_PER_EMAIL === 1 ? 'store' : 'stores';
       throw new HttpsError('resource-exhausted',
-        `You've already created ${existing.size} stores with this email. The limit is ${MAX_TENANTS_PER_EMAIL}. Please use a different account or contact support.`);
+        `Each Google account can create up to ${MAX_TENANTS_PER_EMAIL} ${noun}, and you've already used yours. Switch to a different Google account to create another, or contact support.`);
     }
   }
 
