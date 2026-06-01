@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Start Your Sari-Sari Store — JS Mini Mart</title>
+<base href="/">
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#2563eb" />
+<link rel="apple-touch-icon" href="/newlogo.jpeg" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --success: #16a34a;
+    --error: #dc2626;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  header { text-align: center; margin: 24px 0 32px; }
+  header img { width: 64px; height: 64px; border-radius: 16px; }
+  header h1 { font-size: 28px; margin-top: 12px; font-weight: 700; }
+  header p { color: var(--muted); margin-top: 8px; font-size: 15px; max-width: 520px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .step-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .step-body { margin-bottom: 24px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 15px; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #f8fafc; }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .gicon { width: 18px; height: 18px; }
+  .signed-in-as {
+    background: #f1f5f9;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .signed-in-as strong { color: var(--text); }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .link-btn:hover { text-decoration: underline; }
+  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .input:focus { outline: none; border-color: var(--accent); }
+  .help { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .slug-preview {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: monospace;
+    word-break: break-all;
+  }
+  .slug-preview .url-host { color: var(--text); }
+  .slug-preview .url-slug { color: var(--accent); font-weight: 600; }
+  .slug-row { display: flex; align-items: stretch; }
+  .slug-prefix {
+    display: inline-flex; align-items: center;
+    padding: 0 12px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: monospace;
+  }
+  .slug-row .input {
+    border-radius: 0 8px 8px 0;
+    font-family: monospace;
+  }
+  .status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+  }
+  .status.show { display: block; }
+  .status.error { background: #fee2e2; color: var(--error); border: 1px solid #fecaca; }
+  .status.success { background: #dcfce7; color: var(--success); border: 1px solid #bbf7d0; }
+  .field { margin-bottom: 16px; }
+  .footer-links { margin-top: 24px; text-align: center; font-size: 13px; color: var(--muted); }
+  .footer-links a { color: var(--accent); text-decoration: none; }
+  .footer-links a:hover { text-decoration: underline; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/newlogo.jpeg" alt="JS Mini Mart" />
+  <h1>Start your own sari-sari store</h1>
+  <p>Get a free online storefront and admin panel. No credit card needed for the first month.</p>
+</header>
+
+<div class="card">
+
+  <!-- STEP 1: SIGN IN -->
+  <div id="step-signin">
+    <div class="step-title">Step 1 of 2 · Sign in</div>
+    <div class="step-body">
+      <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+        Sign in with the Google account you want to use to manage your store.
+      </p>
+      <button id="signin-btn" class="btn">
+        <svg class="gicon" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2: STORE DETAILS -->
+  <div id="step-details" class="hidden">
+    <div class="step-title">Step 2 of 2 · Choose your store</div>
+    <div class="step-body">
+      <div class="signed-in-as">
+        <span>Signed in as <strong id="signed-email">—</strong></span>
+        <button class="link-btn" onclick="signOut()">Switch account</button>
+      </div>
+
+      <form id="store-form" onsubmit="submitForm(event)">
+        <div class="field">
+          <label for="store-name">Store name</label>
+          <input class="input" id="store-name" type="text" placeholder="e.g. Tina's Mini Mart" maxlength="100" required />
+          <div class="help">This is what customers will see at the top of your storefront.</div>
+        </div>
+
+        <div class="field">
+          <label for="store-slug">Store URL</label>
+          <div class="slug-row">
+            <span class="slug-prefix">jsminimart.com/</span>
+            <input class="input" id="store-slug" type="text" placeholder="tinastore" minlength="3" maxlength="32" pattern="[a-z][a-z0-9-]*" required autocapitalize="none" autocorrect="off" spellcheck="false" />
+          </div>
+          <div class="slug-preview">
+            Your store will be at <span class="url-host">https://jsminimart.com/</span><span class="url-slug" id="slug-preview">tinastore</span><span class="url-host">/</span>
+          </div>
+          <div class="help">Lowercase letters, numbers, and hyphens. 3–32 characters. Must start with a letter.</div>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary">Create my store</button>
+
+        <div id="status" class="status"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- STEP 3: SUCCESS -->
+  <div id="step-success" class="hidden">
+    <div class="step-title">🎉 Your store is ready!</div>
+    <div class="step-body">
+      <p style="font-size: 15px; margin-bottom: 16px;">
+        <strong id="success-name"></strong> is now live.
+      </p>
+      <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Storefront (share this with customers):</p>
+      <a id="success-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 14px;">—</a>
+      <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Admin (manage your products + orders):</p>
+      <a id="success-admin-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 20px;">—</a>
+      <a id="open-admin-btn" href="#" class="btn btn-primary" style="text-decoration: none;">Open my admin →</a>
+    </div>
+  </div>
+</div>
+
+<div class="footer-links">
+  Already have a store? <a href="#" data-tenant-href="admin/" id="back-to-admin">Sign in to your admin</a>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyACkBlvOdrFvCTJqfMJ24Bwm-1d8AAVOHE",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const functions = firebase.app().functions('asia-southeast1');
+const createTenant = functions.httpsCallable('createTenant');
+
+const slugInput = document.getElementById('store-slug');
+const slugPreview = document.getElementById('slug-preview');
+slugInput.addEventListener('input', () => {
+  const cleaned = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (cleaned !== slugInput.value) slugInput.value = cleaned;
+  slugPreview.textContent = cleaned || 'tinastore';
+});
+
+function showStatus(msg, kind) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status show ' + (kind || '');
+}
+function clearStatus() {
+  const s = document.getElementById('status');
+  s.className = 'status';
+  s.textContent = '';
+}
+
+function showStep(id) {
+  ['step-signin', 'step-details', 'step-success'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+document.getElementById('signin-btn').addEventListener('click', async () => {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  } catch (err) {
+    console.error(err);
+    alert('Sign-in failed: ' + (err && err.message ? err.message : err));
+  }
+});
+
+function signOut() {
+  auth.signOut();
+}
+
+async function submitForm(e) {
+  e.preventDefault();
+  clearStatus();
+  const btn = document.getElementById('submit-btn');
+  const name = document.getElementById('store-name').value.trim();
+  const slug = slugInput.value.trim().toLowerCase();
+  btn.disabled = true;
+  btn.textContent = 'Creating your store...';
+  try {
+    const result = await createTenant({ name, slug });
+    const r = result.data;
+    document.getElementById('success-name').textContent = r.name;
+    const storeLink = document.getElementById('success-url');
+    storeLink.href = r.url;
+    storeLink.textContent = r.url;
+    const adminLink = document.getElementById('success-admin-url');
+    adminLink.href = r.adminUrl;
+    adminLink.textContent = r.adminUrl;
+    document.getElementById('open-admin-btn').href = r.adminUrl;
+    showStep('step-success');
+  } catch (err) {
+    console.error(err);
+    const msg = (err && err.message) ? err.message : 'Something went wrong. Please try again.';
+    showStatus(msg, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Create my store';
+  }
+}
+
+auth.onAuthStateChanged(user => {
+  if (user && user.emailVerified) {
+    document.getElementById('signed-email').textContent = user.email;
+    showStep('step-details');
+  } else {
+    if (user && !user.emailVerified) {
+      // Email/password user; we only support Google. Sign them out.
+      auth.signOut();
+    }
+    showStep('step-signin');
+  }
+});
+</script>
+</body>
+</html>

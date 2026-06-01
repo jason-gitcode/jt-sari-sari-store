@@ -1354,7 +1354,7 @@
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">Authorised Admin Emails</div>
-                <div class="setting-desc">Only these Google accounts can access the admin console. Edit <code>ALLOWED_EMAILS</code> in <code>admin.html</code> to change.</div>
+                <div class="setting-desc">Authorised accounts are read from the <code>ownerEmails</code> field on this store's tenant doc. Superadmin accounts have universal access.</div>
               </div>
               <div class="setting-control" style="text-align:right; font-size:var(--fs-xs); color:var(--muted);">
                 <span id="allowed-emails-count">—</span>
@@ -1888,11 +1888,16 @@ function removePhoto(index) {
 }
 
 // ---------- AUTH ----------
-const ALLOWED_EMAILS = [
+// Superadmin emails — match firestore.rules isSuperadmin() allowlist exactly.
+// These accounts bypass per-tenant ownership; used for emergency support.
+const SUPERADMIN_EMAILS = [
   'aws.jason.b.tubilag@gmail.com',
   'jason.b.tubilag@gmail.com',
   'manilynp07@gmail.com'
 ];
+// Per-tenant owners are read from tenants/{TENANT_ID}.ownerEmails after sign-in.
+// Populated by ensureTenantDocInitialized() or by the createTenant Cloud Function.
+let TENANT_OWNER_EMAILS = [];
 
 async function login() {
   const btn = document.getElementById('login-btn');
@@ -3210,50 +3215,84 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Ensure the tenant doc exists with this admin's email in ownerEmails.
-// Idempotent: only creates if missing, only appends email if not already present.
-// Runs after sign-in so security rules can authorise the writes (superadmin).
-async function ensureTenantDocInitialized(user) {
-  if (!TENANT_ID || !user) return;
+// Self-heal jsminimart tenant doc only. New tenants are created via the
+// `createTenant` Cloud Function — admin should NOT create tenant docs on the fly.
+// (For seed tenant `jsminimart`, this preserves the bootstrap path from Phase 5.)
+async function ensureJsminimartTenantDoc(user) {
+  if (TENANT_ID !== 'jsminimart' || !user) return;
+  if (!SUPERADMIN_EMAILS.includes(user.email)) return;
   try {
     const ref = db.collection('tenants').doc(TENANT_ID);
     const snap = await ref.get();
     if (!snap.exists) {
       await ref.set({
         name: 'JS Mini Mart',
-        ownerEmails: ALLOWED_EMAILS,
+        ownerEmails: SUPERADMIN_EMAILS,
         plan: 'starter',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      console.log('[init] Created tenant doc tenants/' + TENANT_ID);
-    } else {
-      const data = snap.data() || {};
-      const owners = Array.isArray(data.ownerEmails) ? data.ownerEmails : [];
-      if (!owners.includes(user.email)) {
-        await ref.update({
-          ownerEmails: firebase.firestore.FieldValue.arrayUnion(user.email)
-        });
-        console.log('[init] Added ' + user.email + ' to tenants/' + TENANT_ID + '.ownerEmails');
-      }
+      console.log('[init] Created seed tenant doc tenants/jsminimart');
     }
   } catch (err) {
-    console.warn('[init] Tenant doc init skipped:', err && err.message ? err.message : err);
+    console.warn('[init] Seed tenant doc check skipped:', err && err.message ? err.message : err);
   }
 }
 
-auth.onAuthStateChanged(user => {
-  if (user && ALLOWED_EMAILS.includes(user.email)) {
-    ensureTenantDocInitialized(user);
+// Determine if the signed-in user is authorised to use this tenant's admin.
+// Order: superadmin (always allowed) → tenant ownerEmails → deny.
+async function checkAdminAuthorization(user) {
+  if (!user) return { allowed: false, reason: 'not-signed-in' };
+  if (SUPERADMIN_EMAILS.includes(user.email)) {
+    return { allowed: true, reason: 'superadmin' };
+  }
+  if (!TENANT_ID) {
+    return { allowed: false, reason: 'no-tenant-in-url' };
+  }
+  try {
+    const snap = await db.collection('tenants').doc(TENANT_ID).get();
+    if (!snap.exists) {
+      return { allowed: false, reason: 'tenant-not-found' };
+    }
+    const owners = Array.isArray(snap.data().ownerEmails) ? snap.data().ownerEmails : [];
+    TENANT_OWNER_EMAILS = owners;
+    if (owners.includes(user.email)) {
+      return { allowed: true, reason: 'owner' };
+    }
+    return { allowed: false, reason: 'not-an-owner' };
+  } catch (err) {
+    console.error('[auth] tenant ownership check failed:', err);
+    return { allowed: false, reason: 'lookup-failed' };
+  }
+}
+
+auth.onAuthStateChanged(async user => {
+  if (!user) { showLogin(); return; }
+
+  // Self-heal seed tenant doc for superadmin only (idempotent, no-op otherwise).
+  await ensureJsminimartTenantDoc(user);
+
+  const auth_result = await checkAdminAuthorization(user);
+  if (auth_result.allowed) {
     showAdmin();
     const ae = document.getElementById('account-email');
     if (ae) ae.textContent = user.email;
     const aec = document.getElementById('allowed-emails-count');
-    if (aec) aec.textContent = `${ALLOWED_EMAILS.length} admin account${ALLOWED_EMAILS.length === 1 ? '' : 's'}`;
-  } else {
-    if (user) {
-      auth.signOut();
-      document.getElementById('login-error').textContent = 'Access denied. This account is not authorised.';
+    if (aec) {
+      const count = (auth_result.reason === 'superadmin' ? SUPERADMIN_EMAILS.length : TENANT_OWNER_EMAILS.length);
+      const label = (auth_result.reason === 'superadmin' ? 'superadmin' : 'owner');
+      aec.textContent = `${count} ${label}${count === 1 ? '' : 's'}`;
     }
+  } else {
+    const msg = ({
+      'not-signed-in': 'Please sign in.',
+      'no-tenant-in-url': 'No store in the URL. Visit /<your-store>/admin/.',
+      'tenant-not-found': 'Store not found. Check the URL or sign up at /signup/.',
+      'not-an-owner': 'This account is not authorised for this store.',
+      'lookup-failed': 'Could not verify access. Try again.'
+    })[auth_result.reason] || 'Access denied.';
+    auth.signOut();
+    const err = document.getElementById('login-error');
+    if (err) err.textContent = msg;
     showLogin();
   }
 });

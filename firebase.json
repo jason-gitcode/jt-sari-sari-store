@@ -5,6 +5,20 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs22",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
   "hosting": {
     "public": ".",
     "ignore": [
@@ -32,9 +46,11 @@
       { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" },
       { "source": "/checkout", "type": 302, "destination": "/jsminimart/checkout/" },
       { "source": "/checkout/", "type": 302, "destination": "/jsminimart/checkout/" },
-      { "source": "/checkout/index.html", "type": 302, "destination": "/jsminimart/checkout/" }
+      { "source": "/checkout/index.html", "type": 302, "destination": "/jsminimart/checkout/" },
+      { "source": "/signup", "type": 302, "destination": "/signup/" }
     ],
     "rewrites": [
+      { "source": "/signup/**", "destination": "/signup/index.html" },
       { "source": "/*/admin", "destination": "/admin.html" },
       { "source": "/*/admin/", "destination": "/admin.html" },
       { "source": "/*/admin/**", "destination": "/admin.html" },
