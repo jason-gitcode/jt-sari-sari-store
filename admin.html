@@ -967,11 +967,12 @@
         overscroll-behavior-x: contain;
       }
       .chip-group { width: auto; flex-shrink: 0; }
-      .admin-chip { flex: initial; text-align: center; }
-      /* In the horizontal narrow layout, the "All" chip (no delete button)
-         must NOT stretch to 100% width — let it size to its content so the
-         other category chips share the row. */
+      /* In the horizontal narrow layout, all chips size to their content
+         instead of stretching, but with a sensible minimum so the label
+         + count badge always remain readable. */
+      .admin-chip { flex: initial; text-align: center; min-width: max-content; padding: 8px 12px; }
       .admin-chip:not(.with-del) { width: auto; flex: initial; }
+      .admin-chip .chip-label { flex: 0 0 auto; overflow: visible; }
 
       .products-main {
         flex: 1 1 0; min-height: 0;
