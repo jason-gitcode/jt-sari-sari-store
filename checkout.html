@@ -865,9 +865,11 @@ async function placeOrder() {
 
   const orderRef = tcol('orders').doc();
   let stockErrorMsg = null;
+  console.log('[checkout] Starting order. TENANT_ID=', TENANT_ID, 'orderRef.path=', orderRef.path, 'items=', items.length);
 
   try {
     await db.runTransaction(async (transaction) => {
+      console.log('[checkout] Inside transaction');
       // Group items by productId (one Firestore read per product, not per cart line)
       const productGroups = {};
       items.forEach(item => {
@@ -933,7 +935,19 @@ async function placeOrder() {
         }
         if (Object.keys(upd).length > 0) transaction.update(productRefs[i], upd);
       }
+      console.log('[checkout] Transaction body completed, awaiting server commit');
     });
+    console.log('[checkout] Server commit OK. Verifying order doc exists at', orderRef.path);
+    try {
+      const verify = await orderRef.get({ source: 'server' });
+      console.log('[checkout] Server verify exists=', verify.exists, 'data=', verify.data());
+      if (!verify.exists) {
+        throw new Error('Transaction reported success but order doc not found at ' + orderRef.path);
+      }
+    } catch (verifyErr) {
+      console.error('[checkout] Verify failed:', verifyErr);
+      throw verifyErr;
+    }
 
     const shortId = orderRef.id.slice(-6).toUpperCase();
     sendDiscordNotification(orderData, shortId).catch(() => {});
@@ -978,7 +992,7 @@ function showOrderConfirmation(orderId, payment) {
       <div class="confirm-order-num">Order #${shortId}</div>
       <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
       ${gcashHtml}
-      <a href="#" data-tenant-href="" class="confirm-back">Continue Shopping</a>
+      <a href="${tenantUrl('')}" class="confirm-back">Continue Shopping</a>
     </div>
   `;
 }
