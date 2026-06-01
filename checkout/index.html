@@ -936,10 +936,7 @@ async function placeOrder() {
     console.error('Order error:', err);
     btn.disabled = false;
     btn.textContent = 'Place Order';
-    const detail = stockErrorMsg
-      || (err && err.code ? `[${err.code}] ${err.message || ''}` : (err && err.message ? err.message : String(err)));
-    showToast('Order failed: ' + detail);
-    alert('Order failed:\n\n' + detail + '\n\n(Click OK to dismiss; this dialog is here so order failures are not missed.)');
+    showToast(stockErrorMsg || 'Failed to place order. Please try again.');
   }
 }
 
