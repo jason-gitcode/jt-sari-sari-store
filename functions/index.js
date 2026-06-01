@@ -146,7 +146,9 @@ exports.createTenant = onCall(async (request) => {
       for (const doc of pack.docs) {
         batch.set(productsCol.doc(doc.id), doc.data());
         ops++;
-        if (ops >= 400) {
+        // Small batch size keeps us comfortably under Firestore's 10MB
+        // per-batch limit when products carry base64-image data.
+        if (ops >= 20) {
           await batch.commit();
           batch = db.batch();
           ops = 0;

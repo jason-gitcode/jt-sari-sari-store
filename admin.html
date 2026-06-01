@@ -2046,7 +2046,7 @@ async function runSeedStarterPack() {
       for (const d of existingSnap.docs) {
         batch.delete(d.ref);
         ops++;
-        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+        if (ops >= 20) { await batch.commit(); batch = db.batch(); ops = 0; }
       }
       if (ops > 0) await batch.commit();
     }
@@ -2069,7 +2069,7 @@ async function runSeedStarterPack() {
         // and copy perfectly between tenants.
         batch.set(db.collection('starter_pack').doc(p.id), clean);
         ops++;
-        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+        if (ops >= 20) { await batch.commit(); batch = db.batch(); ops = 0; }
       }
       if (ops > 0) await batch.commit();
     }
