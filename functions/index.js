@@ -170,3 +170,34 @@ exports.createTenant = onCall(async (request) => {
     starterPackCopied
   };
 });
+
+// ============================================================
+// deleteTenant — superadmin-only, recursive delete of a tenant doc
+// and all its subcollections (products / orders / settings / etc.)
+// ============================================================
+exports.deleteTenant = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) {
+    throw new HttpsError('failed-precondition', 'Email must be verified.');
+  }
+  if (!SUPERADMIN_EMAILS.has(token.email)) {
+    throw new HttpsError('permission-denied', 'Superadmin only.');
+  }
+
+  const data = request.data || {};
+  const slug = String(data.slug || '').trim().toLowerCase();
+  if (!slug) throw new HttpsError('invalid-argument', 'slug is required');
+  if (slug === 'jsminimart') {
+    throw new HttpsError('failed-precondition',
+      'Refusing to delete the seed tenant jsminimart. Edit functions/index.js to allow.');
+  }
+
+  const tref = db.collection('tenants').doc(slug);
+  // recursiveDelete handles arbitrary nesting and large subcollections
+  // server-side; far more reliable than client-side per-doc loops.
+  await db.recursiveDelete(tref);
+  return { slug, deleted: true };
+});

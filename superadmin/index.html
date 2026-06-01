@@ -272,6 +272,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
@@ -284,6 +285,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const functions = firebase.app().functions('asia-southeast1');
+const deleteTenantFn = functions.httpsCallable('deleteTenant');
 
 // Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
 const SUPERADMIN_EMAILS = new Set([
@@ -411,6 +414,10 @@ function openDeleteModal(slug) {
   document.getElementById('del-slug-display').textContent = slug;
   document.getElementById('del-confirm-input').placeholder = slug;
   document.getElementById('del-confirm-input').value = '';
+  // Reset button state in case a previous attempt left it disabled/stale.
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = false;
+  btn.textContent = 'Delete forever';
   showStatus(document.getElementById('del-status'), '', '');
   document.getElementById('delete-modal').classList.add('show');
   setTimeout(() => document.getElementById('del-confirm-input').focus(), 50);
@@ -438,21 +445,8 @@ async function confirmDelete() {
   btn.disabled = true;
   btn.textContent = 'Deleting…';
   try {
-    showStatus(status, 'Removing subcollections…', '');
-    const tref = db.collection('tenants').doc(slug);
-    const subs = ['products', 'orders', 'settings'];
-    for (const sub of subs) {
-      const subSnap = await tref.collection(sub).get();
-      // Delete in chunks of 20 to stay well under Firestore batch limits.
-      for (let i = 0; i < subSnap.docs.length; i += 20) {
-        const chunk = subSnap.docs.slice(i, i + 20);
-        const batch = db.batch();
-        chunk.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-      }
-      showStatus(status, `Deleted ${subSnap.size} docs from ${sub}/…`, '');
-    }
-    await tref.delete();
+    showStatus(status, 'Deleting tenant on the server…', '');
+    await deleteTenantFn({ slug });
     showStatus(status, `✅ Deleted tenant ${slug}.`, 'success');
     setTimeout(() => {
       closeDeleteModal();
