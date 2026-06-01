@@ -546,7 +546,7 @@
 <header>
   <div class="nav">
     <div class="brand">
-      <a href="#" data-tenant-href="" class="logo"><img src="/newlogo.jpeg" alt="JS Mini Mart" /></a>
+      <a href="#" data-tenant-href="" class="logo" id="brand-logo"><img src="/newlogo.jpeg" alt="" /></a>
       <div>
         <h1 id="store-name">JS Mini Mart</h1>
         <small id="store-tag" style="display:none;"></small>
@@ -1029,6 +1029,12 @@ function init() {
   document.getElementById('store-name').textContent = STORE.name;
   document.getElementById('store-tag').textContent = STORE.tagline;
   document.title = STORE.name;
+  // Logo is jsminimart-specific. Hide for any other tenant until per-tenant
+  // logo upload is added.
+  if (TENANT_ID && TENANT_ID !== 'jsminimart') {
+    const lg = document.getElementById('brand-logo');
+    if (lg) lg.style.display = 'none';
+  }
 
   renderCategories();
   renderCart();

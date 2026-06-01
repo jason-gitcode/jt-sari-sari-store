@@ -1410,6 +1410,32 @@
                 </label>
               </div>
             </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">📅 Schedule delivery slots <span class="mode-badge off" id="set-schedules-badge">OFF</span></div>
+                <div class="setting-desc">Let customers pick a delivery time window at checkout. When off, delivery orders skip the slot picker entirely.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-schedules-enabled" onclick="toggleServiceOption('schedulesEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row" id="schedules-editor-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title" style="font-size:13px;">Delivery time windows</div>
+                <div class="setting-desc">Each window is shown as a button to your customers at checkout. Add as many as you offer.</div>
+                <div id="schedules-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <button type="button" id="schedules-add-btn" onclick="addScheduleRow()" style="margin-top:8px;padding:6px 12px;background:var(--surface-2);border:1px dashed var(--line-strong);border-radius:6px;font-size:13px;color:var(--muted);cursor:pointer;">+ Add another time window</button>
+                <div id="schedules-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="schedules-save-btn" onclick="saveDeliverySchedules()">Save schedules</button>
+              </div>
+            </div>
           </section>
 
           <section class="settings-section" id="set-appearance">
@@ -1824,7 +1850,8 @@ function syncServiceToggles() {
     'set-delivery-enabled':  deliveryOn,
     'set-pay-cash-enabled':  storeSettingsData.payCashEnabled   !== false,
     'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
-    'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false
+    'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false,
+    'set-schedules-enabled': storeSettingsData.schedulesEnabled !== false
   };
   for (const id in fields) {
     const el = document.getElementById(id);
@@ -1847,14 +1874,110 @@ function syncServiceToggles() {
     'set-pay-cash-badge':   fields['set-pay-cash-enabled'],
     'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
     // Effective COD state shown in the badge — false when delivery is off.
-    'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn
+    'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn,
+    'set-schedules-badge':  fields['set-schedules-enabled'] && deliveryOn
   };
+  // Schedule editor visible only when schedules are enabled AND delivery is on.
+  const schedRow = document.getElementById('schedules-editor-row');
+  if (schedRow) schedRow.style.display = (fields['set-schedules-enabled'] && deliveryOn) ? '' : 'none';
+  renderSchedulesEditor();
   for (const id in badges) {
     const el = document.getElementById(id);
     if (!el) continue;
     el.textContent = badges[id] ? 'ON' : 'OFF';
     el.classList.toggle('on', badges[id]);
     el.classList.toggle('off', !badges[id]);
+  }
+}
+
+// ============================================================
+// DELIVERY SCHEDULES EDITOR
+// ============================================================
+// In-memory working copy; saved to Firestore via Save button.
+let scheduleRows = null;
+
+function getDefaultSchedules() {
+  return [
+    { start: '10:00', end: '14:00' },
+    { start: '14:00', end: '18:00' },
+    { start: '16:00', end: '19:00' }
+  ];
+}
+
+function renderSchedulesEditor() {
+  const list = document.getElementById('schedules-list');
+  if (!list) return;
+  if (scheduleRows === null) {
+    // First render after settings snapshot: seed from doc, or defaults.
+    const fromDoc = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : null;
+    scheduleRows = (fromDoc && fromDoc.length > 0) ? fromDoc.map(s => ({ start: s.start || '', end: s.end || '' })) : getDefaultSchedules();
+  }
+  list.innerHTML = scheduleRows.map((s, i) => `
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input type="time" value="${s.start || ''}" onchange="updateScheduleRow(${i}, 'start', this.value)" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;" />
+      <span style="color:var(--muted);font-size:12px;">to</span>
+      <input type="time" value="${s.end || ''}" onchange="updateScheduleRow(${i}, 'end', this.value)" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;" />
+      <button type="button" onclick="removeScheduleRow(${i})" title="Remove" style="padding:4px 8px;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--danger);cursor:pointer;font-size:13px;">×</button>
+    </div>
+  `).join('');
+}
+
+function addScheduleRow() {
+  if (scheduleRows === null) scheduleRows = [];
+  scheduleRows.push({ start: '', end: '' });
+  renderSchedulesEditor();
+}
+
+function removeScheduleRow(idx) {
+  if (!scheduleRows) return;
+  scheduleRows.splice(idx, 1);
+  renderSchedulesEditor();
+}
+
+function updateScheduleRow(idx, key, val) {
+  if (!scheduleRows || !scheduleRows[idx]) return;
+  scheduleRows[idx][key] = val;
+}
+
+async function saveDeliverySchedules() {
+  const status = document.getElementById('schedules-status');
+  const btn = document.getElementById('schedules-save-btn');
+  status.style.color = 'var(--muted)';
+  if (!Array.isArray(scheduleRows) || scheduleRows.length === 0) {
+    status.style.color = '#dc2626';
+    status.textContent = 'Add at least one time window, or turn off Schedule delivery slots.';
+    return;
+  }
+  // Validate each row: both fields filled, end > start (within same day)
+  const cleaned = [];
+  for (let i = 0; i < scheduleRows.length; i++) {
+    const r = scheduleRows[i];
+    if (!r.start || !r.end) {
+      status.style.color = '#dc2626';
+      status.textContent = `Time window ${i + 1}: both start and end required.`;
+      return;
+    }
+    const [sh, sm] = r.start.split(':').map(Number);
+    const [eh, em] = r.end.split(':').map(Number);
+    if (eh * 60 + em <= sh * 60 + sm) {
+      status.style.color = '#dc2626';
+      status.textContent = `Time window ${i + 1}: end must be after start.`;
+      return;
+    }
+    cleaned.push({ start: r.start, end: r.end });
+  }
+  btn.disabled = true; btn.textContent = 'Saving...';
+  status.textContent = 'Saving...';
+  try {
+    await tdoc('settings', 'store').set({ deliverySchedules: cleaned }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = '✅ Saved.';
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save schedules';
   }
 }
 

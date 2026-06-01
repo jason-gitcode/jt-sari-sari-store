@@ -174,7 +174,14 @@ exports.createTenant = onCall(async (request) => {
     payCodEnabled: true,
     // Operating hours (Manila time, 24h). Tenant edits these in admin → Store Info.
     storeOpenHour: 6,
-    storeCloseHour: 16
+    storeCloseHour: 16,
+    // Delivery schedule windows. Tenant edits in admin → Service & Payment.
+    schedulesEnabled: true,
+    deliverySchedules: [
+      { start: '10:00', end: '14:00' },
+      { start: '14:00', end: '18:00' },
+      { start: '16:00', end: '19:00' }
+    ]
   });
 
   // ---------- COPY STARTER PACK PRODUCTS ----------

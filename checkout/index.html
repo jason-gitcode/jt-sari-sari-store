@@ -363,11 +363,34 @@ let maintenanceMode = false;
 let offlineMode = false;
 let deliverySlot = '';
 
-const DELIVERY_SLOTS = [
-  { id: '10am-2pm', label: '10am – 2pm' },
-  { id: '2pm-6pm',  label: '2pm – 6pm'  },
-  { id: '4pm-7pm',  label: '4pm – 7pm'  },
+// Default schedule slots used when settings/store hasn't been loaded yet or
+// the tenant hasn't customised. Same 3 windows as legacy hardcoded behaviour.
+const DEFAULT_DELIVERY_SCHEDULES = [
+  { start: '10:00', end: '14:00' },
+  { start: '14:00', end: '18:00' },
+  { start: '16:00', end: '19:00' }
 ];
+
+function fmtTime12Short(t) {
+  // '10:00' -> '10am'; '14:30' -> '2:30pm'
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+}
+
+function scheduleSlotsFromSettings() {
+  const arr = (Array.isArray(storeSettingsData.deliverySchedules) && storeSettingsData.deliverySchedules.length > 0)
+    ? storeSettingsData.deliverySchedules
+    : DEFAULT_DELIVERY_SCHEDULES;
+  return arr.map(s => ({
+    id:    `${s.start}-${s.end}`,
+    label: `${fmtTime12Short(s.start)} – ${fmtTime12Short(s.end)}`,
+    start: s.start,
+    end:   s.end
+  }));
+}
 
 function getManilaHour() {
   const now = new Date();
@@ -422,15 +445,21 @@ function getEffectiveStoreClosed() {
 }
 
 function getAvailableSlots() {
-  const h = getManilaHour();
-  if (h >= 6 && h < 9)  return DELIVERY_SLOTS;
-  if (h >= 9 && h < 13) return DELIVERY_SLOTS.slice(1);
-  if (h >= 13 && h < 16) return DELIVERY_SLOTS.slice(2);
-  return [];
+  // A slot is available if its end time hasn't passed yet.
+  const now = new Date();
+  const manila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const nowMin = manila.getHours() * 60 + manila.getMinutes();
+  return scheduleSlotsFromSettings().filter(s => {
+    const [eh, em] = s.end.split(':').map(Number);
+    return (eh * 60 + em) > nowMin;
+  });
 }
 
-function pickSlot(id) {
-  deliverySlot = id;
+// deliverySlot now stores the FORMATTED LABEL ("10am – 2pm"), not the id —
+// that way order docs and admin display strings stay human-readable even
+// after the tenant renames their schedule windows.
+function pickSlot(id, label) {
+  deliverySlot = label || id;
   document.querySelectorAll('.schedule-opt').forEach(b => b.classList.toggle('active', b.dataset.slot === id));
 }
 
@@ -510,19 +539,20 @@ function applyTenantStoreConfig() {
   const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
   if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
   const sched = document.getElementById('schedule-section');
+  const schedulesOn = storeSettingsData.schedulesEnabled !== false;
   if (!deliveryOn) {
     if (fulfillmentMethod !== 'pickup') {
       fulfillmentMethod = 'pickup';
     }
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
-    // Delivery is off entirely — hide schedule completely (not just greyed).
     if (sched) sched.style.display = 'none';
     if (pickupBox) pickupBox.style.display = 'block';
   } else {
-    // Delivery is on — make sure the schedule section is visible (pickFulfillment
-    // will toggle the is-disabled greying separately when customer picks pickup).
-    if (sched) sched.style.display = '';
+    // Delivery is on. Schedule section visible only if tenant enabled
+    // schedules AND has at least one slot configured.
+    const hasSlots = scheduleSlotsFromSettings().length > 0;
+    if (sched) sched.style.display = (schedulesOn && hasSlots) ? '' : 'none';
   }
 
   // Hide / show individual payment-method buttons based on admin toggles.
@@ -595,10 +625,12 @@ function init() {
   const subtotal = cartTotal();
   const fee = deliveryFee();
   const grandTotal = subtotal + fee;
+  const allSlots = scheduleSlotsFromSettings();
   const availSlots = getAvailableSlots();
-  const scheduleOptsHtml = DELIVERY_SLOTS.map(s => {
+  const scheduleOptsHtml = allSlots.map(s => {
     const avail = availSlots.some(a => a.id === s.id);
-    return '<button type="button" class="schedule-opt' + (avail ? '' : ' disabled') + '" data-slot="' + s.id + '" onclick="pickSlot(\'' + s.id + '\')">' + s.label + '</button>';
+    const safeLabel = s.label.replace(/'/g, "\\'");
+    return '<button type="button" class="schedule-opt' + (avail ? '' : ' disabled') + '" data-slot="' + s.id + '" onclick="pickSlot(\'' + s.id + '\', \'' + safeLabel + '\')">' + s.label + '</button>';
   }).join('');
 
   main.innerHTML = `
@@ -673,11 +705,8 @@ function init() {
         <input type="text" id="cust-street" placeholder="e.g. Jade St, New York Avenue" value="${savedAddress?.street || ''}" />
       </div>
       <div class="field">
-        <label for="cust-subdivision">Subdivision</label>
-        <select id="cust-subdivision">
-          <option value="">Select</option>
-          ${STORE.deliveryAreas.map(a => `<option ${savedAddress?.subdivision === a ? 'selected' : ''}>${a}</option>`).join('')}
-        </select>
+        <label for="cust-subdivision">Subdivision / Barangay</label>
+        <input type="text" id="cust-subdivision" placeholder="e.g. Valle Verde Subdivision" value="${savedAddress?.subdivision || ''}" />
       </div>
       <div class="field">
         <label for="cust-floor">Floor <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
@@ -909,14 +938,18 @@ async function placeOrder() {
       hasError = true;
     }
     if (!subdivision) {
-      if (!hasError) showToast("Please select your subdivision.");
+      if (!hasError) showToast("Please enter your subdivision or barangay.");
       hasError = true;
     }
     if (!street) {
       if (!hasError) showToast("Please enter your street.");
       hasError = true;
     }
-    if (!deliverySlot) {
+    // Only require a slot if the tenant has the schedule picker enabled
+    // AND has at least one slot configured.
+    const schedulesOn = storeSettingsData.schedulesEnabled !== false;
+    const hasSlots = scheduleSlotsFromSettings().length > 0;
+    if (schedulesOn && hasSlots && !deliverySlot) {
       if (!hasError) showToast("Please select a delivery schedule.");
       hasError = true;
     }
