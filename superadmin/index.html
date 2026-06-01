@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Superadmin — JS Mini Mart SaaS</title>
+<base href="/">
+<link rel="apple-touch-icon" href="/newlogo.jpeg" />
+<meta name="theme-color" content="#0f172a" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface-2: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --line: #334155;
+    --accent: #3b82f6;
+    --accent-dark: #2563eb;
+    --success: #22c55e;
+    --error: #ef4444;
+    --warn: #f59e0b;
+  }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .hidden { display: none !important; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+  /* Sign-in screen */
+  .signin-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .signin-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+  }
+  .signin-card img { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 16px; }
+  .signin-card h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .signin-card p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-decoration: none;
+  }
+  .btn:hover { background: #475569; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-danger { background: transparent; border-color: var(--error); color: var(--error); }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); }
+  .btn-icon { padding: 6px 10px; font-size: 12px; }
+  .gicon { width: 18px; height: 18px; }
+  .signin-error { color: var(--error); font-size: 13px; margin-top: 12px; min-height: 18px; }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-title { display: flex; align-items: center; gap: 12px; }
+  .header-title img { width: 32px; height: 32px; border-radius: 8px; }
+  .header-title h1 { font-size: 16px; font-weight: 600; }
+  .header-title .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .header-user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .stat-label { color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 700; }
+  .stat-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* Section */
+  .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+  .section-title .actions { display: flex; gap: 8px; }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  th { background: rgba(15,23,42,0.4); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+  td.slug { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--accent); }
+  td.name { font-weight: 500; }
+  td.owner { color: var(--muted); font-size: 12px; }
+  td.plan .pill { background: var(--surface-2); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+  td.plan .pill.starter { background: #1e3a8a33; color: #93c5fd; }
+  td.plan .pill.growth { background: #14532d33; color: #86efac; }
+  td.plan .pill.pro { background: #581c8733; color: #d8b4fe; }
+  td.numeric { font-variant-numeric: tabular-nums; }
+  td.created { color: var(--muted); font-size: 12px; }
+  td.actions { white-space: nowrap; }
+  td.actions a, td.actions button { margin-left: 4px; }
+  .empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .loading { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 440px;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 8px; }
+  .modal p { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .modal-status { font-size: 12px; color: var(--muted); margin-top: 12px; min-height: 16px; }
+  .modal-status.success { color: var(--success); }
+  .modal-status.error { color: var(--error); }
+</style>
+</head>
+<body>
+
+<!-- SIGN IN VIEW -->
+<div id="signin-view" class="signin-wrap">
+  <div class="signin-card">
+    <img src="/newlogo.jpeg" alt="JS Mini Mart" />
+    <h1>Superadmin Console</h1>
+    <p>Sign in with a superadmin Google account to manage all tenants on jsminimart.com.</p>
+    <button id="signin-btn" class="btn btn-primary" style="width: 100%;">
+      <svg class="gicon" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Continue with Google
+    </button>
+    <div class="signin-error" id="signin-error"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD VIEW -->
+<div id="dashboard-view" class="hidden">
+  <div class="header">
+    <div class="header-inner">
+      <div class="header-title">
+        <img src="/newlogo.jpeg" alt="JS Mini Mart" />
+        <h1>Superadmin</h1>
+        <span class="badge">SaaS</span>
+      </div>
+      <div class="header-user">
+        <span id="signed-email">—</span>
+        <button class="btn btn-icon" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total tenants</div><div class="stat-value" id="stat-total">—</div></div>
+      <div class="stat"><div class="stat-label">Signed up in last 7 days</div><div class="stat-value" id="stat-recent">—</div></div>
+      <div class="stat"><div class="stat-label">Total products (all tenants)</div><div class="stat-value" id="stat-products">—</div></div>
+      <div class="stat"><div class="stat-label">Total orders (all tenants)</div><div class="stat-value" id="stat-orders">—</div></div>
+    </div>
+
+    <div class="section-title">
+      <span>All tenants</span>
+      <div class="actions">
+        <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="tenants-table">
+        <thead>
+          <tr>
+            <th>Slug</th>
+            <th>Name</th>
+            <th>Plan</th>
+            <th>Owner</th>
+            <th>Created</th>
+            <th class="numeric">Products</th>
+            <th class="numeric">Orders</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tenants-tbody">
+          <tr><td colspan="8" class="loading">Loading tenants…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-backdrop" id="delete-modal">
+  <div class="modal">
+    <h3>Delete tenant?</h3>
+    <p>This permanently deletes <strong id="del-slug-display">—</strong> and all its products, orders, and settings. <strong>This cannot be undone.</strong></p>
+    <p>Type the slug below to confirm.</p>
+    <input id="del-confirm-input" placeholder="—" autocomplete="off" />
+    <div class="modal-actions">
+      <button class="btn" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="del-confirm-btn" onclick="confirmDelete()">Delete forever</button>
+    </div>
+    <div class="modal-status" id="del-status"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+  authDomain: "jt-sari-sari-store.firebaseapp.com",
+  projectId: "jt-sari-sari-store",
+  storageBucket: "jt-sari-sari-store.firebasestorage.app",
+  messagingSenderId: "625852109606",
+  appId: "1:625852109606:web:7474c10133701eafbce7e7"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
+const SUPERADMIN_EMAILS = new Set([
+  'aws.jason.b.tubilag@gmail.com',
+  'jason.b.tubilag@gmail.com',
+  'manilynp07@gmail.com'
+]);
+
+function showStatus(el, msg, kind) {
+  el.textContent = msg || '';
+  el.className = 'modal-status' + (kind ? ' ' + kind : '');
+}
+function showSigninError(msg) {
+  document.getElementById('signin-error').textContent = msg || '';
+}
+
+document.getElementById('signin-btn').addEventListener('click', async () => {
+  try {
+    showSigninError('');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    await auth.signInWithPopup(provider);
+  } catch (err) {
+    console.error(err);
+    showSigninError(err && err.message ? err.message : 'Sign-in failed.');
+  }
+});
+
+function signOut() {
+  auth.signOut();
+}
+
+function formatDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function shortEmail(e) {
+  return e || '—';
+}
+
+let CACHED_TENANTS = [];
+
+async function loadTenants() {
+  const tbody = document.getElementById('tenants-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading tenants…</td></tr>';
+  try {
+    const snap = await db.collection('tenants').orderBy('createdAt', 'desc').get();
+    const tenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    CACHED_TENANTS = tenants;
+
+    // Fetch product/order counts in parallel using count() aggregation
+    const counts = await Promise.all(tenants.map(async (t) => {
+      try {
+        const [pCount, oCount] = await Promise.all([
+          db.collection('tenants').doc(t.id).collection('products').count().get().then(r => r.data().count).catch(() => null),
+          db.collection('tenants').doc(t.id).collection('orders').count().get().then(r => r.data().count).catch(() => null)
+        ]);
+        return { products: pCount, orders: oCount };
+      } catch { return { products: null, orders: null }; }
+    }));
+
+    renderStats(tenants, counts);
+    renderTable(tenants, counts);
+  } catch (err) {
+    console.error(err);
+    tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color:var(--error);">Error loading tenants: ${err.message || err}</td></tr>`;
+  }
+}
+
+function renderStats(tenants, counts) {
+  document.getElementById('stat-total').textContent = tenants.length;
+  const now = Date.now();
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  const recent = tenants.filter(t => {
+    if (!t.createdAt) return false;
+    const ms = t.createdAt.toMillis ? t.createdAt.toMillis() : new Date(t.createdAt).getTime();
+    return (now - ms) < sevenDays;
+  }).length;
+  document.getElementById('stat-recent').textContent = recent;
+  const totalProducts = counts.reduce((s, c) => s + (c.products || 0), 0);
+  const totalOrders = counts.reduce((s, c) => s + (c.orders || 0), 0);
+  document.getElementById('stat-products').textContent = totalProducts.toLocaleString();
+  document.getElementById('stat-orders').textContent = totalOrders.toLocaleString();
+}
+
+function renderTable(tenants, counts) {
+  const tbody = document.getElementById('tenants-tbody');
+  if (tenants.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No tenants yet. Share <a href="/signup/" style="color:var(--accent);">jsminimart.com/signup/</a> to onboard.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tenants.map((t, i) => {
+    const c = counts[i] || {};
+    const plan = (t.plan || 'starter').toLowerCase();
+    const owner = Array.isArray(t.ownerEmails) && t.ownerEmails.length > 0 ? t.ownerEmails[0] : (t.createdByEmail || '—');
+    const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
+    return `
+      <tr>
+        <td class="slug">${t.id}</td>
+        <td class="name">${t.name || '—'}</td>
+        <td class="plan"><span class="pill ${plan}">${plan}</span></td>
+        <td class="owner">${shortEmail(owner)}${ownerSuffix}</td>
+        <td class="created">${formatDate(t.createdAt)}</td>
+        <td class="numeric">${c.products == null ? '—' : c.products}</td>
+        <td class="numeric">${c.orders == null ? '—' : c.orders}</td>
+        <td class="actions">
+          <a class="btn btn-icon" href="/${t.id}/" target="_blank" title="Open storefront">🌐</a>
+          <a class="btn btn-icon" href="/${t.id}/admin/" target="_blank" title="Open admin">⚙️</a>
+          <button class="btn btn-icon btn-danger" onclick="openDeleteModal('${t.id}')" title="Delete tenant">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function refresh() { loadTenants(); }
+
+// ---------- DELETE FLOW ----------
+let pendingDeleteSlug = null;
+
+function openDeleteModal(slug) {
+  pendingDeleteSlug = slug;
+  document.getElementById('del-slug-display').textContent = slug;
+  document.getElementById('del-confirm-input').placeholder = slug;
+  document.getElementById('del-confirm-input').value = '';
+  showStatus(document.getElementById('del-status'), '', '');
+  document.getElementById('delete-modal').classList.add('show');
+  setTimeout(() => document.getElementById('del-confirm-input').focus(), 50);
+}
+
+function closeDeleteModal() {
+  pendingDeleteSlug = null;
+  document.getElementById('delete-modal').classList.remove('show');
+}
+
+async function confirmDelete() {
+  const slug = pendingDeleteSlug;
+  if (!slug) return;
+  const typed = document.getElementById('del-confirm-input').value.trim();
+  const status = document.getElementById('del-status');
+  if (typed !== slug) {
+    showStatus(status, 'Slug does not match. Type the exact slug to confirm.', 'error');
+    return;
+  }
+  if (slug === 'jsminimart') {
+    showStatus(status, 'Refusing to delete the seed tenant. Edit firestore.rules to allow this.', 'error');
+    return;
+  }
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    showStatus(status, 'Removing subcollections…', '');
+    const tref = db.collection('tenants').doc(slug);
+    const subs = ['products', 'orders', 'settings'];
+    for (const sub of subs) {
+      const subSnap = await tref.collection(sub).get();
+      // Delete in chunks of 20 to stay well under Firestore batch limits.
+      for (let i = 0; i < subSnap.docs.length; i += 20) {
+        const chunk = subSnap.docs.slice(i, i + 20);
+        const batch = db.batch();
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      showStatus(status, `Deleted ${subSnap.size} docs from ${sub}/…`, '');
+    }
+    await tref.delete();
+    showStatus(status, `✅ Deleted tenant ${slug}.`, 'success');
+    setTimeout(() => {
+      closeDeleteModal();
+      loadTenants();
+    }, 600);
+  } catch (err) {
+    console.error(err);
+    showStatus(status, '❌ ' + (err && err.message ? err.message : err), 'error');
+    btn.disabled = false;
+    btn.textContent = 'Delete forever';
+  }
+}
+
+// ---------- AUTH ----------
+auth.onAuthStateChanged(user => {
+  if (!user) {
+    document.getElementById('signin-view').classList.remove('hidden');
+    document.getElementById('dashboard-view').classList.add('hidden');
+    return;
+  }
+  if (!user.emailVerified || !SUPERADMIN_EMAILS.has(user.email)) {
+    auth.signOut();
+    showSigninError(`Access denied. ${user.email} is not a superadmin account.`);
+    document.getElementById('signin-view').classList.remove('hidden');
+    document.getElementById('dashboard-view').classList.add('hidden');
+    return;
+  }
+  document.getElementById('signed-email').textContent = user.email;
+  document.getElementById('signin-view').classList.add('hidden');
+  document.getElementById('dashboard-view').classList.remove('hidden');
+  loadTenants();
+});
+</script>
+</body>
+</html>

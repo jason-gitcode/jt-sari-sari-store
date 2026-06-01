@@ -51,6 +51,8 @@
     "rewrites": [
       { "source": "/signup", "destination": "/signup/index.html" },
       { "source": "/signup/**", "destination": "/signup/index.html" },
+      { "source": "/superadmin", "destination": "/superadmin/index.html" },
+      { "source": "/superadmin/**", "destination": "/superadmin/index.html" },
       { "source": "/*/admin", "destination": "/admin.html" },
       { "source": "/*/admin/", "destination": "/admin.html" },
       { "source": "/*/admin/**", "destination": "/admin.html" },
