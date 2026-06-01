@@ -1929,19 +1929,23 @@ function syncServiceToggles() {
     'set-delivery-badge':   fields['set-delivery-enabled'],
     'set-pay-cash-badge':   fields['set-pay-cash-enabled'],
     'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
-    // Effective COD state shown in the badge — false when delivery is off.
+    // COD is special-cased: the effective state is false when delivery is off
+    // (matching its specific UX where the toggle is also dimmed in that case).
     'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn,
-    'set-schedules-badge':  fields['set-schedules-enabled'] && deliveryOn,
-    'set-free-del-badge':   fields['set-free-del-enabled']  && deliveryOn,
-    'set-areas-badge':      fields['set-areas-enabled']     && deliveryOn
+    // Schedules / free-delivery / areas badges reflect the toggle ONLY.
+    // Tenant can configure these ahead of time even while delivery is off;
+    // storefront + checkout already hide all delivery UI when delivery is off.
+    'set-schedules-badge':  fields['set-schedules-enabled'],
+    'set-free-del-badge':   fields['set-free-del-enabled'],
+    'set-areas-badge':      fields['set-areas-enabled']
   };
-  // Sub-editors visible only when their toggle is on AND delivery is on.
+  // Sub-editors visible whenever their toggle is on — no delivery dependency.
   const schedRow = document.getElementById('schedules-editor-row');
-  if (schedRow)   schedRow.style.display   = (fields['set-schedules-enabled'] && deliveryOn) ? '' : 'none';
+  if (schedRow)   schedRow.style.display   = fields['set-schedules-enabled'] ? '' : 'none';
   const freeRow = document.getElementById('free-del-editor-row');
-  if (freeRow)    freeRow.style.display    = (fields['set-free-del-enabled']  && deliveryOn) ? '' : 'none';
+  if (freeRow)    freeRow.style.display    = fields['set-free-del-enabled']  ? '' : 'none';
   const areasRow = document.getElementById('areas-editor-row');
-  if (areasRow)   areasRow.style.display   = (fields['set-areas-enabled']     && deliveryOn) ? '' : 'none';
+  if (areasRow)   areasRow.style.display   = fields['set-areas-enabled']     ? '' : 'none';
   renderSchedulesEditor();
   syncFreeDeliveryEditor();
   renderAreasEditor();
