@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JS Mini Mart — Admin</title>
+  <title>Admin</title>
   <base href="/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,6 +16,15 @@
         const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.setAttribute('data-theme', 'dark');
       } catch (e) {}
+    })();
+    // Sync URL → root class so the jsminimart-branded header is hidden
+    // BEFORE first paint on any other tenant. The real store name + initials
+    // are filled in once settings/store snapshots back.
+    (function () {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts[0] && parts[0] !== 'jsminimart') {
+        document.documentElement.classList.add('non-jsminimart');
+      }
     })();
   </script>
   <style>
@@ -140,6 +149,10 @@
       height: 60px;
     }
     .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    /* For non-jsminimart tenants, blank the brand mark + title at parse time
+       so "JS Mini Mart" never flashes. Filled in by JS once settings load. */
+    html.non-jsminimart .brand-mark { visibility: hidden; }
+    html.non-jsminimart .brand-title { visibility: hidden; }
     .brand-mark {
       width: 32px; height: 32px;
       border-radius: 8px;
@@ -1900,7 +1913,28 @@ tdoc('settings', 'store').onSnapshot(snap => {
   syncOperatingModeToggles();
   syncStoreInfoForm();
   syncServiceToggles();
+  applyTenantBranding();
 });
+
+function applyTenantBranding() {
+  // For jsminimart we keep the hardcoded "JS / JS Mini Mart" header; for
+  // any other tenant we read the live storeName off settings/store and
+  // synthesise initials for the brand mark.
+  if (TENANT_ID === 'jsminimart') return;
+  const name = (storeSettingsData.storeName || '').trim();
+  const titleEl = document.querySelector('.brand-title');
+  const markEl  = document.querySelector('.brand-mark');
+  if (titleEl) {
+    titleEl.textContent = name || 'Store';
+    titleEl.style.visibility = '';
+  }
+  if (markEl) {
+    markEl.textContent = name ? name.slice(0, 2).toUpperCase() : '·';
+    markEl.style.visibility = '';
+  }
+  // Also align the document title with the tenant.
+  if (name) document.title = `${name} — Admin`;
+}
 
 // Service & Payment toggle handlers
 async function toggleServiceOption(field, value) {
