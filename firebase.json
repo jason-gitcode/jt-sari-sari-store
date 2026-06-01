@@ -18,7 +18,22 @@
       "**/*.md",
       "ScreenRecording_*"
     ],
+    "redirects": [
+      { "source": "/", "type": 302, "destination": "/jsminimart/" },
+      { "source": "/index.html", "type": 302, "destination": "/jsminimart/" },
+      { "source": "/admin.html", "type": 302, "destination": "/jsminimart/admin/" },
+      { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" },
+      { "source": "/checkout", "type": 302, "destination": "/jsminimart/checkout/" },
+      { "source": "/checkout/", "type": 302, "destination": "/jsminimart/checkout/" },
+      { "source": "/checkout/index.html", "type": 302, "destination": "/jsminimart/checkout/" }
+    ],
     "rewrites": [
+      { "source": "/*/admin", "destination": "/admin.html" },
+      { "source": "/*/admin/", "destination": "/admin.html" },
+      { "source": "/*/admin/**", "destination": "/admin.html" },
+      { "source": "/*/checkout", "destination": "/checkout/index.html" },
+      { "source": "/*/checkout/", "destination": "/checkout/index.html" },
+      { "source": "/*/checkout/**", "destination": "/checkout/index.html" },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

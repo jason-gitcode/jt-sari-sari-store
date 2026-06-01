@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JS Mini Mart — Admin</title>
+  <base href="/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1359,6 +1360,16 @@
                 <span id="allowed-emails-count">—</span>
               </div>
             </div>
+            <div class="setting-row" id="migrate-row">
+              <div class="setting-info">
+                <div class="setting-title">🚚 One-time Multi-Tenant Migration</div>
+                <div class="setting-desc">Copies root-level <code>products/*</code>, <code>orders/*</code>, and <code>settings/store</code> under <code>tenants/<strong id="migrate-tid">jsminimart</strong>/...</code>. Safe to re-run. Run once after the multi-tenant deploy, then ignore.</div>
+                <div class="setting-desc" id="migrate-status" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="migrate-btn" onclick="runTenantMigration()">Run Migration</button>
+              </div>
+            </div>
           </section>
 
         </div>
@@ -1509,6 +1520,42 @@ firebase.initializeApp(firebaseConfig);
 const db   = firebase.firestore();
 const auth = firebase.auth();
 
+// ----- Multi-tenant tenant resolution (matches index.html / checkout) -----
+const RESERVED_TENANT_IDS = new Set([
+  'admin.html', 'checkout.html', 'checkout',
+  'manifest.json', 'sw.js', 'firebase.json',
+  'logo.PNG', 'newlogo.jpeg',
+  'superadmin', 'signup', 'login', 'api',
+  'assets', 'static', 'public', '__'
+]);
+function resolveTenantId() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts.length === 0) return null;
+  if (RESERVED_TENANT_IDS.has(parts[0])) return null;
+  return parts[0];
+}
+const TENANT_ID = resolveTenantId();
+function tcol(name) {
+  if (!TENANT_ID) throw new Error('Cannot read ' + name + ' — no tenant in URL');
+  return db.collection('tenants').doc(TENANT_ID).collection(name);
+}
+function tdoc(name, id) { return tcol(name).doc(id); }
+function tenantUrl(suffix) {
+  const s = suffix.startsWith('/') ? suffix.slice(1) : suffix;
+  return '/' + (TENANT_ID || 'jsminimart') + '/' + s;
+}
+function resolveTenantHrefs() {
+  document.querySelectorAll('[data-tenant-href]').forEach(el => {
+    const suffix = el.getAttribute('data-tenant-href') || '';
+    el.setAttribute('href', tenantUrl(suffix));
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', resolveTenantHrefs);
+} else {
+  resolveTenantHrefs();
+}
+
 function fmt(n) {
   return parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -1591,7 +1638,7 @@ let rainModeActive = false;
 let storeClosedActive = false;
 let maintenanceModeActive = false;
 
-db.collection('settings').doc('store').onSnapshot(snap => {
+tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   rainModeActive = storeSettingsData.rainMode === true;
   maintenanceModeActive = storeSettingsData.maintenanceMode === true;
@@ -1623,7 +1670,7 @@ function syncOperatingModeToggles() {
 async function toggleRainMode() {
   rainModeActive = !rainModeActive;
   try {
-    await db.collection('settings').doc('store').set({ rainMode: rainModeActive }, { merge: true });
+    await tdoc('settings', 'store').set({ rainMode: rainModeActive }, { merge: true });
   } catch (e) {
     console.error('Rain mode error:', e);
     showToast('Error updating rain mode', 'error');
@@ -1633,7 +1680,7 @@ async function toggleRainMode() {
 async function toggleMaintenanceMode() {
   maintenanceModeActive = !maintenanceModeActive;
   try {
-    await db.collection('settings').doc('store').set({ maintenanceMode: maintenanceModeActive }, { merge: true });
+    await tdoc('settings', 'store').set({ maintenanceMode: maintenanceModeActive }, { merge: true });
   } catch (e) {
     console.error('Maintenance mode error:', e);
     showToast('Error updating maintenance mode', 'error');
@@ -1688,7 +1735,7 @@ function getEffectiveStoreClosed() {
 async function toggleStoreClosed() {
   const newClosed = !getEffectiveStoreClosed();
   try {
-    await db.collection('settings').doc('store').set({
+    await tdoc('settings', 'store').set({
       storeClosed: newClosed,
       storeClosedSource: 'manual',
       storeClosedPeriodId: getCurrentPeriodId()
@@ -1778,7 +1825,7 @@ async function seedDefaultProducts() {
   const local = JSON.parse(localStorage.getItem('sariProducts') || '[]');
   const source = local.length > 0 ? local : DEFAULT_PRODUCTS;
   const batch = db.batch();
-  source.forEach(p => { batch.set(db.collection('products').doc(String(p.id)), p); });
+  source.forEach(p => { batch.set(tcol('products').doc(String(p.id)), p); });
   try {
     await batch.commit();
     showToast('Products synced to cloud!', 'success');
@@ -1870,6 +1917,68 @@ function logout() {
   resetForm();
 }
 
+// ============================================================
+// ONE-TIME TENANT MIGRATION (root → tenants/{tid}/...)
+// ============================================================
+async function runTenantMigration() {
+  const btn = document.getElementById('migrate-btn');
+  const status = document.getElementById('migrate-status');
+  const tidEl = document.getElementById('migrate-tid');
+  if (tidEl && TENANT_ID) tidEl.textContent = TENANT_ID;
+  if (!TENANT_ID) {
+    status.textContent = '❌ No tenant in URL. Open admin via /jsminimart/admin/.';
+    status.style.color = '#dc2626';
+    return;
+  }
+  if (!confirm(`Run one-time migration into tenants/${TENANT_ID}/?\n\nThis copies root products/orders/settings into the tenant subcollection. Re-running is safe but overwrites tenant docs with root data.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Migrating...';
+  status.style.color = 'var(--muted)';
+  try {
+    const log = [];
+    const batchCopy = async (rootName, tenantName) => {
+      const src = await db.collection(rootName).get();
+      let copied = 0;
+      let batch = db.batch();
+      let ops = 0;
+      for (const doc of src.docs) {
+        const dest = db.collection('tenants').doc(TENANT_ID).collection(tenantName).doc(doc.id);
+        batch.set(dest, doc.data());
+        copied++;
+        ops++;
+        if (ops >= 400) {
+          await batch.commit();
+          batch = db.batch();
+          ops = 0;
+        }
+      }
+      if (ops > 0) await batch.commit();
+      log.push(`${rootName} → tenants/${TENANT_ID}/${tenantName}: ${copied} docs`);
+      status.textContent = log.join(' · ');
+    };
+    await batchCopy('products', 'products');
+    await batchCopy('orders', 'orders');
+    // settings/store is a single doc
+    const settingsSrc = await db.collection('settings').doc('store').get();
+    if (settingsSrc.exists) {
+      await db.collection('tenants').doc(TENANT_ID).collection('settings').doc('store').set(settingsSrc.data());
+      log.push(`settings/store → tenants/${TENANT_ID}/settings/store: 1 doc`);
+    } else {
+      log.push('settings/store: not found, skipped');
+    }
+    status.textContent = '✅ ' + log.join(' · ');
+    status.style.color = '#16a34a';
+    btn.textContent = 'Done — re-run if needed';
+    btn.disabled = false;
+  } catch (err) {
+    console.error(err);
+    status.textContent = '❌ ' + (err && err.message ? err.message : String(err));
+    status.style.color = '#dc2626';
+    btn.disabled = false;
+    btn.textContent = 'Retry Migration';
+  }
+}
+
 function showLogin() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('admin-area').style.display = 'none';
@@ -1892,7 +2001,7 @@ function showAdmin() {
 
 function subscribeToProducts() {
   if (unsubscribeProducts) unsubscribeProducts();
-  unsubscribeProducts = db.collection('products').onSnapshot(snapshot => {
+  unsubscribeProducts = tcol('products').onSnapshot(snapshot => {
     products = snapshot.docs.map(doc => doc.data());
     products.sort((a, b) => a.id - b.id);
     renderAdminCategories();
@@ -1907,7 +2016,7 @@ function subscribeToProducts() {
 function subscribeToOrders() {
   if (unsubscribeOrders) unsubscribeOrders();
   let isFirstLoad = true;
-  unsubscribeOrders = db.collection('orders')
+  unsubscribeOrders = tcol('orders')
     .orderBy('createdAt', 'desc')
     .onSnapshot(snapshot => {
       orders = snapshot.docs.map(doc => ({ ...doc.data(), orderId: doc.id }));
@@ -2338,7 +2447,7 @@ async function confirmOrder(orderId) {
 
   try {
     const batch = db.batch();
-    batch.update(db.collection('orders').doc(orderId), {
+    batch.update(tcol('orders').doc(orderId), {
       status: 'confirmed',
       confirmedItems,
       uncheckedItems,
@@ -2388,7 +2497,7 @@ function buildStockRestoreUpdates(order, batch) {
       upd.stock = newStock;
       if (product.stock === 0 && newStock > 0) upd.available = true;
     }
-    if (Object.keys(upd).length > 0) batch.update(db.collection('products').doc(pid), upd);
+    if (Object.keys(upd).length > 0) batch.update(tcol('products').doc(pid), upd);
   }
 }
 
@@ -2397,7 +2506,7 @@ async function cancelOrder(orderId) {
   if (!order) return;
   try {
     const batch = db.batch();
-    batch.update(db.collection('orders').doc(orderId), {
+    batch.update(tcol('orders').doc(orderId), {
       status: 'cancelled',
       cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2415,7 +2524,7 @@ async function refundAndRestock(orderId) {
   if (!order) return;
   try {
     const batch = db.batch();
-    batch.update(db.collection('orders').doc(orderId), {
+    batch.update(tcol('orders').doc(orderId), {
       status: 'refunded',
       refundedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2438,7 +2547,7 @@ async function recordPartialRefund(orderId) {
     return;
   }
   try {
-    await db.collection('orders').doc(orderId).update({
+    await tcol('orders').doc(orderId).update({
       partialRefundRef: refNum,
       partialRefundAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -2457,7 +2566,7 @@ async function adjustStock(id, delta) {
   if (newStock === 0) upd.available = false;
   else if (product.stock === 0 && newStock > 0) upd.available = true;
   try {
-    await db.collection('products').doc(String(id)).update(upd);
+    await tcol('products').doc(String(id)).update(upd);
   } catch (err) {
     console.error('Adjust stock error:', err);
     showToast('Error updating stock', 'error');
@@ -2580,7 +2689,7 @@ function handleUnitChange(val) {
 
 async function toggleAvailability(id, available) {
   try {
-    await db.collection('products').doc(String(id)).update({ available });
+    await tcol('products').doc(String(id)).update({ available });
   } catch (err) {
     console.error('Toggle error:', err);
     showToast('Error updating availability', 'error');
@@ -2593,7 +2702,7 @@ async function toggleAvailability(id, available) {
 // because hidden === true is the only condition that hides.
 async function toggleHidden(id, hidden) {
   try {
-    await db.collection('products').doc(String(id)).update({ hidden });
+    await tcol('products').doc(String(id)).update({ hidden });
     showToast(hidden ? 'Product hidden from storefront' : 'Product visible on storefront', 'success');
   } catch (err) {
     console.error('Toggle hidden error:', err);
@@ -2737,7 +2846,7 @@ async function confirmDelete() {
   let errors = 0;
   for (const id of ids) {
     try {
-      await db.collection('products').doc(String(id)).delete();
+      await tcol('products').doc(String(id)).delete();
     } catch (err) {
       console.error('Delete error:', err);
       errors++;
@@ -2853,7 +2962,7 @@ async function saveProduct(e) {
   formData.id = editingProductId || (products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1);
 
   try {
-    await db.collection('products').doc(String(formData.id)).set(formData);
+    await tcol('products').doc(String(formData.id)).set(formData);
     showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
     closeProductModal();
   } catch (err) {

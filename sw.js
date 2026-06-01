@@ -1,9 +1,8 @@
-const CACHE = 'sari-sari-v17';
+const CACHE = 'sari-sari-v18';
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/checkout.html',
   '/logo.PNG',
+  '/newlogo.jpeg',
+  '/manifest.json',
 ];
 
 self.addEventListener('install', e => {

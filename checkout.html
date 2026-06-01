@@ -4,13 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Order Summary — JS Mini Mart</title>
-<link rel="manifest" href="/jt-sari-sari-store/manifest.json" />
+<base href="/">
+<link rel="manifest" href="/manifest.json" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <meta name="theme-color" content="#2563eb" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
-<link rel="apple-touch-icon" href="newlogo.jpeg" />
+<link rel="apple-touch-icon" href="/newlogo.jpeg" />
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
@@ -185,7 +186,7 @@
 
 <header>
   <div class="nav">
-    <a href="index.html#cart" class="back-btn">← Back</a>
+    <a href="#" data-tenant-href="#cart" class="back-btn">← Back</a>
     <span class="nav-title">Order Summary</span>
   </div>
 </header>
@@ -312,6 +313,43 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// ----- Multi-tenant tenant resolution (matches index.html / admin.html) -----
+const RESERVED_TENANT_IDS = new Set([
+  'admin.html', 'checkout.html', 'checkout',
+  'manifest.json', 'sw.js', 'firebase.json',
+  'logo.PNG', 'newlogo.jpeg',
+  'superadmin', 'signup', 'login', 'api',
+  'assets', 'static', 'public', '__'
+]);
+function resolveTenantId() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  if (parts.length === 0) return null;
+  if (RESERVED_TENANT_IDS.has(parts[0])) return null;
+  return parts[0];
+}
+const TENANT_ID = resolveTenantId();
+function tcol(name) {
+  if (!TENANT_ID) throw new Error('Cannot read ' + name + ' — no tenant in URL');
+  return db.collection('tenants').doc(TENANT_ID).collection(name);
+}
+function tdoc(name, id) { return tcol(name).doc(id); }
+function tenantUrl(suffix) {
+  const s = suffix.startsWith('/') ? suffix.slice(1) : suffix;
+  return '/' + (TENANT_ID || 'jsminimart') + '/' + s;
+}
+function resolveTenantHrefs() {
+  document.querySelectorAll('[data-tenant-href]').forEach(el => {
+    const suffix = el.getAttribute('data-tenant-href') || '';
+    el.setAttribute('href', tenantUrl(suffix));
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', resolveTenantHrefs);
+} else {
+  resolveTenantHrefs();
+}
+
 let PRODUCTS = [];
 let cart = JSON.parse(localStorage.getItem('sariCart') || '{}');
 let payMethod = 'cod';
@@ -408,7 +446,7 @@ function updateWeatherWarning() {
   }
 }
 
-db.collection('settings').doc('store').onSnapshot(snap => {
+tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   rainMode        = storeSettingsData.rainMode === true;
   maintenanceMode = storeSettingsData.maintenanceMode === true;
@@ -447,7 +485,7 @@ function init() {
       <div class="empty">
         <div style="font-size:48px; margin-bottom:12px;">🛒</div>
         <div style="font-size:16px; font-weight:600; margin-bottom:8px;">Your cart is empty</div>
-        <a href="index.html">← Back to store</a>
+        <a href="#" data-tenant-href="">← Back to store</a>
       </div>`;
     return;
   }
@@ -825,7 +863,7 @@ async function placeOrder() {
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  const orderRef = db.collection('orders').doc();
+  const orderRef = tcol('orders').doc();
   let stockErrorMsg = null;
 
   try {
@@ -837,7 +875,7 @@ async function placeOrder() {
         productGroups[item.productId].push(item);
       });
       const productIds = Object.keys(productGroups);
-      const productRefs = productIds.map(pid => db.collection('products').doc(pid));
+      const productRefs = productIds.map(pid => tcol('products').doc(pid));
       const snaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
       // Validate stock — reads must all complete before any writes
@@ -932,7 +970,7 @@ function showOrderConfirmation(orderId, payment) {
       <div class="confirm-order-num">Order #${shortId}</div>
       <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
       ${gcashHtml}
-      <a href="index.html" class="confirm-back">Continue Shopping</a>
+      <a href="#" data-tenant-href="" class="confirm-back">Continue Shopping</a>
     </div>
   `;
 }
@@ -958,7 +996,7 @@ function showToast(msg) {
 }
 
 // Load products from Firestore, then render
-db.collection('products').get().then(snapshot => {
+tcol('products').get().then(snapshot => {
   if (!snapshot.empty) {
     PRODUCTS = snapshot.docs.map(doc => doc.data());
     PRODUCTS.sort((a, b) => a.id - b.id);
@@ -1113,7 +1151,7 @@ db.collection('products').get().then(snapshot => {
 </script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/jt-sari-sari-store/sw.js');
+    navigator.serviceWorker.register('/sw.js');
   }
 </script>
 </body>
