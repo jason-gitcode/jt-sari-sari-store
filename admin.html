@@ -1209,7 +1209,44 @@
     @media (max-width: 980px) {
       .dash-charts-row { grid-template-columns: 1fr; }
       .settings-grid { grid-template-columns: 1fr; }
-      .settings-nav { position: relative; flex-direction: row; flex-wrap: wrap; overflow-x: auto; }
+      /* Settings sub-nav on phones/tablets: collapse the multi-row wrapped
+         list into a single horizontally-scrollable pill bar. Compact, always
+         shows the current section, single tap to switch — same pattern as
+         the storefront category chips and the iOS Settings sub-tabs. */
+      .settings-nav {
+        position: sticky; top: 0; z-index: 5;
+        background: var(--bg);
+        display: flex; flex-direction: row; flex-wrap: nowrap;
+        gap: 8px;
+        padding: 4px 4px 8px;
+        margin: 0 -4px 8px;
+        overflow-x: auto; overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .settings-nav::-webkit-scrollbar { display: none; }
+      .settings-nav button {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 13px; font-weight: 500;
+        color: var(--ink-soft);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        white-space: nowrap;
+        scroll-snap-align: center;
+        transition: background .15s, color .15s, border-color .15s, transform .08s;
+      }
+      .settings-nav button:active { transform: scale(0.97); }
+      .settings-nav button:hover { background: var(--surface-2); color: var(--ink); }
+      .settings-nav button.active {
+        background: var(--accent, #2563eb);
+        color: #fff;
+        border-color: var(--accent, #2563eb);
+        font-weight: 600;
+      }
     }
     /* ---------- iPad + smaller: products table becomes a single horizontally-scrollable grid ----------
        Only the products section changes here. The rest of the admin (forms, charts, settings)
@@ -5788,10 +5825,19 @@ function toggleSoundAlerts(on) {
 }
 
 function goToSettingsSection(name) {
-  document.querySelectorAll('.settings-nav button').forEach(b =>
-    b.classList.toggle('active', b.dataset.settingsNav === name));
+  let activeBtn = null;
+  document.querySelectorAll('.settings-nav button').forEach(b => {
+    const isActive = b.dataset.settingsNav === name;
+    b.classList.toggle('active', isActive);
+    if (isActive) activeBtn = b;
+  });
   const el = document.getElementById('set-' + name);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // On mobile the nav is a horizontal pill bar — keep the tapped chip
+  // centered so the user can see what's around their current selection.
+  if (activeBtn && activeBtn.parentElement && activeBtn.parentElement.scrollWidth > activeBtn.parentElement.clientWidth) {
+    activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
 }
 
 function setHomeGreeting() {
