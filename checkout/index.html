@@ -413,12 +413,18 @@ let storeSettingsData = {};
 
 function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
 function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+function getManilaDayIdx() {
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd);
+}
 function fmtHour12Long(h) {
   if (h === 0) return '12:00 AM'; if (h < 12) return `${h}:00 AM`;
   if (h === 12) return '12:00 PM'; return `${h - 12}:00 PM`;
 }
 
 function isStoreHoursClosed() {
+  if (!getOpenDays().includes(getManilaDayIdx())) return true;
   const h = getManilaHour();
   const o = getOpenHour(), c = getCloseHour();
   return (o < c) ? (h < o || h >= c) : (h >= c && h < o);

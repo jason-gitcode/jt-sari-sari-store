@@ -1562,7 +1562,7 @@
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Operating hours (Manila time)</div>
-                <div class="setting-desc">Daily opening &amp; closing time. The storefront auto-closes outside this window and ticker labels update automatically.</div>
+                <div class="setting-desc">Daily opening &amp; closing time. The storefront auto-closes outside this window and on days you don't operate.</div>
                 <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
                   <div style="flex:1;min-width:140px;">
                     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Opens at</label>
@@ -1572,6 +1572,10 @@
                     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Closes at</label>
                     <select id="si-close-hour" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);"></select>
                   </div>
+                </div>
+                <div style="margin-top:14px;">
+                  <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Open days</label>
+                  <div id="si-day-row" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
                 </div>
               </div>
             </div>
@@ -2460,8 +2464,21 @@ function ensureHourSelectsPopulated() {
   populate('si-close-hour');
 }
 
+function ensureDayCheckboxesPopulated() {
+  const row = document.getElementById('si-day-row');
+  if (!row || row.children.length > 0) return;
+  const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  row.innerHTML = labels.map((lbl, i) => `
+    <label class="si-day-chip" data-idx="${i}" style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--ink-soft);background:var(--surface);">
+      <input type="checkbox" data-day-idx="${i}" style="margin:0;" />
+      <span>${lbl}</span>
+    </label>
+  `).join('');
+}
+
 function syncStoreInfoForm() {
   ensureHourSelectsPopulated();
+  ensureDayCheckboxesPopulated();
   const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };
   f('si-store-name', storeSettingsData.storeName);
   f('si-pickup-address', storeSettingsData.pickupAddress);
@@ -2473,6 +2490,33 @@ function syncStoreInfoForm() {
   const ch = document.getElementById('si-close-hour');
   if (oh && document.activeElement !== oh) oh.value = String(openH);
   if (ch && document.activeElement !== ch) ch.value = String(closeH);
+  // Open days: default to all 7 days if missing.
+  const days = Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6];
+  const open = new Set(days);
+  document.querySelectorAll('#si-day-row input[data-day-idx]').forEach(cb => {
+    const idx = Number(cb.dataset.dayIdx);
+    cb.checked = open.has(idx);
+    const chip = cb.closest('.si-day-chip');
+    if (chip) {
+      chip.style.background = cb.checked ? 'var(--ink)' : 'var(--surface)';
+      chip.style.color = cb.checked ? 'var(--surface)' : 'var(--ink-soft)';
+      chip.style.borderColor = cb.checked ? 'var(--ink)' : 'var(--line)';
+    }
+  });
+  // Wire change handler once (idempotent via data attribute).
+  if (!document.getElementById('si-day-row').dataset.wired) {
+    document.querySelectorAll('#si-day-row input[data-day-idx]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const chip = cb.closest('.si-day-chip');
+        if (chip) {
+          chip.style.background = cb.checked ? 'var(--ink)' : 'var(--surface)';
+          chip.style.color = cb.checked ? 'var(--surface)' : 'var(--ink-soft)';
+          chip.style.borderColor = cb.checked ? 'var(--ink)' : 'var(--line)';
+        }
+      });
+    });
+    document.getElementById('si-day-row').dataset.wired = '1';
+  }
 }
 
 async function saveStoreInfo() {
@@ -2491,10 +2535,15 @@ async function saveStoreInfo() {
   if (!Number.isInteger(storeOpenHour) || storeOpenHour < 0 || storeOpenHour > 23) { status.textContent = 'Opening hour invalid.'; status.style.color = '#dc2626'; return; }
   if (!Number.isInteger(storeCloseHour) || storeCloseHour < 0 || storeCloseHour > 23) { status.textContent = 'Closing hour invalid.'; status.style.color = '#dc2626'; return; }
   if (storeOpenHour === storeCloseHour) { status.textContent = 'Opening and closing hour must differ.'; status.style.color = '#dc2626'; return; }
+  // Collect open days from the chip checkboxes.
+  const openDays = Array.from(document.querySelectorAll('#si-day-row input[data-day-idx]:checked'))
+    .map(cb => Number(cb.dataset.dayIdx))
+    .sort((a, b) => a - b);
+  if (openDays.length === 0) { status.textContent = 'Select at least one open day.'; status.style.color = '#dc2626'; return; }
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour }, { merge: true });
+    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
   } catch (err) {
@@ -2571,14 +2620,20 @@ let storeSettingsData = {};
 
 function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
 function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+function getManilaDayIdx() {
+  // 0 = Sunday, 6 = Saturday (matches JS Date.getDay() convention).
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd);
+}
 
 function isStoreHoursClosed() {
+  // Closed entirely if today isn't an "open day".
+  if (!getOpenDays().includes(getManilaDayIdx())) return true;
   const h = parseInt(new Intl.DateTimeFormat('en-PH', {
     hour: 'numeric', hour12: false, timeZone: 'Asia/Manila'
   }).format(new Date()));
   const o = getOpenHour(), c = getCloseHour();
-  // Same-day window (o < c): closed when outside [o, c)
-  // Overnight window (o > c, e.g. 22→6): closed when inside [c, o)
   return (o < c) ? (h < o || h >= c) : (h >= c && h < o);
 }
 

@@ -606,18 +606,18 @@
         </div>
         <div class="footer-section">
           <h4>🛵 Delivery Times</h4>
-          <p>10:00 AM · 2:00 PM · 6:00 PM</p>
+          <p id="footer-delivery-times">10:00 AM · 2:00 PM · 6:00 PM</p>
         </div>
         <div class="footer-section">
           <h4>🌐 Website</h4>
-          <a href="https://jsminimart.com">jsminimart.com</a>
+          <a id="footer-website" href="https://jsminimart.com">jsminimart.com</a>
         </div>
         <div class="footer-section">
           <h4>📞 Contact Us</h4>
-          <a href="tel:+639184067841">0918-406-7841</a>
+          <a id="footer-contact" href="tel:+639184067841">0918-406-7841</a>
         </div>
       </div>
-      <div class="footer-bottom">© <span id="footer-year"></span> JS Mini Mart · Maraming salamat po! 🙏</div>
+      <div class="footer-bottom">© <span id="footer-year"></span> <span id="footer-store-name">JS Mini Mart</span> · Maraming salamat po! 🙏</div>
     </footer>
   </div>
 </div>
@@ -857,6 +857,22 @@ let storeSettingsData = {};
 
 function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
 function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
+function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+function getManilaDayIdx() {
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd);
+}
+function fmtOpenDays(days) {
+  if (!Array.isArray(days) || days.length === 0) return 'never';
+  if (days.length === 7) return 'daily';
+  const sorted = [...days].sort((a,b) => a-b);
+  if (sorted.length === 5 && sorted.join(',') === '1,2,3,4,5') return 'weekdays';
+  if (sorted.length === 2 && sorted.includes(0) && sorted.includes(6)) return 'weekends';
+  const lbls = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const contig = sorted.every((d, i) => i === 0 || d === sorted[i-1] + 1);
+  if (contig && sorted.length >= 3) return `${lbls[sorted[0]]}–${lbls[sorted[sorted.length-1]]}`;
+  return sorted.map(d => lbls[d]).join(' · ');
+}
 function fmtHour12Short(h) {
   if (h === 0) return '12am'; if (h < 12) return `${h}am`;
   if (h === 12) return '12pm'; return `${h - 12}pm`;
@@ -872,8 +888,16 @@ function fmtTime12Short(t) {
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
 }
+function fmtTime12Long(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
 
 function isStoreHoursClosed() {
+  if (!getOpenDays().includes(getManilaDayIdx())) return true;
   const h = getManilaHour();
   const o = getOpenHour(), c = getCloseHour();
   return (o < c) ? (h < o || h >= c) : (h >= c && h < o);
@@ -929,7 +953,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   if (areasOn && areas.length > 0) {
     items.push({ icon: '📍', text: 'Delivering to: ' + areas.join(' · ') });
   }
-  items.push({ icon: '🕐', text: `Open ${hoursShort} daily` });
+  items.push({ icon: '🕐', text: `Open ${hoursShort} ${fmtOpenDays(getOpenDays())}` });
   if (freeDelOn && threshold > 0) {
     items.push({ icon: '🛵', text: `Free delivery on orders min. Php ${threshold}` });
   }
@@ -937,9 +961,19 @@ function buildTicker(rainMode, storeClosed, maintenance) {
     const labels = schedules.map(s => `${fmtTime12Short(s.start)}–${fmtTime12Short(s.end)}`);
     items.push({ icon: '🕒', text: `Delivery windows: ${labels.join(' · ')}` });
   }
+  // Keep the footer "Delivery Times" line in sync with whatever schedule
+  // windows the tenant has configured. Shows each window's START time.
+  const footDel = document.getElementById('footer-delivery-times');
+  if (footDel) {
+    if (schedulesOn && schedules.length > 0) {
+      footDel.textContent = schedules.map(s => fmtTime12Long(s.start)).join(' · ');
+    } else {
+      footDel.textContent = '—';
+    }
+  }
 
   if (rainMode) items.push(RAIN_TICKER);
-  if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} daily. Thank you for your patience.` });
+  if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} ${fmtOpenDays(getOpenDays())}. Thank you for your patience.` });
   if (maintenance) items.push(MAINTENANCE_TICKER);
   if (offlineMode) items.push(OFFLINE_TICKER);
   // Also keep the footer hours in sync.
@@ -1032,6 +1066,32 @@ tdoc('settings', 'store').onSnapshot(snap => {
   } else if (nameEl) {
     shownName = nameEl.textContent || '';
   }
+
+  // Sync the footer website link with the tenant slug and the contact-us
+  // link with the configured GCash number.
+  const webEl  = document.getElementById('footer-website');
+  if (webEl) {
+    const path = 'jsminimart.com/' + (TENANT_ID || 'jsminimart') + '/';
+    webEl.href = 'https://' + path;
+    webEl.textContent = path;
+  }
+  const contactEl = document.getElementById('footer-contact');
+  if (contactEl) {
+    const num = storeSettingsData.gcashNumber || '';
+    if (num) {
+      // Pretty-print as 09XX-XXX-XXXX
+      const pretty = num.length === 11 ? num.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1-$2-$3') : num;
+      contactEl.href = 'tel:+63' + num.replace(/^0/, '');
+      contactEl.textContent = pretty;
+      contactEl.style.display = '';
+    } else {
+      contactEl.textContent = '—';
+      contactEl.removeAttribute('href');
+    }
+  }
+  // Footer-bottom storeName mirror
+  const footerStoreNameEl = document.getElementById('footer-store-name');
+  if (footerStoreNameEl && shownName) footerStoreNameEl.textContent = shownName;
   // Scale the brand-name font so long names stay readable AND fully visible
   // (no ellipsis). Wraps to multiple lines naturally inside the bounded box.
   if (nameEl) {

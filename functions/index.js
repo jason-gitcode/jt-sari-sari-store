@@ -176,6 +176,8 @@ exports.createTenant = onCall(async (request) => {
     // Operating hours (Manila time, 24h). Tenant edits these in admin → Store Info.
     storeOpenHour: 6,
     storeCloseHour: 16,
+    // Open days of week (0=Sun, 6=Sat). Default: open every day.
+    openDays: [0,1,2,3,4,5,6],
     // Delivery schedule windows. Tenant edits in admin → Service & Payment.
     schedulesEnabled: true,
     deliverySchedules: [
