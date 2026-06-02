@@ -1226,15 +1226,16 @@
       /* Settings sub-nav on phones/tablets: collapse the multi-row wrapped
          list into a single horizontally-scrollable row of compact box
          buttons. Active = black tile (matches the Home page's preset
-         buttons), inactive = white tile with border — keeps Jason's
-         existing dashboard design language consistent. */
+         buttons), inactive = white tile with border — same font size,
+         weight, padding, and radius as `.dash-preset-btn` so the two
+         scrollable rows feel like one design system. */
       .settings-nav {
         position: sticky; top: 0; z-index: 5;
         background: var(--bg);
         display: flex; flex-direction: row; flex-wrap: nowrap;
         gap: 6px;
-        padding: 2px 0 6px;
-        margin: 0 0 6px;
+        padding: 2px 0 4px;
+        margin: 0;
         overflow-x: auto; overflow-y: hidden;
         overscroll-behavior-x: contain;
         scroll-snap-type: x proximity;
@@ -1244,8 +1245,8 @@
       .settings-nav::-webkit-scrollbar { display: none; }
       .settings-nav button {
         flex-shrink: 0;
-        padding: 6px 14px;
-        font-size: 13px; font-weight: 500;
+        padding: 6px 12px;
+        font-size: var(--fs-sm); font-weight: 500;
         color: var(--ink-soft);
         background: var(--surface);
         border: 1px solid var(--line);
@@ -1260,8 +1261,9 @@
         background: var(--ink);
         color: var(--surface);
         border-color: var(--ink);
-        font-weight: 600;
       }
+      /* Compress the gap between the sticky nav and the first section card. */
+      .settings-grid { gap: 8px; }
     }
     /* ---------- iPad + smaller: products table becomes a single horizontally-scrollable grid ----------
        Only the products section changes here. The rest of the admin (forms, charts, settings)
@@ -5878,13 +5880,33 @@ function goToSettingsSection(name) {
     b.classList.toggle('active', isActive);
     if (isActive) activeBtn = b;
   });
-  const el = document.getElementById('set-' + name);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // On mobile the nav is a horizontal pill bar — keep the tapped chip
-  // centered so the user can see what's around their current selection.
-  if (activeBtn && activeBtn.parentElement && activeBtn.parentElement.scrollWidth > activeBtn.parentElement.clientWidth) {
-    activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+
+  // Center the active chip horizontally in the mobile pill bar.
+  // Use scrollTo directly on the nav so we don't accidentally scroll any
+  // vertical ancestor — `scrollIntoView({block:'nearest'})` was fighting
+  // the section scroll below and the page wasn't reaching the target.
+  if (activeBtn) {
+    const nav = activeBtn.parentElement;
+    if (nav && nav.scrollWidth > nav.clientWidth) {
+      const targetLeft = activeBtn.offsetLeft - (nav.clientWidth - activeBtn.offsetWidth) / 2;
+      nav.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+    }
   }
+
+  // Vertically scroll the chosen section into view inside the settings tab.
+  // On mobile the nav is a sticky horizontal bar that visually covers the
+  // section heading once it docks at top:0 — subtract its height so the
+  // heading lands just under the nav, not behind it. On desktop the nav
+  // is a sidebar (side-by-side), so no offset is needed.
+  const el = document.getElementById('set-' + name);
+  if (!el) return;
+  const tab = document.getElementById('settings-tab');
+  if (!tab) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  const nav = document.querySelector('.settings-nav');
+  const isStackedNav = window.innerWidth <= 980;
+  const offset = isStackedNav && nav ? nav.offsetHeight + 8 : 0;
+  const top = el.getBoundingClientRect().top - tab.getBoundingClientRect().top + tab.scrollTop - offset;
+  tab.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 }
 
 function setHomeGreeting() {
