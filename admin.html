@@ -67,7 +67,9 @@
       --fs-2xl: 22px;
     }
 
+    :root { color-scheme: light; }
     [data-theme="dark"] {
+      color-scheme: dark;
       --bg: #0b0c0f;
       --surface: #14161a;
       --surface-2: #1a1d22;
@@ -1078,6 +1080,49 @@
     .settings-section textarea::placeholder {
       color: var(--muted);
       opacity: 0.75;
+    }
+
+    /* Tactile feel for date / time inputs across admin. The native pickers
+       are largely browser-controlled (Chrome's clock dial isn't restylable),
+       but we can make the field itself feel clickable: hover + focus rings,
+       slightly taller hit area, and a pointer cursor on the calendar / clock
+       picker indicator. The picker dropdown itself follows `color-scheme`
+       (set above on :root + [data-theme=dark]) so it renders in dark mode. */
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"] {
+      min-height: 38px;
+      transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+      cursor: text;
+    }
+    input[type="date"]:hover,
+    input[type="time"]:hover,
+    input[type="datetime-local"]:hover {
+      border-color: var(--line-strong, var(--line));
+      background: var(--surface-2);
+    }
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    input[type="datetime-local"]:focus {
+      outline: none;
+      border-color: var(--accent, #2563eb);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+      background: var(--surface);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      opacity: 0.7;
+      transition: opacity 120ms ease, background-color 120ms ease;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover,
+    input[type="time"]::-webkit-calendar-picker-indicator:hover,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+      opacity: 1;
+      background-color: var(--surface-3);
     }
 
     .setting-row {
