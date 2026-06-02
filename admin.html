@@ -4812,8 +4812,11 @@ auth.onAuthStateChanged(async user => {
       const label = (auth_result.reason === 'superadmin' ? 'superadmin' : 'owner');
       aec.textContent = `${count} ${label}${count === 1 ? '' : 's'}`;
     }
-    // Reveal superadmin-only tools (kept hidden from tenant owners).
-    if (auth_result.reason === 'superadmin') {
+    // Reveal superadmin-only tools — ONLY on the seed-tenant slug (jsminimart).
+    // These tools (migration, starter-pack seeding, allowlist count) operate
+    // against the original single-tenant data; they have no meaning on other
+    // tenants, and superadmins who visit a non-seed tenant shouldn't see them.
+    if (auth_result.reason === 'superadmin' && TENANT_ID === 'jsminimart') {
       ['seed-pack-row', 'allowed-emails-row', 'migrate-row'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = '';
