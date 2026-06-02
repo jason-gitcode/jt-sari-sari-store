@@ -1216,18 +1216,25 @@
     /* ---------- RESPONSIVE ---------- */
     @media (max-width: 980px) {
       .dash-charts-row { grid-template-columns: 1fr; }
+      /* Tighter chart boxes on mobile — Chart.js's responsive logic needs
+         an explicit-sized container, and the desktop 240px is too tall on
+         a narrow viewport once the bottom legend takes its share. */
+      .dash-chart-canvas { height: 220px; width: 100%; min-width: 0; }
+      .dash-chart-box { padding: 14px 14px; }
+      .dash-chart-box h3 { font-size: var(--fs-base); margin-bottom: 10px; }
       .settings-grid { grid-template-columns: 1fr; }
       /* Settings sub-nav on phones/tablets: collapse the multi-row wrapped
-         list into a single horizontally-scrollable pill bar. Compact, always
-         shows the current section, single tap to switch — same pattern as
-         the storefront category chips and the iOS Settings sub-tabs. */
+         list into a single horizontally-scrollable row of compact box
+         buttons. Active = black tile (matches the Home page's preset
+         buttons), inactive = white tile with border — keeps Jason's
+         existing dashboard design language consistent. */
       .settings-nav {
         position: sticky; top: 0; z-index: 5;
         background: var(--bg);
         display: flex; flex-direction: row; flex-wrap: nowrap;
-        gap: 8px;
-        padding: 4px 4px 8px;
-        margin: 0 -4px 8px;
+        gap: 6px;
+        padding: 2px 0 6px;
+        margin: 0 0 6px;
         overflow-x: auto; overflow-y: hidden;
         overscroll-behavior-x: contain;
         scroll-snap-type: x proximity;
@@ -1237,22 +1244,22 @@
       .settings-nav::-webkit-scrollbar { display: none; }
       .settings-nav button {
         flex-shrink: 0;
-        padding: 8px 14px;
+        padding: 6px 14px;
         font-size: 13px; font-weight: 500;
         color: var(--ink-soft);
         background: var(--surface);
         border: 1px solid var(--line);
-        border-radius: 999px;
+        border-radius: var(--radius-sm);
         white-space: nowrap;
         scroll-snap-align: center;
         transition: background .15s, color .15s, border-color .15s, transform .08s;
       }
       .settings-nav button:active { transform: scale(0.97); }
-      .settings-nav button:hover { background: var(--surface-2); color: var(--ink); }
+      .settings-nav button:hover:not(.active) { border-color: var(--line-strong); color: var(--ink); }
       .settings-nav button.active {
-        background: var(--accent, #2563eb);
-        color: #fff;
-        border-color: var(--accent, #2563eb);
+        background: var(--ink);
+        color: var(--surface);
+        border-color: var(--ink);
         font-weight: 600;
       }
     }
@@ -1372,7 +1379,25 @@
       .variant-item .v-field-cost  { grid-column: 1; }
       .variant-item .remove-btn { grid-column: 2; grid-row: 1; align-self: start; }
       .variant-profit { grid-column: 1 / -1; }
-      .dash-date-range { margin-left: 0; width: 100%; }
+      /* Home filter bar — single horizontally scrollable row.
+         The buttons keep their existing rectangle design; the bar just
+         stops wrapping. Date range chases the presets on the same line. */
+      .dash-filter-bar {
+        flex-wrap: nowrap;
+        overflow-x: auto; overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        gap: 6px;
+        padding-bottom: 10px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .dash-filter-bar::-webkit-scrollbar { display: none; }
+      .dash-preset-btn { flex-shrink: 0; white-space: nowrap; }
+      .dash-date-range {
+        margin-left: 0; width: auto;
+        flex-shrink: 0; flex-wrap: nowrap;
+      }
+      .dash-date-range input { flex-shrink: 0; }
       .setting-row { flex-direction: column; align-items: flex-start; }
       .setting-control { align-self: stretch; }
     }
@@ -4287,6 +4312,13 @@ function switchTab(tab, reset = true) {
   if (tab === 'home') {
     setHomeGreeting();
     renderDashboard();
+    // After the home tab becomes visible, kick all chart instances to
+    // re-measure their containers. Chart.js's responsive logic can lock to
+    // a stale size if the tab was hidden when renderDashboard first ran.
+    requestAnimationFrame(() => {
+      [catChartInst, soldByCatChartInst, dailyChartInst, itemChartInst]
+        .forEach(c => { if (c) try { c.resize(); } catch (_) {} });
+    });
   }
 }
 
@@ -5217,6 +5249,12 @@ function renderCatChart() {
     },
     plugins: [percentLabelsPlugin]
   });
+  // Force a resize after layout settles. Chart.js measures the canvas
+  // parent at construction time; if the home tab was offscreen or the
+  // mobile media query hadn't fully applied, the chart will lock to a
+  // wrong size. A rAF resize re-reads clientWidth/Height once the DOM is
+  // painted, which fixes "empty chart box on phone."
+  requestAnimationFrame(() => catChartInst && catChartInst.resize());
 }
 
 // Doughnut: quantity sold per category for the currently-selected period.
@@ -5281,6 +5319,7 @@ function renderSoldByCategoryChart(confirmedOrders) {
     },
     plugins: [percentLabelsPlugin]
   });
+  requestAnimationFrame(() => soldByCatChartInst && soldByCatChartInst.resize());
 }
 
 // Extract the Manila hour-of-day (0..23) from a Firestore timestamp. Used
