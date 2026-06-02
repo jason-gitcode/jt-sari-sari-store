@@ -1686,6 +1686,34 @@
 
             <div class="setting-row">
               <div class="setting-info">
+                <div class="setting-title">💰 Charge a delivery fee <span class="mode-badge off" id="set-del-fee-badge">OFF</span></div>
+                <div class="setting-desc">When off, delivery is always free for every order. When on, customers pay the amount below (still subject to the free-delivery threshold).</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-del-fee-enabled" onclick="toggleServiceOption('deliveryFeeEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row" id="del-fee-editor-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title" style="font-size:13px;">Delivery fee amount (PHP)</div>
+                <div class="setting-desc">Charged on delivery orders that don't qualify for free delivery.</div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+                  <span style="color:var(--muted);font-size:13px;">₱</span>
+                  <input type="number" id="del-fee-amount" min="0" max="100000" step="1" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                </div>
+                <div id="del-fee-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="del-fee-save-btn" onclick="saveDeliveryFeeAmount()">Save fee</button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
                 <div class="setting-title">🎁 Free delivery on large orders <span class="mode-badge off" id="set-free-del-badge">OFF</span></div>
                 <div class="setting-desc">Waive the delivery fee when a customer's cart reaches a minimum amount. Configure the threshold below.</div>
               </div>
@@ -2198,6 +2226,7 @@ function syncServiceToggles() {
     'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
     'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false,
     'set-schedules-enabled': storeSettingsData.schedulesEnabled !== false,
+    'set-del-fee-enabled':   storeSettingsData.deliveryFeeEnabled !== false,
     'set-free-del-enabled':  storeSettingsData.freeDeliveryEnabled !== false,
     'set-areas-enabled':     storeSettingsData.deliveryAreasEnabled !== false
   };
@@ -2230,19 +2259,23 @@ function syncServiceToggles() {
     'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
     // COD effective state — false when delivery is off.
     'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn,
-    // Schedules / free-delivery / areas badges reflect the toggle ONLY.
+    // Schedules / delivery-fee / free-delivery / areas badges reflect the toggle ONLY.
     'set-schedules-badge':  fields['set-schedules-enabled'],
+    'set-del-fee-badge':    fields['set-del-fee-enabled'],
     'set-free-del-badge':   fields['set-free-del-enabled'],
     'set-areas-badge':      fields['set-areas-enabled']
   };
   // Sub-editors visible whenever their toggle is on — no delivery dependency.
   const schedRow = document.getElementById('schedules-editor-row');
   if (schedRow)   schedRow.style.display   = fields['set-schedules-enabled'] ? '' : 'none';
+  const delFeeRow = document.getElementById('del-fee-editor-row');
+  if (delFeeRow)  delFeeRow.style.display  = fields['set-del-fee-enabled']   ? '' : 'none';
   const freeRow = document.getElementById('free-del-editor-row');
   if (freeRow)    freeRow.style.display    = fields['set-free-del-enabled']  ? '' : 'none';
   const areasRow = document.getElementById('areas-editor-row');
   if (areasRow)   areasRow.style.display   = fields['set-areas-enabled']     ? '' : 'none';
   renderSchedulesEditor();
+  syncDeliveryFeeEditor();
   syncFreeDeliveryEditor();
   renderAreasEditor();
   for (const id in badges) {
@@ -2301,6 +2334,41 @@ function removeScheduleRow(idx) {
 function updateScheduleRow(idx, key, val) {
   if (!scheduleRows || !scheduleRows[idx]) return;
   scheduleRows[idx][key] = val;
+}
+
+// ============================================================
+// DELIVERY FEE AMOUNT
+// ============================================================
+function syncDeliveryFeeEditor() {
+  const input = document.getElementById('del-fee-amount');
+  if (!input || document.activeElement === input) return;
+  const val = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  input.value = String(val);
+}
+
+async function saveDeliveryFeeAmount() {
+  const status = document.getElementById('del-fee-status');
+  const btn = document.getElementById('del-fee-save-btn');
+  const raw = document.getElementById('del-fee-amount').value;
+  const n = parseInt(raw, 10);
+  if (!Number.isInteger(n) || n < 0 || n > 100000) {
+    status.style.color = '#dc2626';
+    status.textContent = 'Fee must be a whole number ≥ 0.';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Saving...';
+  status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
+  try {
+    await tdoc('settings', 'store').set({ deliveryFee: n }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = '✅ Saved.';
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save fee';
+  }
 }
 
 // ============================================================

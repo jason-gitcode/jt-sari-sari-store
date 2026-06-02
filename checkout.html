@@ -592,10 +592,13 @@ function cartTotal() {
   }, 0);
 }
 function deliveryFee() {
+  const feeOn = storeSettingsData.deliveryFeeEnabled !== false;
+  if (!feeOn) return 0;
   const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
   const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   if (freeOn && cartTotal() >= threshold) return 0;
-  return 45;
+  const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  return amt;
 }
 
 

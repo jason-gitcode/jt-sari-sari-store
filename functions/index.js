@@ -185,6 +185,9 @@ exports.createTenant = onCall(async (request) => {
       { start: '14:00', end: '18:00' },
       { start: '16:00', end: '19:00' }
     ],
+    // Delivery fee — toggleable + configurable amount (PHP).
+    deliveryFeeEnabled: true,
+    deliveryFee: 45,
     // Free delivery promotion + delivery areas list — both toggleable.
     freeDeliveryEnabled: true,
     freeDeliveryThreshold: 400,

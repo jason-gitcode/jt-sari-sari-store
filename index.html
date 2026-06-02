@@ -938,6 +938,7 @@ function getEffectiveStoreClosed() {
 function buildTicker(rainMode, storeClosed, maintenance) {
   const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
   const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
+  const feeOn        = storeSettingsData.deliveryFeeEnabled !== false;
   const freeDelOn    = storeSettingsData.freeDeliveryEnabled !== false;
   const threshold    = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   const schedulesOn  = storeSettingsData.schedulesEnabled !== false;
@@ -954,7 +955,9 @@ function buildTicker(rainMode, storeClosed, maintenance) {
     items.push({ icon: '📍', text: 'Delivering to: ' + areas.join(' · ') });
   }
   items.push({ icon: '🕐', text: `Open ${hoursShort} ${fmtOpenDays(getOpenDays())}` });
-  if (freeDelOn && threshold > 0) {
+  if (!feeOn) {
+    items.push({ icon: '🛵', text: 'Free delivery on every order' });
+  } else if (freeDelOn && threshold > 0) {
     items.push({ icon: '🛵', text: `Free delivery on orders min. Php ${threshold}` });
   }
   if (schedulesOn && schedules.length > 0) {
@@ -1487,10 +1490,13 @@ function cartTotal() {
   }, 0);
 }
 function deliveryFee() {
+  const feeOn = storeSettingsData.deliveryFeeEnabled !== false;
+  if (!feeOn) return 0;
   const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
   const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   if (freeOn && cartTotal() >= threshold) return 0;
-  return 45;
+  const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  return amt;
 }
 function cartCount() {
   return Object.values(cart).reduce((a, b) => a + b, 0);
