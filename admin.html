@@ -284,24 +284,45 @@
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
-    /* Supplier table */
-    .suppliers-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-    .suppliers-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .suppliers-table th, .suppliers-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    /* Supplier table — mirrors the Home Inventory ranking table (.dash-table)
+       in font scale, padding, sticky header, and box treatment. Wrapper
+       scrolls horizontally when the table is wider than the viewport so
+       the columns stay readable on phones. */
+    .suppliers-table-wrap {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      overflow-x: auto; overflow-y: hidden;
+      overscroll-behavior-x: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .suppliers-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+    .suppliers-table th, .suppliers-table td {
+      padding: 10px 12px; text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
     .suppliers-table tr:last-child td { border-bottom: 0; }
-    .suppliers-table th { background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
-    .suppliers-table td.actions { text-align: right; white-space: nowrap; width: 1%; }
+    .suppliers-table th {
+      font-size: var(--fs-xs); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--muted); background: var(--surface-2);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .suppliers-table td.actions { text-align: right; width: 1%; }
+    .suppliers-table tr:hover td { background: var(--surface-2); }
     .suppliers-table .name-link {
       background: none; border: 0; padding: 0; cursor: pointer;
       color: var(--accent); font: inherit; font-weight: 600; text-align: left;
     }
     .suppliers-table .name-link:hover { text-decoration: underline; color: var(--accent-dark); }
     .suppliers-table .supp-edit-btn {
-      background: var(--surface-2); border: 1px solid var(--line);
-      padding: 6px 14px; border-radius: 6px; cursor: pointer;
-      font-size: 13px; font-weight: 500; color: var(--ink);
+      background: var(--surface); border: 1px solid var(--line);
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft);
     }
-    .suppliers-table .supp-edit-btn:hover { background: var(--surface); border-color: var(--line-strong); color: var(--accent); }
+    .suppliers-table .supp-edit-btn:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--accent); }
     .suppliers-table .row-muted { color: var(--muted); }
     .suppliers-empty { padding: 48px 16px; text-align: center; color: var(--muted); }
 
@@ -576,10 +597,13 @@
 
     /* ---------- ORDERS ---------- */
     .orders-filter { display: flex; gap: 6px; flex-shrink: 0; margin-bottom: 14px; flex-wrap: wrap; }
+    /* Match the Home page preset buttons and Settings sub-nav chips —
+       same font, padding, radius — so all three scrollable rows look
+       like one design system. */
     .orders-filter-btn {
-      padding: 6px 14px;
+      padding: 6px 12px;
       border: 1px solid var(--line);
-      border-radius: var(--radius-pill);
+      border-radius: var(--radius-sm);
       font-size: var(--fs-sm); font-weight: 500;
       background: var(--surface);
       color: var(--ink-soft);
@@ -1381,6 +1405,20 @@
       .variant-item .v-field-cost  { grid-column: 1; }
       .variant-item .remove-btn { grid-column: 2; grid-row: 1; align-self: start; }
       .variant-profit { grid-column: 1 / -1; }
+      /* Orders filter — same single-row scrollable pattern as the Home
+         preset bar and Settings sub-nav. Buttons stop wrapping and the
+         row scrolls horizontally instead. */
+      .orders-filter {
+        flex-wrap: nowrap;
+        overflow-x: auto; overflow-y: hidden;
+        overscroll-behavior-x: none;
+        gap: 6px;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .orders-filter::-webkit-scrollbar { display: none; }
+      .orders-filter-btn { flex-shrink: 0; white-space: nowrap; }
       /* Home filter bar — single horizontally scrollable row.
          The buttons keep their existing rectangle design; the bar just
          stops wrapping. Date range chases the presets on the same line. */
@@ -4321,6 +4359,8 @@ function switchTab(tab, reset = true) {
       [catChartInst, soldByCatChartInst, dailyChartInst, itemChartInst]
         .forEach(c => { if (c) try { c.resize(); } catch (_) {} });
     });
+  } else if (tab === 'settings') {
+    setupSettingsScrollSpy();
   }
 }
 
@@ -5873,7 +5913,14 @@ function toggleSoundAlerts(on) {
   showToast(`Sound alerts ${on ? 'enabled' : 'disabled'}`, 'success');
 }
 
+// Brief lock so scroll-spy doesn't overwrite the chip we just tapped while
+// the smooth-scroll animation crosses other sections en route to the target.
+let _settingsSpyLockUntil = 0;
+
 function goToSettingsSection(name) {
+  // Suppress scroll-spy for the duration of the smooth-scroll animation.
+  _settingsSpyLockUntil = Date.now() + 700;
+
   let activeBtn = null;
   document.querySelectorAll('.settings-nav button').forEach(b => {
     const isActive = b.dataset.settingsNav === name;
@@ -5907,6 +5954,63 @@ function goToSettingsSection(name) {
   const offset = isStackedNav && nav ? nav.offsetHeight + 8 : 0;
   const top = el.getBoundingClientRect().top - tab.getBoundingClientRect().top + tab.scrollTop - offset;
   tab.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
+// Scroll-spy: as the user scrolls the Settings tab, highlight the sub-nav
+// chip for whichever section is currently anchored just below the sticky
+// nav. Chips also auto-recenter in the horizontal pill bar as the spy
+// activates them, so the current section is always visible in the nav.
+let _settingsSpyTickRequested = false;
+let _settingsSpyLastActiveId = '';
+
+function settingsScrollSpyTick() {
+  _settingsSpyTickRequested = false;
+  if (Date.now() < _settingsSpyLockUntil) return;
+  const tab = document.getElementById('settings-tab');
+  if (!tab || !tab.classList.contains('active')) return;
+  const sections = document.querySelectorAll('.settings-section');
+  if (!sections.length) return;
+
+  const nav = document.querySelector('.settings-nav');
+  const isStackedNav = window.innerWidth <= 980;
+  const navHeight = (isStackedNav && nav) ? nav.offsetHeight : 0;
+  // A section becomes "current" when its top crosses just below the nav.
+  // The +24 fudge keeps the new chip from activating one pixel too early.
+  const triggerLine = tab.getBoundingClientRect().top + navHeight + 24;
+
+  let candidate = sections[0];
+  for (const s of sections) {
+    if (s.getBoundingClientRect().top <= triggerLine) candidate = s;
+    else break;
+  }
+  if (candidate.id === _settingsSpyLastActiveId) return;
+  _settingsSpyLastActiveId = candidate.id;
+
+  const navName = candidate.id.replace(/^set-/, '');
+  let activeBtn = null;
+  document.querySelectorAll('.settings-nav button').forEach(b => {
+    const isActive = b.dataset.settingsNav === navName;
+    b.classList.toggle('active', isActive);
+    if (isActive) activeBtn = b;
+  });
+  if (activeBtn && isStackedNav) {
+    const navEl = activeBtn.parentElement;
+    if (navEl && navEl.scrollWidth > navEl.clientWidth) {
+      const targetLeft = activeBtn.offsetLeft - (navEl.clientWidth - activeBtn.offsetWidth) / 2;
+      navEl.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+    }
+  }
+}
+
+function setupSettingsScrollSpy() {
+  const tab = document.getElementById('settings-tab');
+  if (!tab || tab.dataset.spyAttached === '1') return;
+  tab.dataset.spyAttached = '1';
+  tab.addEventListener('scroll', () => {
+    if (_settingsSpyTickRequested) return;
+    _settingsSpyTickRequested = true;
+    requestAnimationFrame(settingsScrollSpyTick);
+  }, { passive: true });
 }
 
 function setHomeGreeting() {
