@@ -109,6 +109,12 @@
       position: fixed;
       top: 0; left: 0;
       overscroll-behavior: none;
+      /* Stop mobile browsers from auto-inflating "small" text inside narrow
+         columns. Without this, iOS Safari and Chrome on Android were bumping
+         the 10px product-meta line ("Ulam · per pc") up past the 13px
+         product name, inverting the visual hierarchy. */
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
