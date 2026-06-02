@@ -601,7 +601,7 @@
       <div class="footer-inner">
         <div class="footer-section">
           <h4>🕐 Store Hours</h4>
-          <p>Monday – Sunday</p>
+          <p id="footer-days">Monday – Sunday</p>
           <p id="footer-hours">6:00 AM – 4:00 PM</p>
         </div>
         <div class="footer-section">
@@ -873,6 +873,20 @@ function fmtOpenDays(days) {
   if (contig && sorted.length >= 3) return `${lbls[sorted[0]]}–${lbls[sorted[sorted.length-1]]}`;
   return sorted.map(d => lbls[d]).join(' · ');
 }
+// Footer-friendly variant — full weekday names + Title Case so it reads
+// naturally as a standalone line ("Monday – Friday" vs the ticker's "weekdays").
+function fmtOpenDaysFooter(days) {
+  if (!Array.isArray(days) || days.length === 0) return 'Closed';
+  if (days.length === 7) return 'Daily';
+  const sorted = [...days].sort((a,b) => a-b);
+  if (sorted.length === 5 && sorted.join(',') === '1,2,3,4,5') return 'Monday – Friday';
+  if (sorted.length === 2 && sorted.includes(0) && sorted.includes(6)) return 'Saturday & Sunday';
+  const full  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const short = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const contig = sorted.every((d, i) => i === 0 || d === sorted[i-1] + 1);
+  if (contig && sorted.length >= 3) return `${full[sorted[0]]} – ${full[sorted[sorted.length-1]]}`;
+  return sorted.map(d => short[d]).join(' · ');
+}
 function fmtHour12Short(h) {
   if (h === 0) return '12am'; if (h < 12) return `${h}am`;
   if (h === 12) return '12pm'; return `${h - 12}pm`;
@@ -979,9 +993,11 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   if (storeClosed) items.push({ ...CLOSED_TICKER, text: `Store Closed: Our store is currently closed. Operating hours are ${hoursLong} ${fmtOpenDays(getOpenDays())}. Thank you for your patience.` });
   if (maintenance) items.push(MAINTENANCE_TICKER);
   if (offlineMode) items.push(OFFLINE_TICKER);
-  // Also keep the footer hours in sync.
+  // Also keep the footer hours + open-days in sync with admin settings.
   const footHours = document.getElementById('footer-hours');
   if (footHours) footHours.textContent = hoursLong;
+  const footDays = document.getElementById('footer-days');
+  if (footDays) footDays.textContent = fmtOpenDaysFooter(getOpenDays());
   const oneSet = items.map(it => {
     const cls = it.rain ? ' rain-ticker-item' : it.closed ? ' closed-ticker-item' : it.maintenance ? ' maintenance-ticker-item' : '';
     return `<span class="ticker-item${cls}">${it.icon} <strong>${it.text}</strong></span>` +

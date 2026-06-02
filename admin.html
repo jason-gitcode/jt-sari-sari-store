@@ -694,15 +694,22 @@
     .order-total-row { display: flex; justify-content: space-between; font-weight: 700; font-size: var(--fs-base); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 6px; }
     .order-pay-label { font-size: var(--fs-sm); color: var(--muted); margin-top: 6px; }
     .order-notes-label { font-size: var(--fs-sm); color: var(--muted); font-style: italic; margin-top: 6px; }
-    .order-actions-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface-2); flex-wrap: wrap; }
+    /* All action buttons share one row (no wrap). The primary action
+       (Confirm Order / Refund & Restock) takes 2 flex units, the
+       secondary actions (Cancel, Copy Order) take 1 each — so the
+       primary always reads as the biggest button and the two secondary
+       buttons are visually equivalent siblings. `min-width: 0` lets
+       flex shrink them below their content width on narrow phones;
+       `white-space: nowrap` keeps the labels on one line. */
+    .order-actions-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface-2); flex-wrap: nowrap; }
 
-    .btn-confirm-order { flex: 1; min-width: 140px; padding: 9px; background: var(--ok); color: #fff; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 600; transition: background .15s; }
+    .btn-confirm-order { flex: 2 1 0; min-width: 0; padding: 9px; background: var(--ok); color: #fff; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 600; transition: background .15s; white-space: nowrap; }
     .btn-confirm-order:hover { background: #15803d; }
-    .btn-cancel-order { padding: 9px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--muted); transition: background .15s; }
+    .btn-cancel-order { flex: 1 1 0; min-width: 0; padding: 9px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--muted); transition: background .15s; white-space: nowrap; }
     .btn-cancel-order:hover { background: var(--surface-3); color: var(--ink); }
-    .btn-refund-order { padding: 9px 14px; background: var(--surface); border: 1px solid var(--danger); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--danger); transition: background .15s; }
+    .btn-refund-order { flex: 2 1 0; min-width: 0; padding: 9px 14px; background: var(--surface); border: 1px solid var(--danger); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--danger); transition: background .15s; white-space: nowrap; }
     .btn-refund-order:hover { background: var(--danger-soft); }
-    .btn-copy-order { padding: 9px 14px; background: var(--surface); border: 1px solid var(--ok); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--ok); transition: background .15s; }
+    .btn-copy-order { flex: 1 1 0; min-width: 0; padding: 9px 10px; background: var(--surface); border: 1px solid var(--ok); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--ok); transition: background .15s; white-space: nowrap; }
     .btn-copy-order:hover { background: var(--ok-soft); }
     .btn-copy-order.copied { background: var(--ok-soft); }
 
