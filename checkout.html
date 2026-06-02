@@ -999,14 +999,24 @@ function updatePaymentOptions() {
 
   // Cash is for in-person pickup only, and only if admin allows
   cashBtn.classList.toggle('disabled', !isPickup || !cashAdminOn);
-  // Cash on Delivery is for delivery only, only for small orders, only if admin allows
-  const codAllowedByTotal = total < 200;
+  // Cash on Delivery is for delivery only, only if admin allows, and only
+  // under the per-tenant cart-total limit (0 = no limit).
+  const codLimitRaw = storeSettingsData.codMaxAmount;
+  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 200;
+  const codAllowedByTotal = (codLimit === 0) || (total < codLimit);
   const codAllowedByFulfill = !isPickup;
   const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);
   codBtn.classList.toggle('disabled', codDisabled);
 
-  // Bubble the ₱200+ COD note only when delivery is selected AND COD is admin-allowed
-  if (note) note.style.display = (!isPickup && codAdminOn && !codAllowedByTotal) ? 'block' : 'none';
+  // Bubble the COD limit note only when delivery is selected AND COD is admin-allowed
+  if (note) {
+    if (!isPickup && codAdminOn && !codAllowedByTotal) {
+      note.textContent = `Cash on Delivery is not available for orders ₱${codLimit} and above. Please use GCash.`;
+      note.style.display = 'block';
+    } else {
+      note.style.display = 'none';
+    }
+  }
 
   // If the currently selected method has just become invalid, pick a sensible default
   const cashValid  = isPickup && cashAdminOn;

@@ -1880,6 +1880,21 @@
               </div>
             </div>
 
+            <div class="setting-row" id="cod-limit-editor-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title" style="font-size:13px;">Maximum order amount for COD (PHP)</div>
+                <div class="setting-desc">Cash on Delivery is auto-hidden once a customer's cart reaches this amount — they're nudged to GCash instead. Set to <strong>0</strong> to allow COD on any order amount.</div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+                  <span style="color:var(--muted);font-size:13px;">₱</span>
+                  <input type="number" id="cod-limit-amount" min="0" max="100000" step="1" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                </div>
+                <div id="cod-limit-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="cod-limit-save-btn" onclick="saveCodMaxAmount()">Save limit</button>
+              </div>
+            </div>
+
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">📅 Schedule delivery slots <span class="mode-badge off" id="set-schedules-badge">OFF</span></div>
@@ -2488,6 +2503,9 @@ function syncServiceToggles() {
     'set-areas-badge':      fields['set-areas-enabled']
   };
   // Sub-editors visible whenever their toggle is on — no delivery dependency.
+  // COD limit editor: only visible when COD itself is effectively on (toggle ON + delivery ON).
+  const codLimitRow = document.getElementById('cod-limit-editor-row');
+  if (codLimitRow) codLimitRow.style.display = (fields['set-pay-cod-enabled'] && deliveryOn) ? '' : 'none';
   const schedRow = document.getElementById('schedules-editor-row');
   if (schedRow)   schedRow.style.display   = fields['set-schedules-enabled'] ? '' : 'none';
   const delFeeRow = document.getElementById('del-fee-editor-row');
@@ -2497,6 +2515,7 @@ function syncServiceToggles() {
   const areasRow = document.getElementById('areas-editor-row');
   if (areasRow)   areasRow.style.display   = fields['set-areas-enabled']     ? '' : 'none';
   renderSchedulesEditor();
+  syncCodLimitEditor();
   syncDeliveryFeeEditor();
   syncFreeDeliveryEditor();
   renderAreasEditor();
@@ -2556,6 +2575,41 @@ function removeScheduleRow(idx) {
 function updateScheduleRow(idx, key, val) {
   if (!scheduleRows || !scheduleRows[idx]) return;
   scheduleRows[idx][key] = val;
+}
+
+// ============================================================
+// COD MAX AMOUNT
+// ============================================================
+function syncCodLimitEditor() {
+  const input = document.getElementById('cod-limit-amount');
+  if (!input || document.activeElement === input) return;
+  const val = (typeof storeSettingsData.codMaxAmount === 'number') ? storeSettingsData.codMaxAmount : 200;
+  input.value = String(val);
+}
+
+async function saveCodMaxAmount() {
+  const status = document.getElementById('cod-limit-status');
+  const btn = document.getElementById('cod-limit-save-btn');
+  const raw = document.getElementById('cod-limit-amount').value;
+  const n = parseInt(raw, 10);
+  if (!Number.isInteger(n) || n < 0 || n > 100000) {
+    status.style.color = '#dc2626';
+    status.textContent = 'Limit must be a whole number ≥ 0 (use 0 for no limit).';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Saving...';
+  status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
+  try {
+    await tdoc('settings', 'store').set({ codMaxAmount: n }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = n === 0 ? '✅ Saved — no COD limit.' : `✅ Saved — COD allowed up to ₱${n}.`;
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save limit';
+  }
 }
 
 // ============================================================

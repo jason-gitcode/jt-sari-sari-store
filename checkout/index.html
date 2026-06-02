@@ -1035,11 +1035,22 @@ function updatePaymentOptions() {
   // Visual "disabled" state inside the (already-visible) button. Buttons
   // that are admin-disabled entirely are hidden by applyTenantStoreConfig.
   cashBtn.classList.toggle('disabled', !isPickup || !cashAdminOn);
-  const codAllowedByTotal = total < 200;
+  // Per-tenant COD limit: number > 0 = max cart total for COD; 0 or missing = no limit.
+  // Default 200 preserves existing tenants' behaviour from before this was configurable.
+  const codLimitRaw = storeSettingsData.codMaxAmount;
+  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 200;
+  const codAllowedByTotal = (codLimit === 0) || (total < codLimit);
   const codAllowedByFulfill = !isPickup;
   const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);
   codBtn.classList.toggle('disabled', codDisabled);
-  if (note) note.style.display = (!isPickup && codAdminOn && !codAllowedByTotal) ? 'block' : 'none';
+  if (note) {
+    if (!isPickup && codAdminOn && !codAllowedByTotal) {
+      note.textContent = `Cash on Delivery is not available for orders ₱${codLimit} and above. Please use GCash.`;
+      note.style.display = 'block';
+    } else {
+      note.style.display = 'none';
+    }
+  }
 
   // Re-pick payment method if the current one is no longer valid.
   const cashValid  = isPickup && cashAdminOn;

@@ -173,6 +173,9 @@ exports.createTenant = onCall(async (request) => {
     payCashEnabled: true,
     payGcashEnabled: true,
     payCodEnabled: true,
+    // Maximum cart total (PHP) for Cash on Delivery. 0 = no limit.
+    // Default of 200 matches the original hardcoded behaviour.
+    codMaxAmount: 200,
     // Operating hours (Manila time, 24h). Tenant edits these in admin → Store Info.
     storeOpenHour: 6,
     storeCloseHour: 16,
