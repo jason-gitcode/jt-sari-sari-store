@@ -1219,10 +1219,11 @@
     }
     .threshold-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    .mode-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .mode-badge.on { background: var(--ok-soft); color: #166534; }
-    .mode-badge.off { background: var(--surface-3); color: var(--muted); }
-    [data-theme="dark"] .mode-badge.on { background: rgba(34,197,94,0.18); color: #4ade80; }
+    /* The ON/OFF state pill duplicates the visual state already conveyed
+       by the toggle switch sitting beside it. Hide it everywhere — the
+       JS still flips its classes so any code that reads them keeps
+       working, it's just visually absent. Cleaner row, mobile especially. */
+    .mode-badge { display: none; }
 
     .account-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: var(--fs-sm); margin-top: 4px; }
     .account-pill strong { color: var(--ink); font-weight: 600; }
@@ -1440,6 +1441,12 @@
       .dash-date-range input { flex-shrink: 0; }
       .setting-row { flex-direction: column; align-items: flex-start; }
       .setting-control { align-self: stretch; }
+      /* Toggle-bearing rows stay in row layout on phones so the toggle
+         lives where the ON/OFF badge used to be — top-right of the row,
+         next to the title block. Sub-editor rows (inputs, save buttons)
+         still stack as a full-width column from the rule above. */
+      .setting-row:has(.toggle-sw) { flex-direction: row; align-items: flex-start; gap: 12px; }
+      .setting-row:has(.toggle-sw) .setting-control { align-self: flex-start; padding-top: 2px; width: auto; }
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
