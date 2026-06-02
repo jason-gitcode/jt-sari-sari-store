@@ -256,8 +256,32 @@
     .supplier-card textarea.supp-input { min-height: 50px; resize: vertical; }
     .supplier-card .supp-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .supplier-card .supp-cell { flex: 1; min-width: 200px; }
-    .supplier-card .supp-cat-input::placeholder { font-style: italic; color: var(--muted); opacity: 1; }
-    .supplier-card .supp-cat-input { font-size: 13px; }
+    /* Chip-based category input */
+    .cat-chip-wrap {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+      min-height: 40px; background: var(--surface); cursor: text;
+      position: relative;
+    }
+    .cat-chip-wrap:focus-within { border-color: var(--ink); }
+    .cat-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 4px; padding: 3px 4px 3px 10px;
+      font-size: 13px; color: var(--ink-soft); user-select: none;
+    }
+    .cat-chip-x {
+      background: transparent; border: 0; cursor: pointer;
+      color: var(--muted); font-size: 16px; line-height: 1;
+      padding: 0 4px; border-radius: 3px;
+    }
+    .cat-chip-x:hover { color: var(--danger); background: rgba(220,38,38,0.08); }
+    .cat-chip-input {
+      flex: 1; min-width: 140px; border: 0; outline: 0;
+      font-size: 13px; padding: 4px 4px; background: transparent;
+      color: var(--ink); font-family: inherit;
+    }
+    .cat-chip-input::placeholder { font-style: italic; color: var(--muted); opacity: 1; }
     .cat-suggestions {
       position: absolute; top: 100%; left: 0; right: 0;
       background: var(--surface); border: 1px solid var(--line);
@@ -2873,11 +2897,11 @@ function renderSuppliers() {
   }
   const cats = getProductCategories();
   list.innerHTML = suppliers.map(s => renderSupplierCard(s, cats)).join('');
-  // Attach the autocomplete behaviour to every category input on screen.
-  list.querySelectorAll('.supp-cat-input').forEach(setupCategoryAutocomplete);
+  // Wire chip-input autocomplete on every category field on screen.
+  list.querySelectorAll('.cat-chip-input').forEach(setupChipAutocomplete);
 }
 
-// ----- Category autocomplete (segment-aware on a comma-separated input) -----
+// ----- Chip-based category input with autocomplete -----
 function buildAllCategorySuggestions() {
   const set = new Set();
   (products || []).forEach(p => { if (p.category) set.add(p.category); });
@@ -2887,28 +2911,53 @@ function buildAllCategorySuggestions() {
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
-function setupCategoryAutocomplete(input) {
+function chipsInWrap(wrap) {
+  return Array.from(wrap.querySelectorAll('.cat-chip')).map(c => c.dataset.cat || '').filter(Boolean);
+}
+
+function addChipToWrap(wrap, cat) {
+  if (!cat) return;
+  const trimmed = cat.trim();
+  if (!trimmed) return;
+  const existing = chipsInWrap(wrap);
+  if (existing.some(e => e.toLowerCase() === trimmed.toLowerCase())) return;
+  const chip = document.createElement('span');
+  chip.className = 'cat-chip';
+  chip.dataset.cat = trimmed;
+  chip.innerHTML = `<span></span><button type="button" class="cat-chip-x" onclick="removeCatChip(this)" title="Remove">×</button>`;
+  chip.firstChild.textContent = trimmed;
+  const input = wrap.querySelector('.cat-chip-input');
+  wrap.insertBefore(chip, input);
+  if (input) {
+    input.value = '';
+    input.placeholder = 'Add another…';
+    input.focus();
+  }
+}
+
+function removeCatChip(btn) {
+  const chip = btn.closest('.cat-chip');
+  if (!chip) return;
+  const wrap = chip.parentElement;
+  chip.remove();
+  const input = wrap?.querySelector('.cat-chip-input');
+  if (input) {
+    if (chipsInWrap(wrap).length === 0) input.placeholder = 'e.g. Beverages, Diapers, Noodles';
+    input.focus();
+  }
+}
+
+function setupChipAutocomplete(input) {
   if (input._catAcReady) return;
   input._catAcReady = true;
-  const wrap = input.parentElement;
-  wrap.style.position = 'relative';
+  const wrap = input.closest('.cat-chip-wrap');
+  if (!wrap) return;
   const dropdown = document.createElement('div');
   dropdown.className = 'cat-suggestions';
   dropdown.style.display = 'none';
   wrap.appendChild(dropdown);
   let activeIdx = -1;
   let currentMatches = [];
-
-  function currentSegment() {
-    const cursor = input.selectionStart;
-    const before = input.value.slice(0, cursor);
-    const after = input.value.slice(cursor);
-    const lastCommaBefore = before.lastIndexOf(',');
-    const nextCommaAfter = after.indexOf(',');
-    const segStart = lastCommaBefore + 1;
-    const segEnd = nextCommaAfter === -1 ? input.value.length : cursor + nextCommaAfter;
-    return { start: segStart, end: segEnd, text: input.value.slice(segStart, segEnd).trim() };
-  }
 
   function highlight(text, query) {
     if (!query) return escText(text);
@@ -2920,10 +2969,8 @@ function setupCategoryAutocomplete(input) {
   function update() {
     const all = buildAllCategorySuggestions();
     if (all.length === 0) { dropdown.style.display = 'none'; return; }
-    const seg = currentSegment();
-    const query = seg.text.toLowerCase();
-    const taken = new Set(input.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
-    if (query) taken.delete(query); // don't exclude what the user is currently typing
+    const query = (input.value || '').trim().toLowerCase();
+    const taken = new Set(chipsInWrap(wrap).map(c => c.toLowerCase()));
     currentMatches = all.filter(c => {
       const cl = c.toLowerCase();
       if (taken.has(cl)) return false;
@@ -2938,20 +2985,6 @@ function setupCategoryAutocomplete(input) {
     dropdown.style.display = 'block';
   }
 
-  function pickSuggestion(cat) {
-    const seg = currentSegment();
-    const before = input.value.slice(0, seg.start);
-    const afterSeg = input.value.slice(seg.end);
-    const cleanAfter = afterSeg.replace(/^\s*,?\s*/, '');
-    const needsLeadingSpace = before && !/[\s,]$/.test(before);
-    const insert = (needsLeadingSpace ? ' ' : '') + cat + ', ';
-    input.value = before + insert + cleanAfter;
-    const newCursor = before.length + insert.length;
-    input.focus();
-    input.setSelectionRange(newCursor, newCursor);
-    dropdown.style.display = 'none';
-  }
-
   function setActive(idx) {
     activeIdx = idx;
     Array.from(dropdown.children).forEach((el, i) => {
@@ -2964,22 +2997,52 @@ function setupCategoryAutocomplete(input) {
   input.addEventListener('focus', update);
   input.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 150));
   input.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !input.value) {
+      // Empty input + Backspace → delete the last chip
+      const chips = wrap.querySelectorAll('.cat-chip');
+      if (chips.length > 0) { chips[chips.length - 1].remove(); update(); }
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+      // Pick highlighted suggestion, OR add what the user typed.
+      if (dropdown.style.display !== 'none' && activeIdx >= 0) {
+        e.preventDefault();
+        addChipToWrap(wrap, currentMatches[activeIdx]);
+        dropdown.style.display = 'none';
+      } else if (input.value.trim()) {
+        e.preventDefault();
+        addChipToWrap(wrap, input.value);
+        dropdown.style.display = 'none';
+      }
+      return;
+    }
     if (dropdown.style.display === 'none') return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActive(Math.min(activeIdx + 1, currentMatches.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(Math.max(activeIdx - 1, 0)); }
-    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); pickSuggestion(currentMatches[activeIdx]); }
     else if (e.key === 'Escape') { dropdown.style.display = 'none'; }
   });
   dropdown.addEventListener('mousedown', (e) => {
     const item = e.target.closest('.cat-sug-item');
     if (!item) return;
-    e.preventDefault(); // keep input focus
-    pickSuggestion(currentMatches[Number(item.dataset.idx)]);
+    e.preventDefault();
+    addChipToWrap(wrap, currentMatches[Number(item.dataset.idx)]);
+    dropdown.style.display = 'none';
   });
 }
 
 function renderSupplierCard(s, allCats) {
-  const catsValue = (Array.isArray(s.categories) ? s.categories : []).join(', ');
+  const cats = Array.isArray(s.categories) ? s.categories : [];
+  // Split combined schedule (YYYY-MM-DDTHH:MM) into separate date + time
+  // for two-input editing. Falls back gracefully for empty / malformed values.
+  let schedDate = '', schedTime = '';
+  if (typeof s.schedule === 'string' && s.schedule) {
+    const sep = s.schedule.indexOf('T');
+    if (sep > -1) { schedDate = s.schedule.slice(0, sep); schedTime = s.schedule.slice(sep + 1); }
+    else schedDate = s.schedule;
+  }
+  const chipsHtml = cats.map(c =>
+    `<span class="cat-chip" data-cat="${escAttr(c)}"><span>${escText(c)}</span><button type="button" class="cat-chip-x" onclick="removeCatChip(this)" title="Remove">×</button></span>`
+  ).join('');
   return `
     <div class="supplier-card" data-supplier-id="${escAttr(s.id)}">
       <div class="supp-row">
@@ -2999,7 +3062,10 @@ function renderSupplierCard(s, allCats) {
         </div>
         <div class="supp-cell">
           <label class="supp-label">Next delivery / schedule</label>
-          <input type="datetime-local" class="supp-input" data-field="schedule" value="${escAttr(s.schedule)}" />
+          <div style="display:flex;gap:8px;">
+            <input type="date" class="supp-input" data-field="scheduleDate" value="${escAttr(schedDate)}" style="flex:1;" />
+            <input type="time" class="supp-input" data-field="scheduleTime" value="${escAttr(schedTime)}" style="flex:1;" />
+          </div>
         </div>
       </div>
       <div>
@@ -3008,8 +3074,10 @@ function renderSupplierCard(s, allCats) {
       </div>
       <div>
         <label class="supp-label">Categories supplied</label>
-        <input type="text" class="supp-input supp-cat-input" data-field="categoriesText" value="${escAttr(catsValue)}" placeholder="e.g. Beverages, Diapers, Noodles" />
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Separate multiple categories with commas.</div>
+        <div class="cat-chip-wrap" onclick="(this.querySelector('.cat-chip-input') || {}).focus && this.querySelector('.cat-chip-input').focus()">
+          ${chipsHtml}
+          <input type="text" class="cat-chip-input" placeholder="${cats.length === 0 ? 'e.g. Beverages, Diapers, Noodles' : 'Add another…'}" />
+        </div>
       </div>
       <div class="supp-footer">
         <span class="supp-status"></span>
@@ -3048,17 +3116,23 @@ async function saveSupplier(id) {
   if (!card) return;
   const data = {};
   card.querySelectorAll('.supp-input').forEach(el => {
-    if (el.dataset.field === 'categoriesText') return; // handled separately
     data[el.dataset.field] = (el.value || '').trim();
   });
-  // Parse comma-separated categories into an array; drop empties + dedupe.
-  const catText = card.querySelector('[data-field="categoriesText"]')?.value || '';
-  const seen = new Set();
-  data.categories = catText.split(',').map(s => s.trim()).filter(s => {
-    if (!s || seen.has(s.toLowerCase())) return false;
-    seen.add(s.toLowerCase());
-    return true;
-  });
+  // Combine the separate date + time fields into the single schedule field
+  // stored on the doc (YYYY-MM-DDTHH:MM). Either side empty → store partial.
+  const sd = data.scheduleDate || '';
+  const st = data.scheduleTime || '';
+  data.schedule = (sd && st) ? `${sd}T${st}` : (sd || st || '');
+  delete data.scheduleDate;
+  delete data.scheduleTime;
+  // Read chips from the chip wrapper. If the user typed text and didn't
+  // commit it (no Enter / comma), promote that text to a chip on save too.
+  const wrap = card.querySelector('.cat-chip-wrap');
+  const pendingInput = wrap?.querySelector('.cat-chip-input');
+  if (pendingInput && pendingInput.value.trim()) {
+    addChipToWrap(wrap, pendingInput.value);
+  }
+  data.categories = wrap ? chipsInWrap(wrap) : [];
 
   const status = card.querySelector('.supp-status');
   status.textContent = 'Saving...';
