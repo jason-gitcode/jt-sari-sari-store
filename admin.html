@@ -256,8 +256,8 @@
     .supplier-card textarea.supp-input { min-height: 50px; resize: vertical; }
     .supplier-card .supp-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .supplier-card .supp-cell { flex: 1; min-width: 200px; }
-    .supplier-card .supp-cat-list { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
-    .supplier-card .supp-cat-list label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
+    .supplier-card .supp-cat-input::placeholder { font-style: italic; color: var(--muted); opacity: 1; }
+    .supplier-card .supp-cat-input { font-size: 13px; }
     .supplier-card .supp-footer { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
     .supplier-card .supp-status { font-size: 12px; color: var(--muted); margin-right: auto; }
     .supplier-card .supp-del-btn { background: transparent; border: 1px solid #fecaca; color: var(--danger); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
@@ -2862,12 +2862,7 @@ function renderSuppliers() {
 }
 
 function renderSupplierCard(s, allCats) {
-  const selected = new Set(Array.isArray(s.categories) ? s.categories : []);
-  const catChecks = allCats.length > 0
-    ? `<div class="supp-cat-list">${allCats.map(c => `
-        <label><input type="checkbox" class="supp-cat" data-cat="${escAttr(c)}" ${selected.has(c) ? 'checked' : ''} /> ${escText(c)}</label>
-      `).join('')}</div>`
-    : '<span style="font-size:12px;color:var(--muted);">Add some products first to define categories.</span>';
+  const catsValue = (Array.isArray(s.categories) ? s.categories : []).join(', ');
   return `
     <div class="supplier-card" data-supplier-id="${escAttr(s.id)}">
       <div class="supp-row">
@@ -2896,7 +2891,8 @@ function renderSupplierCard(s, allCats) {
       </div>
       <div>
         <label class="supp-label">Categories supplied</label>
-        ${catChecks}
+        <input type="text" class="supp-input supp-cat-input" data-field="categoriesText" value="${escAttr(catsValue)}" placeholder="e.g. Beverages, Diapers, Noodles" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Separate multiple categories with commas.</div>
       </div>
       <div class="supp-footer">
         <span class="supp-status"></span>
@@ -2935,9 +2931,17 @@ async function saveSupplier(id) {
   if (!card) return;
   const data = {};
   card.querySelectorAll('.supp-input').forEach(el => {
+    if (el.dataset.field === 'categoriesText') return; // handled separately
     data[el.dataset.field] = (el.value || '').trim();
   });
-  data.categories = Array.from(card.querySelectorAll('.supp-cat:checked')).map(cb => cb.dataset.cat);
+  // Parse comma-separated categories into an array; drop empties + dedupe.
+  const catText = card.querySelector('[data-field="categoriesText"]')?.value || '';
+  const seen = new Set();
+  data.categories = catText.split(',').map(s => s.trim()).filter(s => {
+    if (!s || seen.has(s.toLowerCase())) return false;
+    seen.add(s.toLowerCase());
+    return true;
+  });
 
   const status = card.querySelector('.supp-status');
   status.textContent = 'Saving...';
