@@ -1056,6 +1056,30 @@
     .settings-section h3 { font-size: var(--fs-md); font-weight: 600; margin-bottom: 4px; }
     .settings-section .section-sub { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 18px; }
 
+    /* Theme-aware form controls inside settings — the inline styles on each
+       input set border + padding but no bg/color, so in dark mode the browser
+       default white-on-black is unreadable. These rules give every input,
+       textarea, and select a proper themed surface + ink color regardless of
+       the inline overrides. */
+    .settings-section input[type="text"],
+    .settings-section input[type="tel"],
+    .settings-section input[type="email"],
+    .settings-section input[type="number"],
+    .settings-section input[type="time"],
+    .settings-section input[type="search"],
+    .settings-section input[type="url"],
+    .settings-section input[type="date"],
+    .settings-section textarea,
+    .settings-section select {
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .settings-section input::placeholder,
+    .settings-section textarea::placeholder {
+      color: var(--muted);
+      opacity: 0.75;
+    }
+
     .setting-row {
       display: flex; align-items: center; justify-content: space-between;
       gap: 14px;
