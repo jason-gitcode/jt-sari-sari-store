@@ -662,13 +662,11 @@
     .order-card.confirmed { border-left: 3px solid var(--ok); }
     .order-card.cancelled { border-left: 3px solid var(--line-strong); opacity: 0.7; }
     .order-card.refunded  { border-left: 3px solid #f87171; opacity: 0.75; }
-    .order-card-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+    .order-card-header { display: flex; align-items: center; gap: 6px; padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
     .order-id-label { font-size: var(--fs-sm); font-weight: 700; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; letter-spacing: 0.04em; }
-    /* Stack the status (Confirmed/Pending/...) and fulfillment (Delivery/Pick-up)
-       badges vertically on the order card header. Tightens horizontal space so
-       the date/time can sit on a single line next to them on phone widths. */
-    .order-badges-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-    .order-status-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+    /* Compact pills so the entire header — id, status, fulfillment, date —
+       can sit on a single row down to phone widths. */
+    .order-status-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; flex-shrink: 0; }
     .order-status-badge.pending   { background: var(--warn-soft); color: #92400e; }
     .order-status-badge.confirmed { background: var(--ok-soft); color: #166534; }
     .order-status-badge.cancelled { background: var(--surface-3); color: var(--muted); }
@@ -677,10 +675,10 @@
     [data-theme="dark"] .order-status-badge.confirmed { color: #4ade80; }
     [data-theme="dark"] .order-status-badge.refunded  { color: #f87171; }
     .order-fulfillment-badge {
-      font-size: 10px; font-weight: 700; padding: 2px 8px;
-      border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em;
+      font-size: 9px; font-weight: 700; padding: 2px 7px;
+      border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em;
       background: var(--accent-soft); color: var(--accent-strong);
-      white-space: nowrap;
+      white-space: nowrap; flex-shrink: 0;
     }
     .order-fulfillment-badge.pickup {
       background: #ecfdf5; color: #047857;
@@ -4027,8 +4025,8 @@ function renderOrders() {
                    : o.payment === 'cash'  ? '💵 Cash at Pickup'
                    : '🛵 Cash on Delivery';
     const fulfBadge = isPickup
-      ? `<span class="order-fulfillment-badge pickup">🏬 Pick-up</span>`
-      : `<span class="order-fulfillment-badge">🛵 Delivery</span>`;
+      ? `<span class="order-fulfillment-badge pickup">Pick-up</span>`
+      : `<span class="order-fulfillment-badge">Delivery</span>`;
     const fee      = parseFloat(o.deliveryFee ?? 0);
     const feeStr   = fee === 0 ? '<span style="color:var(--ok)">✓ Free</span>' : '₱' + fee.toFixed(2);
 
@@ -4145,10 +4143,8 @@ function renderOrders() {
       <div class="order-card ${o.status}">
         <div class="order-card-header">
           <span class="order-id-label">#${shortId}</span>
-          <div class="order-badges-stack">
-            <span class="order-status-badge ${o.status}">${o.status}</span>
-            ${fulfBadge}
-          </div>
+          <span class="order-status-badge ${o.status}">${o.status}</span>
+          ${fulfBadge}
           <span class="order-time-label">${formatOrderTime(o.createdAt)}</span>
         </div>
         <div class="order-card-body">
