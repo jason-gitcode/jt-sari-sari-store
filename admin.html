@@ -272,16 +272,18 @@
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
     /* Each tab panel is its OWN scroll container (body is position:fixed at
-       the root). Pin overscroll-behavior so iOS doesn't rubber-band the
-       container itself at top/bottom — that bounce is what reads as "wobbly"
-       on Home + Settings. Products + Orders feel steady because their inner
-       scroll containers (products-main, orders-list) already had this set;
-       these top-level tabs were missing it. */
-    #home-tab.active     { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 32px; }
+       the root). `overscroll-behavior: none` kills BOTH scroll-chaining to
+       the parent AND the iOS boundary rubber-band on the container itself.
+       Using `contain` (previous attempt) only blocked scroll-chaining and
+       left the container free to bounce at top/bottom — that bounce is the
+       "wobble" Jason saw on Home + Settings. Products + Orders use
+       `overflow: hidden` so they never scroll at this level; their inner
+       containers handle scrolling. */
+    #home-tab.active     { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #orders-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-    #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 32px; }
-    #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 32px; }
+    #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     /* Supplier table */
     .suppliers-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
     .suppliers-table { width: 100%; border-collapse: collapse; font-size: 14px; }
