@@ -525,19 +525,31 @@ function applyTenantStoreConfig() {
   const closedHoursEl = document.getElementById('closed-hours');
   if (closedHoursEl) closedHoursEl.textContent = `${fmtHour12Long(getOpenHour())} to ${fmtHour12Long(getCloseHour())}`;
   const deliveryOn = storeSettingsData.deliveryEnabled !== false;
-  const cashOn     = storeSettingsData.payCashEnabled  !== false;
+  const pickupOn   = storeSettingsData.pickupEnabled   !== false;
   const gcashOn    = storeSettingsData.payGcashEnabled !== false;
+  const cashOn     = storeSettingsData.payCashEnabled  !== false && pickupOn;
   const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
+  // Force fulfillment to whatever is actually available.
+  if (!deliveryOn && pickupOn && fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
+  if (!pickupOn && deliveryOn && fulfillmentMethod !== 'delivery') fulfillmentMethod = 'delivery';
   const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
-  if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  const showFfPicker = deliveryOn && pickupOn;
+  if (ffOptionsWrap) ffOptionsWrap.style.display = showFfPicker ? '' : 'none';
+  const ffDelBtn  = document.querySelector('.ff-opt[data-ff="delivery"]');
+  const ffPickBtn = document.querySelector('.ff-opt[data-ff="pickup"]');
+  if (ffDelBtn)  ffDelBtn.style.display  = deliveryOn ? '' : 'none';
+  if (ffPickBtn) ffPickBtn.style.display = pickupOn   ? '' : 'none';
   const sched = document.getElementById('schedule-section');
   const schedulesOn = storeSettingsData.schedulesEnabled !== false;
   if (!deliveryOn) {
-    if (fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
     if (sched) sched.style.display = 'none';
     if (pickupBox) pickupBox.style.display = 'block';
+  } else if (!pickupOn) {
+    if (pickupBox) pickupBox.style.display = 'none';
+    const hasSlots = scheduleSlotsFromSettings().length > 0;
+    if (sched) sched.style.display = (schedulesOn && hasSlots) ? '' : 'none';
   } else {
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (sched) sched.style.display = (schedulesOn && hasSlots) ? '' : 'none';
@@ -969,7 +981,8 @@ function updatePaymentOptions() {
   if (!codBtn || !cashBtn || !gcashBtn) return;
 
   const deliveryEnabled = storeSettingsData.deliveryEnabled !== false;
-  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false;
+  const pickupEnabled   = storeSettingsData.pickupEnabled !== false;
+  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false && pickupEnabled;
   const gcashAdminOn = storeSettingsData.payGcashEnabled !== false;
   const codAdminOn   = storeSettingsData.payCodEnabled   !== false && deliveryEnabled;
 

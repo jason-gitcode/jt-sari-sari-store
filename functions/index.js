@@ -169,6 +169,7 @@ exports.createTenant = onCall(async (request) => {
     gcashNumber,
     // Service & payment defaults — new tenants start with everything ON.
     deliveryEnabled: true,
+    pickupEnabled: true,
     payCashEnabled: true,
     payGcashEnabled: true,
     payCodEnabled: true,

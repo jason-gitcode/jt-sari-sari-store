@@ -1604,6 +1604,19 @@
 
             <div class="setting-row">
               <div class="setting-info">
+                <div class="setting-title">🏬 Offer pick-up <span class="mode-badge off" id="set-pickup-badge">OFF</span></div>
+                <div class="setting-desc">When off, the checkout hides the pick-up option and the "Cash at pickup" payment method. At least one of delivery or pick-up must stay enabled.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-pickup-enabled" onclick="toggleServiceOption('pickupEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
                 <div class="setting-title">💵 Accept Cash (at pickup) <span class="mode-badge off" id="set-pay-cash-badge">OFF</span></div>
                 <div class="setting-desc">Pay-in-person at the store. Only relevant for pickup orders.</div>
               </div>
@@ -2151,6 +2164,15 @@ async function toggleServiceOption(field, value) {
       return;
     }
   }
+  // Guard: don't let admin disable both fulfillment methods
+  if ((field === 'deliveryEnabled' || field === 'pickupEnabled') && value === false) {
+    const other = field === 'deliveryEnabled' ? 'pickupEnabled' : 'deliveryEnabled';
+    if (storeSettingsData[other] === false) {
+      alert('At least one of "Offer delivery" or "Offer pick-up" must stay enabled — otherwise customers can\'t complete an order.');
+      syncServiceToggles();
+      return;
+    }
+  }
   try {
     await tdoc('settings', 'store').set({ [field]: value }, { merge: true });
     showToast('Updated.', 'success');
@@ -2164,8 +2186,10 @@ async function toggleServiceOption(field, value) {
 function syncServiceToggles() {
   // Default true if field absent (preserves existing tenants' behaviour)
   const deliveryOn = storeSettingsData.deliveryEnabled !== false;
+  const pickupOn   = storeSettingsData.pickupEnabled !== false;
   const fields = {
     'set-delivery-enabled':  deliveryOn,
+    'set-pickup-enabled':    pickupOn,
     'set-pay-cash-enabled':  storeSettingsData.payCashEnabled   !== false,
     'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
     'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false,
@@ -2177,28 +2201,32 @@ function syncServiceToggles() {
     const el = document.getElementById(id);
     if (el) el.checked = fields[id];
   }
-  // COD is gated by delivery — when delivery is off, disable the COD toggle
-  // and dim its row, but DON'T overwrite payCodEnabled on the doc so the
-  // user's COD preference is restored when delivery is turned back on.
-  const codInput = document.getElementById('set-pay-cod-enabled');
-  if (codInput) {
-    codInput.disabled = !deliveryOn;
-    const codRow = codInput.closest('.setting-row');
-    if (codRow) {
-      codRow.style.opacity = deliveryOn ? '' : '0.45';
-      codRow.title = deliveryOn ? '' : 'Cash on Delivery is auto-disabled while "Offer delivery" is off.';
+  // COD is gated by delivery; Cash (at pickup) is gated by pick-up.
+  // When the parent toggle is off, the dependent toggle gets disabled +
+  // dimmed but we DON'T overwrite the underlying setting so the user's
+  // preference is restored when they flip the parent back on.
+  const gateDependent = (childInputId, parentOn, parentLabel, childLabel) => {
+    const input = document.getElementById(childInputId);
+    if (!input) return;
+    input.disabled = !parentOn;
+    const row = input.closest('.setting-row');
+    if (row) {
+      row.style.opacity = parentOn ? '' : '0.45';
+      row.title = parentOn ? '' : `${childLabel} is auto-disabled while "${parentLabel}" is off.`;
     }
-  }
+  };
+  gateDependent('set-pay-cod-enabled',  deliveryOn, 'Offer delivery', 'Cash on Delivery');
+  gateDependent('set-pay-cash-enabled', pickupOn,   'Offer pick-up',  'Cash at pickup');
+
   const badges = {
     'set-delivery-badge':   fields['set-delivery-enabled'],
-    'set-pay-cash-badge':   fields['set-pay-cash-enabled'],
+    'set-pickup-badge':     fields['set-pickup-enabled'],
+    // Cash (at pickup) effective state — false when pick-up is off.
+    'set-pay-cash-badge':   fields['set-pay-cash-enabled'] && pickupOn,
     'set-pay-gcash-badge':  fields['set-pay-gcash-enabled'],
-    // COD is special-cased: the effective state is false when delivery is off
-    // (matching its specific UX where the toggle is also dimmed in that case).
+    // COD effective state — false when delivery is off.
     'set-pay-cod-badge':    fields['set-pay-cod-enabled'] && deliveryOn,
     // Schedules / free-delivery / areas badges reflect the toggle ONLY.
-    // Tenant can configure these ahead of time even while delivery is off;
-    // storefront + checkout already hide all delivery UI when delivery is off.
     'set-schedules-badge':  fields['set-schedules-enabled'],
     'set-free-del-badge':   fields['set-free-del-enabled'],
     'set-areas-badge':      fields['set-areas-enabled']

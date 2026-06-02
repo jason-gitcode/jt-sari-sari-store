@@ -538,35 +538,47 @@ function applyTenantStoreConfig() {
 
   // Service & payment toggles. Defaults true if field is missing.
   const deliveryOn = storeSettingsData.deliveryEnabled !== false;
-  const cashOn     = storeSettingsData.payCashEnabled  !== false;
+  const pickupOn   = storeSettingsData.pickupEnabled   !== false;
   const gcashOn    = storeSettingsData.payGcashEnabled !== false;
+  // Cash is "Cash at pickup" — only meaningful if pick-up is offered.
+  const cashOn     = storeSettingsData.payCashEnabled  !== false && pickupOn;
+  // Cash on Delivery — only meaningful if delivery is offered.
   const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
 
-  // When delivery is disabled: hide the fulfillment picker entirely, hide
-  // the delivery address + schedule sections, force pickup, always show
-  // the pickup-info box.
-  const ffSection = document.querySelector('.section .section-label')?.parentElement; // first section with that label
-  // Locate via a more specific selector — the section that contains .ff-options.
+  // Force the fulfillment method to whatever is actually available.
+  if (!deliveryOn && pickupOn && fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
+  if (!pickupOn && deliveryOn && fulfillmentMethod !== 'delivery') fulfillmentMethod = 'delivery';
+
+  // Show the fulfillment picker only when BOTH options are available; if
+  // only one is available, hide the picker entirely (and force that method).
   const ffOptionsWrap = document.querySelector('.ff-options')?.closest('.section');
-  if (ffOptionsWrap) ffOptionsWrap.style.display = deliveryOn ? '' : 'none';
+  const showFfPicker = deliveryOn && pickupOn;
+  if (ffOptionsWrap) ffOptionsWrap.style.display = showFfPicker ? '' : 'none';
+  // Hide individual fulfillment buttons that aren't available.
+  const ffDelBtn = document.querySelector('.ff-opt[data-ff="delivery"]');
+  const ffPickBtn = document.querySelector('.ff-opt[data-ff="pickup"]');
+  if (ffDelBtn)  ffDelBtn.style.display  = deliveryOn ? '' : 'none';
+  if (ffPickBtn) ffPickBtn.style.display = pickupOn   ? '' : 'none';
+
   const sched = document.getElementById('schedule-section');
   const schedulesOn = storeSettingsData.schedulesEnabled !== false;
   if (!deliveryOn) {
-    if (fulfillmentMethod !== 'pickup') {
-      fulfillmentMethod = 'pickup';
-    }
+    // No delivery → hide address + schedule sections; always show pickup-info.
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
     if (sched) sched.style.display = 'none';
     if (pickupBox) pickupBox.style.display = 'block';
+  } else if (!pickupOn) {
+    // No pick-up → hide the pickup-info box (no need for it).
+    if (pickupBox) pickupBox.style.display = 'none';
+    const hasSlots = scheduleSlotsFromSettings().length > 0;
+    if (sched) sched.style.display = (schedulesOn && hasSlots) ? '' : 'none';
   } else {
-    // Delivery is on. Schedule section visible only if tenant enabled
-    // schedules AND has at least one slot configured.
+    // Both available — let pickFulfillment / current method drive visibility.
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (sched) sched.style.display = (schedulesOn && hasSlots) ? '' : 'none';
   }
 
-  // Hide / show individual payment-method buttons based on admin toggles.
   const setPayVisible = (key, on) => {
     const btn = document.querySelector(`[data-pay="${key}"]`);
     if (btn) btn.style.display = on ? '' : 'none';
@@ -1003,7 +1015,9 @@ function updatePaymentOptions() {
 
   // Admin-level enable flags (default true if missing on settings doc).
   const deliveryEnabled = storeSettingsData.deliveryEnabled !== false;
-  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false;
+  const pickupEnabled   = storeSettingsData.pickupEnabled !== false;
+  // Cash (at pickup) depends on the store offering pickup at all.
+  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false && pickupEnabled;
   const gcashAdminOn = storeSettingsData.payGcashEnabled !== false;
   const codAdminOn   = storeSettingsData.payCodEnabled   !== false && deliveryEnabled;
 
