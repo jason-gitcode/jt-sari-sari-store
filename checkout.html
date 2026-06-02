@@ -1177,24 +1177,8 @@ async function placeOrder() {
 
 function showOrderConfirmation(orderId, payment) {
   const shortId = orderId.slice(-6).toUpperCase();
-  const gcashAccount = storeSettingsData.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || '';
-  const gcashNum = storeSettingsData.gcashNumber || STORE.gcashNumber || '';
-  const gcashHtml = payment === 'gcash' ? `
-    <div class="confirm-gcash-box">
-      <h3>📱 GCash Payment Required</h3>
-      <p>Send payment to:</p>
-      <p style="margin-top:6px;"><strong>${gcashAccount}</strong></p>
-      <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
-        <strong>${gcashNum}</strong>
-        <button onclick="navigator.clipboard.writeText('${gcashNum}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
-      </p>
-      <p style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
-        <span>Order No. <strong>#${shortId}</strong></span>
-        <button onclick="navigator.clipboard.writeText('#${shortId}').catch(()=>{})" style="padding:2px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;">Copy</button>
-      </p>
-      <p style="margin-top:10px;font-size:13px;color:var(--muted);">When sending payment in the GCash app, include the Order No. in the message.</p>
-    </div>
-  ` : '';
+  // GCash instructions live on the checkout page itself now (shown as soon
+  // as the customer picks GCash) — no need to repeat them here.
 
   document.getElementById('main').innerHTML = `
     <div class="confirm-screen">
@@ -1202,7 +1186,6 @@ function showOrderConfirmation(orderId, payment) {
       <div class="confirm-title">Order Placed!</div>
       <div class="confirm-order-num">Order #${shortId}</div>
       <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
-      ${gcashHtml}
       <a href="${tenantUrl('')}" class="confirm-back">Continue Shopping</a>
     </div>
   `;
