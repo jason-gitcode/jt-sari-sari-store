@@ -560,6 +560,8 @@
       gap: 12px; padding-bottom: 20px;
     }
     .order-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+    .gcash-receipt-thumb-admin { max-width: 220px; max-height: 220px; border-radius: 8px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
+    .gcash-receipt-thumb-admin:hover { border-color: var(--accent); }
     .order-card.pending  { border-left: 3px solid var(--warn); }
     .order-card.confirmed { border-left: 3px solid var(--ok); }
     .order-card.cancelled { border-left: 3px solid var(--line-strong); opacity: 0.7; }
@@ -3543,6 +3545,12 @@ function renderOrders() {
         </div>
         ${o.deliveryFee != null ? `<div class="order-subtotal-row" style="margin-top:8px;"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
         <div class="order-pay-label">${payLabel}</div>
+        ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
+          <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
+          <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
+            <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
+          </a>
+        </div>` : ''}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
     } else {
@@ -3585,6 +3593,12 @@ function renderOrders() {
           <div class="order-subtotal-row"><span>Delivery Fee</span><span>${feeStr}</span></div>` : ''}
         <div class="order-total-row"><span>Total</span><span>₱${displayTotal.toFixed(2)}</span></div>
         <div class="order-pay-label">${payLabel}</div>
+        ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
+          <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
+          <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
+            <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
+          </a>
+        </div>` : ''}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
         ${partialRefundHtml}`;

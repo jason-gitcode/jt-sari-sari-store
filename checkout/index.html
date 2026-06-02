@@ -132,6 +132,17 @@
   .pay-info { margin-top: 10px; padding: 10px; background: var(--soft); border-radius: 8px; font-size: 13px; color: var(--muted); display: none; }
   .pay-info.show { display: block; }
   .pay-info strong { color: var(--ink); }
+  /* GCash payment box (instructions + receipt upload) */
+  .gcash-box h4 { font-size: 14px; color: var(--ink); margin: 0 0 6px; font-weight: 600; }
+  .gcash-box p { margin: 4px 0; font-size: 13px; }
+  .gcash-copy-btn { padding: 2px 10px; font-size: 12px; background: #fff; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--ink); }
+  .gcash-copy-btn:hover { background: var(--soft); }
+  .gcash-receipt-box { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
+  .gcash-upload-btn { display: inline-block; padding: 8px 16px; background: #fff; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ink); font-weight: 500; }
+  .gcash-upload-btn:hover { background: var(--soft); border-color: var(--accent); }
+  .gcash-receipt-thumb { position: relative; display: inline-block; max-width: 200px; margin-top: 4px; }
+  .gcash-receipt-thumb img { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--line); display: block; }
+  .gcash-receipt-remove { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #dc2626; color: white; border: 2px solid #fff; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
 
   /* Delivery schedule */
   .schedule-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -744,7 +755,27 @@ function init() {
           Please prepare exact amount or small bills. Pay upon delivery.
         </div>
         <div class="pay-info" id="pay-info-gcash">
-          <strong>GCash selected</strong> — payment details will be shown after you place your order.
+          <div class="gcash-box">
+            <h4>📱 GCash Payment Required</h4>
+            <p>Send payment to:</p>
+            <p><strong id="gcash-payee-name" style="color:var(--ink);">—</strong></p>
+            <p style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+              <strong id="gcash-payee-number" style="color:var(--ink);">—</strong>
+              <button type="button" class="gcash-copy-btn" onclick="copyGcashField('gcash-payee-number')">Copy</button>
+            </p>
+            <p style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap;">
+              <span>Order No. <strong id="gcash-order-ref" style="color:var(--ink);">—</strong></span>
+              <button type="button" class="gcash-copy-btn" onclick="copyGcashField('gcash-order-ref')">Copy</button>
+            </p>
+            <p style="margin-top:10px;font-size:12px;color:var(--muted);">When sending payment in the GCash app, include the Order No. in the message.</p>
+          </div>
+          <div class="gcash-receipt-box">
+            <p style="margin:0 0 6px;"><strong style="color:var(--ink);">Upload GCash payment screenshot</strong></p>
+            <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">After sending payment, attach a screenshot so the store can verify quickly.</p>
+            <input type="file" id="gcash-receipt-input" accept="image/*" capture="environment" style="display:none;" onchange="handleGcashReceiptUpload(event)" />
+            <label for="gcash-receipt-input" class="gcash-upload-btn">📎 Choose photo</label>
+            <div id="gcash-receipt-preview"></div>
+          </div>
         </div>
         <div id="cod-restricted-note" style="display:none;margin-top:8px;font-size:12px;color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 10px;">
           Cash on Delivery is not available for orders ₱200 and above. Please use GCash.
@@ -833,6 +864,88 @@ function pickPay(method) {
   document.querySelectorAll('.pay-info').forEach(el => el.classList.remove('show'));
   const info = document.getElementById('pay-info-' + method);
   if (info) info.classList.add('show');
+  if (method === 'gcash') populateGcashInstructions();
+}
+
+// ----- GCash instructions + receipt upload -----
+let gcashReceiptData = null;
+let gcashOrderRefId = null;
+
+function populateGcashInstructions() {
+  // Reuse a single generated ref ID for this checkout session so the
+  // displayed "Order No." matches the eventual placed-order's ID.
+  if (!gcashOrderRefId) gcashOrderRefId = tcol('orders').doc().id;
+  const account = storeSettingsData.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || 'Store GCash';
+  const num     = storeSettingsData.gcashNumber || STORE.gcashNumber || '—';
+  const shortRef = '#' + gcashOrderRefId.slice(-6).toUpperCase();
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setText('gcash-payee-name', account);
+  setText('gcash-payee-number', num);
+  setText('gcash-order-ref', shortRef);
+}
+
+function copyGcashField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = (el.textContent || '').trim();
+  if (!text) return;
+  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function handleGcashReceiptUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('Please choose an image file.'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('Image too large. Max 10 MB.'); return; }
+  compressReceiptImage(file, (compressed) => {
+    gcashReceiptData = compressed;
+    renderGcashReceiptPreview();
+  });
+}
+
+function compressReceiptImage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 900;
+      let w = img.width, h = img.height;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => showToast('Could not load image. Try a different one.');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderGcashReceiptPreview() {
+  const preview = document.getElementById('gcash-receipt-preview');
+  if (!preview) return;
+  if (gcashReceiptData) {
+    const safe = gcashReceiptData.replace(/"/g, '&quot;');
+    preview.innerHTML = `
+      <div class="gcash-receipt-thumb">
+        <img src="${safe}" alt="Receipt preview" />
+        <button type="button" class="gcash-receipt-remove" onclick="removeGcashReceipt()" title="Remove">×</button>
+      </div>
+    `;
+  } else {
+    preview.innerHTML = '';
+  }
+}
+
+function removeGcashReceipt() {
+  gcashReceiptData = null;
+  const input = document.getElementById('gcash-receipt-input');
+  if (input) input.value = '';
+  renderGcashReceiptPreview();
 }
 
 // Toggle delivery vs pickup — hides the address + schedule sections, swaps
@@ -1002,10 +1115,17 @@ async function placeOrder() {
     subtotal: subtotalAmt,
     deliveryFee: feeAmt,
     total: subtotalAmt + feeAmt,
+    // Attach the customer-uploaded GCash receipt screenshot when relevant.
+    ...(payMethod === 'gcash' && gcashReceiptData ? { gcashReceipt: gcashReceiptData } : {}),
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  const orderRef = tcol('orders').doc();
+  // For GCash orders, reuse the pre-generated ref ID the customer already
+  // saw on the checkout page so the order number on screen / in the GCash
+  // message matches the actual doc ID.
+  const orderRef = (payMethod === 'gcash' && gcashOrderRefId)
+    ? tcol('orders').doc(gcashOrderRefId)
+    : tcol('orders').doc();
   let stockErrorMsg = null;
   console.log('[checkout] Starting order. TENANT_ID=', TENANT_ID, 'orderRef.path=', orderRef.path, 'items=', items.length);
 
