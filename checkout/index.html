@@ -869,6 +869,7 @@ function pickPay(method) {
 
 // ----- GCash instructions + receipt upload -----
 let gcashReceiptData = null;
+let gcashReceiptName = null;
 let gcashOrderRefId = null;
 
 function populateGcashInstructions() {
@@ -897,6 +898,7 @@ function handleGcashReceiptUpload(event) {
   if (!file) return;
   if (!file.type.startsWith('image/')) { showToast('Please choose an image file.'); return; }
   if (file.size > 10 * 1024 * 1024) { showToast('Image too large. Max 10 MB.'); return; }
+  gcashReceiptName = file.name || 'receipt.jpg';
   compressReceiptImage(file, (compressed) => {
     gcashReceiptData = compressed;
     renderGcashReceiptPreview();
@@ -943,6 +945,7 @@ function renderGcashReceiptPreview() {
 
 function removeGcashReceipt() {
   gcashReceiptData = null;
+  gcashReceiptName = null;
   const input = document.getElementById('gcash-receipt-input');
   if (input) input.value = '';
   renderGcashReceiptPreview();
@@ -1116,7 +1119,7 @@ async function placeOrder() {
     deliveryFee: feeAmt,
     total: subtotalAmt + feeAmt,
     // Attach the customer-uploaded GCash receipt screenshot when relevant.
-    ...(payMethod === 'gcash' && gcashReceiptData ? { gcashReceipt: gcashReceiptData } : {}),
+    ...(payMethod === 'gcash' && gcashReceiptData ? { gcashReceipt: gcashReceiptData, gcashReceiptName: (gcashReceiptName || 'receipt.jpg') } : {}),
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 

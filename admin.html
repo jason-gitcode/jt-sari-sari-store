@@ -564,8 +564,22 @@
       gap: 12px; padding-bottom: 20px;
     }
     .order-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-shrink: 0; box-shadow: var(--shadow-sm); }
-    .gcash-receipt-thumb-admin { max-width: 220px; max-height: 220px; border-radius: 8px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
-    .gcash-receipt-thumb-admin:hover { border-color: var(--accent); }
+    /* File-link button for GCash receipt (replaces the inline thumbnail). */
+    .receipt-file-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 6px; padding: 6px 12px;
+      font-size: 13px; font-family: inherit; cursor: pointer;
+      color: var(--accent); font-weight: 500;
+      max-width: 100%; overflow: hidden;
+    }
+    .receipt-file-link:hover { background: var(--surface); border-color: var(--accent); color: var(--accent-dark); }
+    .receipt-file-link span {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      text-decoration: underline; text-decoration-color: rgba(0,0,0,0);
+      transition: text-decoration-color 0.15s;
+    }
+    .receipt-file-link:hover span { text-decoration-color: currentColor; }
     /* Receipt lightbox (popup) */
     .receipt-modal-overlay {
       position: fixed; inset: 0;
@@ -3612,7 +3626,9 @@ function renderOrders() {
         <div class="order-pay-label">${payLabel}</div>
         ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
           <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
-          <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" onclick="openReceiptModal('${o.orderId}')" title="Click to view full size" />
+          <button type="button" class="receipt-file-link" onclick="openReceiptModal('${o.orderId}')" title="Click to view receipt">
+            🖼️ <span>${escText(o.gcashReceiptName || 'gcash-receipt.jpg')}</span>
+          </button>
         </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
@@ -3658,7 +3674,9 @@ function renderOrders() {
         <div class="order-pay-label">${payLabel}</div>
         ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
           <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
-          <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" onclick="openReceiptModal('${o.orderId}')" title="Click to view full size" />
+          <button type="button" class="receipt-file-link" onclick="openReceiptModal('${o.orderId}')" title="Click to view receipt">
+            🖼️ <span>${escText(o.gcashReceiptName || 'gcash-receipt.jpg')}</span>
+          </button>
         </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
