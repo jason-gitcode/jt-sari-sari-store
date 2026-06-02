@@ -566,6 +566,30 @@
     .order-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-shrink: 0; box-shadow: var(--shadow-sm); }
     .gcash-receipt-thumb-admin { max-width: 220px; max-height: 220px; border-radius: 8px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
     .gcash-receipt-thumb-admin:hover { border-color: var(--accent); }
+    /* Receipt lightbox (popup) */
+    .receipt-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 24px; cursor: pointer;
+    }
+    .receipt-modal-overlay.show { display: flex; }
+    .receipt-modal-overlay img {
+      max-width: 95vw; max-height: 90vh;
+      object-fit: contain; border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      cursor: default;
+    }
+    .receipt-modal-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 40px; height: 40px;
+      background: rgba(255,255,255,0.15); color: white;
+      border: 0; border-radius: 50%;
+      font-size: 24px; line-height: 1; padding: 0;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .receipt-modal-close:hover { background: rgba(255,255,255,0.3); }
     .order-card.pending  { border-left: 3px solid var(--warn); }
     .order-card.confirmed { border-left: 3px solid var(--ok); }
     .order-card.cancelled { border-left: 3px solid var(--line-strong); opacity: 0.7; }
@@ -1403,6 +1427,12 @@
           <button type="button" class="btn-primary" onclick="saveSupplierFromEdit()">Save</button>
         </div>
       </div>
+    </div>
+
+    <!-- GCASH RECEIPT LIGHTBOX -->
+    <div class="receipt-modal-overlay" id="receipt-modal" onclick="closeReceiptModal(event)">
+      <button type="button" class="receipt-modal-close" onclick="closeReceiptModal()" aria-label="Close">×</button>
+      <img id="receipt-modal-img" src="" alt="GCash Receipt" onclick="event.stopPropagation()" />
     </div>
 
     <!-- SETTINGS -->
@@ -3434,6 +3464,30 @@ function formatOrderTime(ts) {
   });
 }
 
+// ----- GCash receipt lightbox -----
+function openReceiptModal(orderId) {
+  const o = orders.find(x => x.orderId === orderId);
+  if (!o || !o.gcashReceipt) return;
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = o.gcashReceipt;
+  document.getElementById('receipt-modal').classList.add('show');
+}
+function closeReceiptModal(e) {
+  // If invoked from the backdrop click, only close when it was the backdrop
+  // itself that was clicked (e.target === e.currentTarget). When called
+  // from the × button or the keydown handler, e is undefined.
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('receipt-modal').classList.remove('show');
+  // Release the data URI so we don't keep it in memory after close.
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = '';
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('receipt-modal');
+  if (modal && modal.classList.contains('show')) closeReceiptModal();
+});
+
 function copyOrder(orderId, btn) {
   const o = orders.find(x => x.orderId === orderId);
   if (!o) return;
@@ -3558,9 +3612,7 @@ function renderOrders() {
         <div class="order-pay-label">${payLabel}</div>
         ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
           <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
-          <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
-            <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
-          </a>
+          <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" onclick="openReceiptModal('${o.orderId}')" title="Click to view full size" />
         </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
@@ -3606,9 +3658,7 @@ function renderOrders() {
         <div class="order-pay-label">${payLabel}</div>
         ${o.gcashReceipt ? `<div class="order-gcash-receipt" style="margin-top:10px;">
           <div class="order-section-label" style="margin-bottom:6px;">📎 GCash Receipt</div>
-          <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
-            <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
-          </a>
+          <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" onclick="openReceiptModal('${o.orderId}')" title="Click to view full size" />
         </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
