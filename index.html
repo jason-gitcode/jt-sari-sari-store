@@ -125,7 +125,7 @@
     display: flex; align-items: center; gap: 12px;
     position: relative; z-index: 1;
   }
-  .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; max-width: 240px; }
   .brand .logo {
     height: 54px; width: 54px; flex-shrink: 0;
     border-radius: 50%; overflow: hidden;
@@ -134,8 +134,14 @@
     padding: 4px;
   }
   .brand .logo img { height: 100%; width: 100%; object-fit: contain; }
-  .brand h1 { font-size: 17px; font-weight: 600; line-height: 1.2; }
-  .brand small { color: var(--muted); font-size: 12px; }
+  .brand > div { min-width: 0; flex: 1; }
+  .brand h1 {
+    font-size: 17px; font-weight: 600; line-height: 1.2;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; text-overflow: ellipsis;
+    word-break: break-word; max-height: 2.4em;
+  }
+  .brand small { color: var(--muted); font-size: 12px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .search {
     flex: 1; position: relative;
     display: flex; align-items: center; gap: 8px;

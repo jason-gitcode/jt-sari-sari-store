@@ -1126,6 +1126,7 @@ async function placeOrder() {
   const orderRef = (payMethod === 'gcash' && gcashOrderRefId)
     ? tcol('orders').doc(gcashOrderRefId)
     : tcol('orders').doc();
+  console.log('[checkout] payMethod=', payMethod, 'hasReceipt=', !!orderData.gcashReceipt, 'receiptBytes=', orderData.gcashReceipt ? orderData.gcashReceipt.length : 0);
   let stockErrorMsg = null;
   console.log('[checkout] Starting order. TENANT_ID=', TENANT_ID, 'orderRef.path=', orderRef.path, 'items=', items.length);
 
@@ -1227,7 +1228,6 @@ function showOrderConfirmation(orderId, payment) {
       <div class="confirm-icon">✅</div>
       <div class="confirm-title">Order Placed!</div>
       <div class="confirm-order-num">Order #${shortId}</div>
-      <p style="font-size:14px;color:var(--muted);">We'll review your order and confirm it shortly.</p>
       <a href="${tenantUrl('')}" class="confirm-back">Continue Shopping</a>
     </div>
   `;

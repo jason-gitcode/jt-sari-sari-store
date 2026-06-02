@@ -3550,7 +3550,7 @@ function renderOrders() {
           <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
             <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
           </a>
-        </div>` : ''}
+        </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}`;
     } else {
@@ -3598,7 +3598,7 @@ function renderOrders() {
           <a href="${o.gcashReceipt}" target="_blank" rel="noopener" title="Open full size in new tab">
             <img src="${o.gcashReceipt}" alt="GCash payment screenshot" class="gcash-receipt-thumb-admin" />
           </a>
-        </div>` : ''}
+        </div>` : (o.payment === 'gcash' ? `<div class="order-notes-label" style="margin-top:10px;color:var(--warn);">⚠ Customer did not attach a GCash receipt.</div>` : '')}
         ${o.deliverySchedule ? `<div class="order-notes-label">🕒 Delivery: ${o.deliverySchedule}</div>` : ''}
         ${o.notes ? `<div class="order-notes-label">Notes: ${o.notes}</div>` : ''}
         ${partialRefundHtml}`;
