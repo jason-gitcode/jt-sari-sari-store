@@ -161,8 +161,12 @@
       color: #fff; font-weight: 700; font-size: 13px; letter-spacing: 0.02em;
       flex-shrink: 0;
     }
-    .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
-    .brand-title { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; max-width: 260px; }
+    .brand-title { font-size: var(--fs-md); font-weight: 600; line-height: 1.15; word-break: break-word; }
+    /* Scale-down classes applied by applyTenantBranding based on storeName length. */
+    .brand-title.scale-md { font-size: 14px; }
+    .brand-title.scale-sm { font-size: 12px; }
+    .brand-title.scale-xs { font-size: 11px; }
     .brand-sub { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
 
     .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
@@ -2075,6 +2079,13 @@ function applyTenantBranding() {
     // default (visibility:hidden has lower specificity than an inline
     // visibility: visible value).
     titleEl.style.visibility = 'visible';
+    // Scale font down for longer names so the full text stays visible
+    // without overlapping the centered Storefront button.
+    titleEl.classList.remove('scale-md', 'scale-sm', 'scale-xs');
+    const len = displayName.length;
+    if (len > 45) titleEl.classList.add('scale-xs');
+    else if (len > 30) titleEl.classList.add('scale-sm');
+    else if (len > 20) titleEl.classList.add('scale-md');
   }
   if (markEl) {
     markEl.textContent = initials;

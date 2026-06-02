@@ -137,10 +137,12 @@
   .brand > div { min-width: 0; flex: 1; }
   .brand h1 {
     font-size: 17px; font-weight: 600; line-height: 1.2;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden; text-overflow: ellipsis;
-    word-break: break-word; max-height: 2.4em;
+    word-break: break-word; max-height: 3em; overflow: hidden;
   }
+  /* Scale down for longer storeNames so the full name fits on screen. */
+  .brand h1.scale-md { font-size: 14px; }
+  .brand h1.scale-sm { font-size: 12px; }
+  .brand h1.scale-xs { font-size: 11px; }
   .brand small { color: var(--muted); font-size: 12px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .search {
     flex: 1; position: relative;
@@ -1018,13 +1020,25 @@ tdoc('settings', 'store').onSnapshot(snap => {
   const dynName = storeSettingsData.storeName;
   const nameEl = document.getElementById('store-name');
   const tagEl  = document.getElementById('store-tag');
+  let shownName = '';
   if (dynName) {
     if (nameEl) nameEl.textContent = dynName;
     document.title = dynName;
+    shownName = dynName;
   } else if (nameEl && TENANT_ID && TENANT_ID !== 'jsminimart') {
-    // Fallback so the header isn't permanently blank if the tenant hasn't
-    // saved a Store Info name yet.
     nameEl.textContent = TENANT_ID;
+    shownName = TENANT_ID;
+  } else if (nameEl) {
+    shownName = nameEl.textContent || '';
+  }
+  // Scale the brand-name font so long names stay readable AND fully visible
+  // (no ellipsis). Wraps to multiple lines naturally inside the bounded box.
+  if (nameEl) {
+    nameEl.classList.remove('scale-md', 'scale-sm', 'scale-xs');
+    const len = shownName.trim().length;
+    if (len > 45) nameEl.classList.add('scale-xs');
+    else if (len > 30) nameEl.classList.add('scale-sm');
+    else if (len > 20) nameEl.classList.add('scale-md');
   }
   // Restore visibility (CSS hid these via the no-default-logo class to
   // prevent the JS Mini Mart flash for non-jsminimart tenants).
