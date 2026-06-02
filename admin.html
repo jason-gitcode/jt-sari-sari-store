@@ -250,12 +250,62 @@
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 32px; }
     #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 32px; }
-    .supplier-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-    .supplier-card label.supp-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
-    .supplier-card .supp-input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink); box-sizing: border-box; }
-    .supplier-card textarea.supp-input { min-height: 50px; resize: vertical; }
-    .supplier-card .supp-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .supplier-card .supp-cell { flex: 1; min-width: 200px; }
+    /* Supplier table */
+    .suppliers-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .suppliers-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .suppliers-table th, .suppliers-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .suppliers-table tr:last-child td { border-bottom: 0; }
+    .suppliers-table th { background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .suppliers-table td.actions { text-align: right; white-space: nowrap; width: 1%; }
+    .suppliers-table .name-link {
+      background: none; border: 0; padding: 0; cursor: pointer;
+      color: var(--accent); font: inherit; font-weight: 600; text-align: left;
+    }
+    .suppliers-table .name-link:hover { text-decoration: underline; color: var(--accent-dark); }
+    .suppliers-table .supp-edit-btn {
+      background: var(--surface-2); border: 1px solid var(--line);
+      padding: 6px 14px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; color: var(--ink);
+    }
+    .suppliers-table .supp-edit-btn:hover { background: var(--surface); border-color: var(--line-strong); color: var(--accent); }
+    .suppliers-table .row-muted { color: var(--muted); }
+    .suppliers-empty { padding: 48px 16px; text-align: center; color: var(--muted); }
+
+    /* Supplier form (inside edit modal) */
+    .supp-form { display: flex; flex-direction: column; gap: 12px; }
+    .supp-form label.supp-label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .supp-form .supp-input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; background: var(--surface); color: var(--ink); box-sizing: border-box; }
+    .supp-form textarea.supp-input { min-height: 60px; resize: vertical; }
+    .supp-form .supp-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .supp-form .supp-cell { flex: 1; min-width: 200px; }
+
+    /* Supplier modal overlays */
+    .supp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+    .supp-modal-overlay.show { display: flex; }
+    .supp-modal { background: var(--surface); border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.18); }
+    .supp-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+    .supp-modal-header h2 { font-size: 17px; font-weight: 600; }
+    .supp-modal-header .close-btn { background: transparent; border: 0; font-size: 22px; cursor: pointer; color: var(--muted); line-height: 1; padding: 4px 8px; border-radius: 6px; }
+    .supp-modal-header .close-btn:hover { background: var(--surface-2); color: var(--ink); }
+    .supp-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+    .supp-modal-footer { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); background: var(--surface-2); }
+    .supp-modal-footer .supp-status { font-size: 12px; color: var(--muted); margin-right: auto; }
+    .supp-modal-footer .btn-secondary { background: transparent; border: 1px solid var(--line); padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+    .supp-modal-footer .btn-secondary:hover { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+    .supp-modal-footer .btn-primary { background: var(--ink); border: 1px solid var(--ink); color: var(--surface); padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .supp-modal-footer .btn-primary:hover { background: var(--ink-soft); }
+    .supp-modal-footer .supp-del-btn { background: transparent; border: 1px solid #fecaca; color: var(--danger); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .supp-modal-footer .supp-del-btn:hover { background: #fee2e2; }
+    [data-theme="dark"] .supp-modal-footer .supp-del-btn { border-color: rgba(248,113,113,0.4); }
+    [data-theme="dark"] .supp-modal-footer .supp-del-btn:hover { background: rgba(248,113,113,0.12); }
+
+    /* View modal layout */
+    .supp-view-grid { display: grid; gap: 14px; }
+    .supp-view-row .supp-view-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+    .supp-view-row .supp-view-value { font-size: 14px; color: var(--ink); margin-top: 4px; word-break: break-word; }
+    .supp-view-row .supp-view-value.empty { color: var(--muted); font-style: italic; }
+    .supp-view-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .supp-view-chips .cat-chip { cursor: default; }
     /* Chip-based category input */
     .cat-chip-wrap {
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
@@ -296,10 +346,6 @@
     .cat-sug-item:last-child { border-bottom: 0; }
     .cat-sug-item:hover, .cat-sug-item.active { background: var(--accent); color: #fff; }
     .cat-sug-item .match { font-weight: 600; color: inherit; }
-    .supplier-card .supp-footer { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
-    .supplier-card .supp-status { font-size: 12px; color: var(--muted); margin-right: auto; }
-    .supplier-card .supp-del-btn { background: transparent; border: 1px solid #fecaca; color: var(--danger); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-    .supplier-card .supp-del-btn:hover { background: #fee2e2; }
 
     /* ---------- PAGE HEADER ---------- */
     .page-header {
@@ -1315,10 +1361,42 @@
           <div class="page-subtitle">Track your suppliers, their contacts, and when they deliver to you.</div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button class="btn-add-product" onclick="addSupplier()">+ Add Supplier</button>
+          <button class="btn-add-product" onclick="openSupplierAdd()">+ Add Supplier</button>
         </div>
       </div>
-      <div id="suppliers-list" style="display:flex;flex-direction:column;gap:12px;padding:8px 0 32px;"></div>
+      <div id="suppliers-list"></div>
+    </div>
+
+    <!-- SUPPLIER VIEW MODAL -->
+    <div class="supp-modal-overlay" id="supplier-view-modal" onclick="closeSupplierView(event)">
+      <div class="supp-modal" onclick="event.stopPropagation()">
+        <div class="supp-modal-header">
+          <h2 id="view-modal-title">Supplier Details</h2>
+          <button type="button" class="close-btn" onclick="closeSupplierView()">×</button>
+        </div>
+        <div class="supp-modal-body" id="view-modal-body"></div>
+        <div class="supp-modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeSupplierView()">Close</button>
+          <button type="button" class="btn-primary" onclick="editFromView()">Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPPLIER EDIT / ADD MODAL -->
+    <div class="supp-modal-overlay" id="supplier-edit-modal" onclick="closeSupplierEdit(event)">
+      <div class="supp-modal" onclick="event.stopPropagation()">
+        <div class="supp-modal-header">
+          <h2 id="edit-modal-title">Edit Supplier</h2>
+          <button type="button" class="close-btn" onclick="closeSupplierEdit()">×</button>
+        </div>
+        <div class="supp-modal-body" id="edit-modal-body"></div>
+        <div class="supp-modal-footer">
+          <span class="supp-status" id="edit-modal-status"></span>
+          <button type="button" class="supp-del-btn" id="edit-modal-delete-btn" onclick="deleteSupplierFromEdit()">Delete</button>
+          <button type="button" class="btn-secondary" onclick="closeSupplierEdit()">Cancel</button>
+          <button type="button" class="btn-primary" onclick="saveSupplierFromEdit()">Save</button>
+        </div>
+      </div>
     </div>
 
     <!-- SETTINGS -->
@@ -2888,17 +2966,41 @@ function renderSuppliers() {
   const list = document.getElementById('suppliers-list');
   if (!list) return;
   if (suppliers.length === 0) {
-    list.innerHTML = `<div style="text-align:center;padding:48px 16px;color:var(--muted);">
+    list.innerHTML = `<div class="suppliers-empty">
       <div style="font-size:48px;margin-bottom:12px;">🏭</div>
       <div style="font-size:14px;">No suppliers yet.</div>
       <div style="font-size:12px;margin-top:4px;">Click "+ Add Supplier" above to add your first one.</div>
     </div>`;
     return;
   }
-  const cats = getProductCategories();
-  list.innerHTML = suppliers.map(s => renderSupplierCard(s, cats)).join('');
-  // Wire chip-input autocomplete on every category field on screen.
-  list.querySelectorAll('.cat-chip-input').forEach(setupChipAutocomplete);
+  list.innerHTML = `
+    <div class="suppliers-table-wrap">
+      <table class="suppliers-table">
+        <thead>
+          <tr>
+            <th>Business name</th>
+            <th>Contact person</th>
+            <th>Contact number</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${suppliers.map(s => `
+            <tr>
+              <td>
+                <button class="name-link" onclick="openSupplierView('${escAttr(s.id)}')">
+                  ${escText(s.businessName || '(unnamed)')}
+                </button>
+              </td>
+              <td>${s.contactPerson ? escText(s.contactPerson) : '<span class="row-muted">—</span>'}</td>
+              <td>${s.contactNumber ? escText(s.contactNumber) : '<span class="row-muted">—</span>'}</td>
+              <td class="actions"><button class="supp-edit-btn" onclick="openSupplierEdit('${escAttr(s.id)}')">Edit</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 // ----- Chip-based category input with autocomplete -----
@@ -3030,21 +3132,20 @@ function setupChipAutocomplete(input) {
   });
 }
 
-function renderSupplierCard(s, allCats) {
-  const cats = Array.isArray(s.categories) ? s.categories : [];
-  // Split combined schedule (YYYY-MM-DDTHH:MM) into separate date + time
-  // for two-input editing. Falls back gracefully for empty / malformed values.
+function renderSupplierFormBody(s) {
+  // Splits combined schedule into separate date + time inputs for editing.
   let schedDate = '', schedTime = '';
   if (typeof s.schedule === 'string' && s.schedule) {
     const sep = s.schedule.indexOf('T');
     if (sep > -1) { schedDate = s.schedule.slice(0, sep); schedTime = s.schedule.slice(sep + 1); }
     else schedDate = s.schedule;
   }
+  const cats = Array.isArray(s.categories) ? s.categories : [];
   const chipsHtml = cats.map(c =>
     `<span class="cat-chip" data-cat="${escAttr(c)}"><span>${escText(c)}</span><button type="button" class="cat-chip-x" onclick="removeCatChip(this)" title="Remove">×</button></span>`
   ).join('');
   return `
-    <div class="supplier-card" data-supplier-id="${escAttr(s.id)}">
+    <div class="supp-form">
       <div class="supp-row">
         <div class="supp-cell">
           <label class="supp-label">Business name</label>
@@ -3079,86 +3180,148 @@ function renderSupplierCard(s, allCats) {
           <input type="text" class="cat-chip-input" placeholder="${cats.length === 0 ? 'e.g. Beverages, Diapers, Noodles' : 'Add another…'}" />
         </div>
       </div>
-      <div class="supp-footer">
-        <span class="supp-status"></span>
-        <button class="supp-del-btn" onclick="deleteSupplier('${escAttr(s.id)}')">Delete</button>
-        <button class="btn-logout-settings" onclick="saveSupplier('${escAttr(s.id)}')">Save</button>
+    </div>
+  `;
+}
+
+function renderSupplierViewBody(s) {
+  const cats = Array.isArray(s.categories) ? s.categories : [];
+  const chips = cats.length > 0
+    ? `<div class="supp-view-chips">${cats.map(c => `<span class="cat-chip"><span>${escText(c)}</span></span>`).join('')}</div>`
+    : '<div class="supp-view-value empty">No categories listed</div>';
+  // Schedule: format YYYY-MM-DDTHH:MM into a friendlier local string.
+  let schedDisplay = '';
+  if (typeof s.schedule === 'string' && s.schedule) {
+    const d = new Date(s.schedule);
+    if (!isNaN(d.getTime())) {
+      schedDisplay = d.toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' });
+    } else {
+      schedDisplay = s.schedule;
+    }
+  }
+  const row = (label, value, isEmpty) =>
+    `<div class="supp-view-row"><div class="supp-view-label">${label}</div><div class="supp-view-value${isEmpty ? ' empty' : ''}">${isEmpty ? 'Not set' : value}</div></div>`;
+  return `
+    <div class="supp-view-grid">
+      ${row('Business name', escText(s.businessName), !s.businessName)}
+      ${row('Contact person', escText(s.contactPerson), !s.contactPerson)}
+      ${row('Contact number', escText(s.contactNumber), !s.contactNumber)}
+      ${row('Address', escText(s.address).replace(/\n/g, '<br>'), !s.address)}
+      ${row('Next delivery / schedule', escText(schedDisplay), !schedDisplay)}
+      <div class="supp-view-row">
+        <div class="supp-view-label">Categories supplied</div>
+        ${chips}
       </div>
     </div>
   `;
 }
 
-async function addSupplier() {
-  try {
-    await tcol('suppliers').add({
-      businessName: '',
-      contactPerson: '',
-      contactNumber: '',
-      address: '',
-      schedule: '',
-      categories: [],
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    // Snapshot listener will pick it up and render. Then scroll to the new
-    // card so the user can start typing immediately.
-    setTimeout(() => {
-      const list = document.getElementById('suppliers-list');
-      if (list) list.scrollTop = list.scrollHeight;
-    }, 200);
-  } catch (err) {
-    console.error(err);
-    showToast('Error adding supplier: ' + (err && err.message ? err.message : err), 'error');
-  }
+// ----- View modal -----
+let currentViewSupplierId = null;
+function openSupplierView(id) {
+  const s = suppliers.find(x => x.id === id);
+  if (!s) return;
+  currentViewSupplierId = id;
+  document.getElementById('view-modal-title').textContent = s.businessName || 'Supplier Details';
+  document.getElementById('view-modal-body').innerHTML = renderSupplierViewBody(s);
+  document.getElementById('supplier-view-modal').classList.add('show');
+}
+function closeSupplierView(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('supplier-view-modal').classList.remove('show');
+  currentViewSupplierId = null;
+}
+function editFromView() {
+  const id = currentViewSupplierId;
+  closeSupplierView();
+  if (id) openSupplierEdit(id);
 }
 
-async function saveSupplier(id) {
-  const card = document.querySelector(`.supplier-card[data-supplier-id="${id}"]`);
-  if (!card) return;
+// ----- Edit / Add modal -----
+let currentEditSupplierId = null; // null when adding a new supplier
+function openSupplierAdd() {
+  currentEditSupplierId = null;
+  const blank = { businessName: '', contactPerson: '', contactNumber: '', address: '', schedule: '', categories: [] };
+  document.getElementById('edit-modal-title').textContent = 'Add Supplier';
+  document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(blank);
+  document.getElementById('edit-modal-delete-btn').style.display = 'none';
+  const status = document.getElementById('edit-modal-status'); status.textContent = ''; status.style.color = '';
+  document.getElementById('supplier-edit-modal').classList.add('show');
+  document.querySelectorAll('#edit-modal-body .cat-chip-input').forEach(setupChipAutocomplete);
+  setTimeout(() => document.querySelector('#edit-modal-body [data-field="businessName"]')?.focus(), 30);
+}
+function openSupplierEdit(id) {
+  const s = suppliers.find(x => x.id === id);
+  if (!s) return;
+  currentEditSupplierId = id;
+  document.getElementById('edit-modal-title').textContent = 'Edit Supplier';
+  document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(s);
+  document.getElementById('edit-modal-delete-btn').style.display = '';
+  const status = document.getElementById('edit-modal-status'); status.textContent = ''; status.style.color = '';
+  document.getElementById('supplier-edit-modal').classList.add('show');
+  document.querySelectorAll('#edit-modal-body .cat-chip-input').forEach(setupChipAutocomplete);
+}
+function closeSupplierEdit(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('supplier-edit-modal').classList.remove('show');
+  currentEditSupplierId = null;
+}
+async function saveSupplierFromEdit() {
+  const body = document.getElementById('edit-modal-body');
+  if (!body) return;
   const data = {};
-  card.querySelectorAll('.supp-input').forEach(el => {
+  body.querySelectorAll('.supp-input').forEach(el => {
     data[el.dataset.field] = (el.value || '').trim();
   });
-  // Combine the separate date + time fields into the single schedule field
-  // stored on the doc (YYYY-MM-DDTHH:MM). Either side empty → store partial.
+  // Combine date + time → schedule
   const sd = data.scheduleDate || '';
   const st = data.scheduleTime || '';
   data.schedule = (sd && st) ? `${sd}T${st}` : (sd || st || '');
   delete data.scheduleDate;
   delete data.scheduleTime;
-  // Read chips from the chip wrapper. If the user typed text and didn't
-  // commit it (no Enter / comma), promote that text to a chip on save too.
-  const wrap = card.querySelector('.cat-chip-wrap');
-  const pendingInput = wrap?.querySelector('.cat-chip-input');
-  if (pendingInput && pendingInput.value.trim()) {
-    addChipToWrap(wrap, pendingInput.value);
-  }
+  // Categories from chips (promote any uncommitted typed text first)
+  const wrap = body.querySelector('.cat-chip-wrap');
+  const pending = wrap?.querySelector('.cat-chip-input');
+  if (pending && pending.value.trim()) addChipToWrap(wrap, pending.value);
   data.categories = wrap ? chipsInWrap(wrap) : [];
-
-  const status = card.querySelector('.supp-status');
-  status.textContent = 'Saving...';
+  // Light validation
+  if (!data.businessName) {
+    const st = document.getElementById('edit-modal-status');
+    st.textContent = 'Business name is required.';
+    st.style.color = 'var(--danger)';
+    return;
+  }
+  const status = document.getElementById('edit-modal-status');
+  status.textContent = 'Saving…';
   status.style.color = 'var(--muted)';
   try {
-    await tdoc('suppliers', id).set(data, { merge: true });
-    status.textContent = '✅ Saved';
-    status.style.color = '#16a34a';
-    // Fade out the saved indicator after a moment.
-    setTimeout(() => { if (status) status.textContent = ''; }, 2500);
+    if (currentEditSupplierId) {
+      await tdoc('suppliers', currentEditSupplierId).set(data, { merge: true });
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await tcol('suppliers').add(data);
+    }
+    closeSupplierEdit();
   } catch (err) {
     console.error(err);
     status.textContent = '❌ ' + (err && err.message ? err.message : err);
-    status.style.color = '#dc2626';
+    status.style.color = 'var(--danger)';
   }
 }
-
-async function deleteSupplier(id) {
-  const sup = suppliers.find(s => s.id === id);
-  const name = (sup && sup.businessName) ? sup.businessName : 'this supplier';
+async function deleteSupplierFromEdit() {
+  const id = currentEditSupplierId;
+  if (!id) return;
+  const sup = suppliers.find(x => x.id === id);
+  const name = (sup && sup.businessName) || 'this supplier';
   if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
   try {
     await tdoc('suppliers', id).delete();
+    closeSupplierEdit();
   } catch (err) {
     console.error(err);
-    showToast('Error deleting supplier: ' + (err && err.message ? err.message : err), 'error');
+    const st = document.getElementById('edit-modal-status');
+    st.textContent = '❌ ' + (err && err.message ? err.message : err);
+    st.style.color = 'var(--danger)';
   }
 }
 
