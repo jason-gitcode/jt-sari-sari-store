@@ -1284,12 +1284,35 @@
     }
     @media (max-width: 600px) {
       header { padding: 10px 14px; height: 56px; }
-      .brand-title { font-size: var(--fs-base); }
+      /* Phone header: drop the gradient avatar entirely (no value at this
+         size, just steals room from the store name) and shrink the title
+         hard so even long tenant names sit inside the corner without
+         crashing into the centered Storefront button. */
+      .brand-mark { display: none; }
+      .brand-text { max-width: 140px; }
+      .brand-title { font-size: 12px; line-height: 1.2; word-break: break-word; }
+      .brand-title.scale-md,
+      .brand-title.scale-sm,
+      .brand-title.scale-xs { font-size: 11px; }
       .brand-sub { display: none; }
       .container { padding: 14px 12px 20px; }
       .tabs { width: 100%; overflow-x: auto; }
       .tab-btn { padding: 6px 12px; }
       .page-title { font-size: var(--fs-lg); }
+      /* Keep the page-header on a single row on phones so Delete + Add
+         Product live next to the "Products" title (and its subtitle below).
+         Buttons shrink to match the title's visual weight: 28px tall,
+         smaller text, tighter padding, but still tappable. */
+      .page-header { flex-wrap: nowrap; gap: 8px; align-items: flex-start; }
+      .page-header > div:first-child { flex: 1; min-width: 0; }
+      .page-header > div:last-child { flex-shrink: 0; }
+      .btn-add-product,
+      .delete-sel-btn {
+        height: 28px; padding: 0 10px;
+        font-size: 12px; font-weight: 600;
+        border-radius: 6px;
+      }
+      .btn-add-product { gap: 4px; }
       .form-grid { grid-template-columns: 1fr; }
       .variant-item { grid-template-columns: 1fr auto; }
       .variant-item .v-field-name  { grid-column: 1; }
