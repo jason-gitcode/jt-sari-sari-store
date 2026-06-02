@@ -95,7 +95,21 @@
       --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
     }
 
-    html, body { height: 100%; overflow: hidden; }
+    /* App-style viewport lock: rigidly fix html + body so the page itself
+       cannot be dragged or rubber-banded on touch devices. Without this,
+       iOS Safari and Chrome on Android let users pull the whole page in
+       arbitrary 2D directions (the "circular pull" symptom) even when
+       overflow is hidden — only `position: fixed` + `overscroll-behavior:
+       none` truly prevents it. All real scrolling happens inside the
+       designated inner containers (products-main, settings-main, etc.). */
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: fixed;
+      top: 0; left: 0;
+      overscroll-behavior: none;
+    }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: var(--fs-base);
