@@ -40,8 +40,8 @@
       "ScreenRecording_*"
     ],
     "redirects": [
-      { "source": "/", "type": 302, "destination": "/jsminimart/" },
-      { "source": "/index.html", "type": 302, "destination": "/jsminimart/" },
+      { "source": "/", "type": 302, "destination": "/signup/" },
+      { "source": "/index.html", "type": 302, "destination": "/signup/" },
       { "source": "/admin.html", "type": 302, "destination": "/jsminimart/admin/" },
       { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" },
       { "source": "/checkout", "type": 302, "destination": "/jsminimart/checkout/" },
