@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Superadmin — JS Mini Mart SaaS</title>
+<title>Superadmin — Pabili Mart SaaS</title>
 <base href="/">
 <link rel="apple-touch-icon" href="/newlogo.jpeg" />
 <meta name="theme-color" content="#0f172a" />
@@ -186,9 +186,9 @@
 <!-- SIGN IN VIEW -->
 <div id="signin-view" class="signin-wrap">
   <div class="signin-card">
-    <img src="/newlogo.jpeg" alt="JS Mini Mart" />
+    <img src="/newlogo.jpeg" alt="Pabili Mart" />
     <h1>Superadmin Console</h1>
-    <p>Sign in with a superadmin Google account to manage all tenants on jsminimart.com.</p>
+    <p>Sign in with a superadmin Google account to manage all tenants on pabilimart.com.</p>
     <button id="signin-btn" class="btn btn-primary" style="width: 100%;">
       <svg class="gicon" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -207,7 +207,7 @@
   <div class="header">
     <div class="header-inner">
       <div class="header-title">
-        <img src="/newlogo.jpeg" alt="JS Mini Mart" />
+        <img src="/newlogo.jpeg" alt="Pabili Mart" />
         <h1>Superadmin</h1>
         <span class="badge">SaaS</span>
       </div>
@@ -420,7 +420,7 @@ function renderStats(tenants, counts) {
 function renderTable(tenants, counts) {
   const tbody = document.getElementById('tenants-tbody');
   if (tenants.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">No tenants yet. Share <a href="/signup/" style="color:var(--accent);">jsminimart.com/signup/</a> to onboard.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No tenants yet. Share <a href="/signup/" style="color:var(--accent);">pabilimart.com/signup/</a> to onboard.</td></tr>';
     return;
   }
   tbody.innerHTML = tenants.map((t, i) => {
@@ -588,7 +588,7 @@ async function loadInviteCodes() {
       const redeemed = c.redeemedAt
         ? `${escTextSA(c.redeemedBy || '—')}<br><span style="color:var(--muted, #64748b);font-size:11px;">→ /${escTextSA(c.redeemedSlug || '?')}/</span>`
         : '<span style="color:var(--muted, #64748b);">—</span>';
-      const shareUrl = `https://jsminimart.com/signup/?code=${c.code}`;
+      const shareUrl = `https://pabilimart.com/signup/?code=${c.code}`;
       const actions = (!c.redeemedAt && !c.revoked)
         ? `<button class="btn btn-icon" onclick="copyToClipboard('${escTextSA(shareUrl)}', this)">Copy link</button> <button class="btn btn-icon" onclick="revokeInviteCode('${escTextSA(c.code)}')" style="color:#991b1b;">Revoke</button>`
         : '—';

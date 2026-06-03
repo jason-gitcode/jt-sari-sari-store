@@ -300,8 +300,8 @@ exports.createTenant = onCall(async (request) => {
   return {
     slug,
     name,
-    url: `https://jsminimart.com/${slug}/`,
-    adminUrl: `https://jsminimart.com/${slug}/admin/`,
+    url: `https://pabilimart.com/${slug}/`,
+    adminUrl: `https://pabilimart.com/${slug}/admin/`,
     starterPackCopied
   };
 });
@@ -380,7 +380,7 @@ exports.generateInviteCode = onCall(async (request) => {
       code,
       email: boundEmail || null,
       note: note || null,
-      shareUrl: `https://jsminimart.com/signup/?code=${code}`
+      shareUrl: `https://pabilimart.com/signup/?code=${code}`
     };
   }
   throw new HttpsError('internal', 'Could not allocate a unique code. Try again.');
@@ -465,8 +465,8 @@ exports.getMyTenant = onCall(async (request) => {
       return {
         slug: d.id,
         name: data.name || d.id,
-        url: `https://jsminimart.com/${d.id}/`,
-        adminUrl: `https://jsminimart.com/${d.id}/admin/`
+        url: `https://pabilimart.com/${d.id}/`,
+        adminUrl: `https://pabilimart.com/${d.id}/admin/`
       };
     })
   };

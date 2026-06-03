@@ -1,7 +1,7 @@
 {
-  "name": "JS Mini Mart",
-  "short_name": "JS Mini Mart",
-  "description": "Order groceries and essentials from JS Mini Mart in Valle Verde.",
+  "name": "Pabili Mart",
+  "short_name": "Pabili Mart",
+  "description": "Order from your neighborhood sari-sari store, carinderia, or café — delivered or for pickup.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

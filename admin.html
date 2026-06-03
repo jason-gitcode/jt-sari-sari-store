@@ -7335,7 +7335,12 @@ async function exportPDF() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(15, 23, 42);
-    doc.text('JS Mini Mart — Inventory Ranked by Sales', 40, 40);
+    // Use the live tenant store name so the PDF header reflects each
+    // tenant's brand, not the platform's. Falls back to the slug, then to
+    // a generic title — covers tenants who haven't filled in storeName yet.
+    const _pdfStoreName = (storeSettingsData && storeSettingsData.storeName)
+      || (typeof TENANT_ID === 'string' ? TENANT_ID : 'Store');
+    doc.text(`${_pdfStoreName} — Inventory Ranked by Sales`, 40, 40);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(100);

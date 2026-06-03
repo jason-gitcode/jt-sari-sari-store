@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Start Your Sari-Sari Store — JS Mini Mart</title>
+<title>Start Your Sari-Sari Store — Pabili Mart</title>
 <base href="/">
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
@@ -157,7 +157,6 @@
 <body>
 
 <header>
-  <img src="/newlogo.jpeg" alt="JS Mini Mart" />
   <h1>Start your own sari-sari store</h1>
   <p>Get a free online storefront and admin panel. No credit card needed for the first month.</p>
 </header>
@@ -208,11 +207,11 @@
         <div class="field">
           <label for="store-slug">Store URL</label>
           <div class="slug-row">
-            <span class="slug-prefix">jsminimart.com/</span>
+            <span class="slug-prefix">pabilimart.com/</span>
             <input class="input" id="store-slug" type="text" placeholder="tinastore" minlength="3" maxlength="32" pattern="[a-z][a-z0-9-]*" required autocapitalize="none" autocorrect="off" spellcheck="false" />
           </div>
           <div class="slug-preview">
-            Your store will be at <span class="url-host">https://jsminimart.com/</span><span class="url-slug" id="slug-preview">tinastore</span><span class="url-host">/</span>
+            Your store will be at <span class="url-host">https://pabilimart.com/</span><span class="url-slug" id="slug-preview">tinastore</span><span class="url-host">/</span>
           </div>
           <div class="help">Lowercase letters, numbers, and hyphens. 3–32 characters. Must start with a letter.</div>
         </div>
@@ -280,7 +279,7 @@
 <div class="footer-links">
   <div style="margin-bottom:8px;">Already have a store? Sign in to your admin:</div>
   <form id="admin-go-form" onsubmit="goToAdmin(event)" style="display:inline-flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;max-width:100%;">
-    <span style="font-family:monospace;font-size:12px;color:var(--muted);">jsminimart.com/</span>
+    <span style="font-family:monospace;font-size:12px;color:var(--muted);">pabilimart.com/</span>
     <input type="text" id="admin-go-slug" placeholder="your-store" required pattern="[a-z][a-z0-9-]*" minlength="3" maxlength="32" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:monospace;width:140px;" />
     <span style="font-family:monospace;font-size:12px;color:var(--muted);">/admin/</span>
     <button type="submit" style="padding:6px 14px;background:var(--accent);color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;">Go</button>
@@ -314,7 +313,7 @@ const createTenant = functions.httpsCallable('createTenant');
 const getMyTenant  = functions.httpsCallable('getMyTenant');
 
 // Pre-fill the invite code field from the URL — share-link friendly:
-//   https://jsminimart.com/signup/?code=K8X3M9PQ
+//   https://pabilimart.com/signup/?code=K8X3M9PQ
 (() => {
   try {
     const params = new URLSearchParams(window.location.search);
