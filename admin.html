@@ -1698,6 +1698,14 @@
       }
       body.printing-report .restock-controls,
       body.printing-report .restock-legend { display: none !important; }
+      /* Restocking starts on a fresh page in print so its heading lands at
+         the top of a clean sheet, not squashed under the Sales Report's
+         last few rows. Both legacy and modern break-before keywords for
+         cross-browser safety. */
+      body.printing-report #restock-section {
+        page-break-before: always !important;
+        break-before: page !important;
+      }
       @page { margin: 12mm; }
     }
 
