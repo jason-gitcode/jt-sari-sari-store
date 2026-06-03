@@ -842,8 +842,21 @@ function locateMe() {
   navigator.geolocation.getCurrentPosition(
     pos => {
       const { latitude: lat, longitude: lon } = pos.coords;
+      // Persist into the same state the Leaflet picker uses so the order
+      // gets `lat/lng` saved on its address. Without this, the iframe map
+      // would refresh visually but nothing reaches the admin doc.
+      locLat = lat;
+      locLon = lon;
+      locPicked = true;
       const iframe = document.getElementById('map-iframe');
       if (iframe) iframe.src = `https://maps.google.com/maps?q=${lat},${lon}&z=17&output=embed`;
+      // If the full-screen map picker is already open, recenter it + move
+      // the draggable marker so the visible state matches what was captured.
+      if (locMap && locMarker) {
+        locMap.setView([lat, lon], 17);
+        locMarker.setLatLng([lat, lon]);
+      }
+      showToast('📍 Location captured — the store will get a map link on your order.');
     },
     () => showToast('Unable to retrieve your location.')
   );
