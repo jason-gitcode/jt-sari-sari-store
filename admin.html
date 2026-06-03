@@ -1688,8 +1688,85 @@
       /* Repeat table headers on each printed page when a long table breaks. */
       body.printing-report .report-table thead { display: table-header-group; }
       body.printing-report .report-table tr { page-break-inside: avoid; }
+      /* Keep filled urgency badges visible in print — browsers default to
+         stripping background colours to save ink. */
+      body.printing-report .restock-badge,
+      body.printing-report .report-paymix-seg {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      body.printing-report .restock-controls,
+      body.printing-report .restock-legend { display: none !important; }
       @page { margin: 12mm; }
     }
+
+    /* Restocking report — controls + urgency badges. */
+    .restock-controls {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      margin-bottom: 16px;
+    }
+    .restock-control {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: var(--fs-sm);
+    }
+    .restock-control-label { color: var(--muted); font-size: var(--fs-xs); }
+    .restock-control select,
+    .restock-control input {
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      font-size: var(--fs-sm);
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .restock-control input[type="number"] { width: 60px; }
+
+    /* Urgency badges — used both in the table and the legend strip below it.
+       Solid background + bold so they read like state pills, not text. */
+    .restock-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .restock-badge.oos      { background: #dc2626; color: #fff; }
+    .restock-badge.critical { background: #ea580c; color: #fff; }
+    .restock-badge.watch    { background: #f59e0b; color: #fff; }
+    .restock-badge.healthy  { background: #16a34a; color: #fff; }
+    .restock-badge.no-data  { background: var(--surface-3); color: var(--muted); }
+    [data-theme="dark"] .restock-badge.no-data { background: rgba(148,163,184,0.18); color: #cbd5e1; }
+
+    .restock-legend {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      font-size: var(--fs-xs); color: var(--muted);
+      align-items: center;
+    }
+    .restock-supplier-link {
+      background: none; border: 0; padding: 0;
+      color: var(--accent);
+      font: inherit; font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+    }
+    .restock-supplier-link:hover { text-decoration: underline; }
+    .restock-supplier-none { color: var(--muted); font-style: italic; font-size: 12px; }
+    .restock-supplier-extra { color: var(--muted); font-size: 11px; margin-left: 4px; }
+    .restock-empty {
+      padding: 32px 12px; text-align: center;
+      color: var(--muted); font-style: italic; font-size: var(--fs-sm);
+    }
+    .restock-suggested-cell { font-weight: 700; }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -2006,6 +2083,66 @@
           <h3 class="report-block-title">Cancellations &amp; refunds</h3>
           <div class="report-table-wrap">
             <table class="report-table" id="report-cr-table"></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           RESTOCKING / REORDER REPORT
+           ============================================================ -->
+      <div class="report-section" id="restock-section">
+        <div class="report-section-head">
+          <div>
+            <h2 class="report-section-title">Restocking &amp; Reorder</h2>
+            <div class="report-section-period" id="restock-meta">Analysing recent sales velocity to flag items running low.</div>
+          </div>
+          <div class="report-actions">
+            <button class="dash-export-btn"             onclick="exportRestockingReportCSV()">⬇ Download CSV</button>
+            <button class="dash-export-btn dash-export-btn--ghost" onclick="printSalesReport()">🖨 Print / Save as PDF</button>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="restock-controls">
+          <label class="restock-control">
+            <span class="restock-control-label">Analyse last</span>
+            <select id="restock-window" onchange="onRestockControlChange()">
+              <option value="3">3 days</option>
+              <option value="7" selected>7 days</option>
+              <option value="14">14 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </label>
+          <label class="restock-control">
+            <span class="restock-control-label">Cover next</span>
+            <input type="number" id="restock-cover" value="14" min="1" max="90" onchange="onRestockControlChange()" />
+            <span class="restock-control-label">days</span>
+          </label>
+          <label class="restock-control">
+            <span class="restock-control-label">Show</span>
+            <select id="restock-filter" onchange="onRestockControlChange()">
+              <option value="reorder" selected>Needs reorder</option>
+              <option value="critical">Critical only</option>
+              <option value="oos">Out of stock only</option>
+              <option value="all">All tracked products</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Summary strip -->
+        <div class="report-kpis" id="restock-kpis"></div>
+
+        <!-- Table -->
+        <div class="report-block">
+          <div class="report-table-wrap">
+            <table class="report-table" id="restock-table"></table>
+          </div>
+          <div class="restock-legend">
+            <span class="restock-badge oos">Out of stock</span>
+            <span class="restock-badge critical">Critical (&lt; 3 days)</span>
+            <span class="restock-badge watch">Watch (&lt; 7 days)</span>
+            <span class="restock-badge healthy">Healthy (≥ 7 days)</span>
+            <span class="restock-badge no-data">No velocity</span>
           </div>
         </div>
       </div>
@@ -4923,6 +5060,7 @@ function switchTab(tab, reset = true) {
       setReportPreset('30d', false);
     }
     renderSalesReport();
+    renderRestockingReport();
   }
 }
 
@@ -6180,6 +6318,248 @@ function exportSalesReportCSV() {
   r('Refunded',  d.refunds.count,       d.refunds.revenue.toFixed(2));
 
   // Prepend BOM so Excel opens UTF-8 + the peso sign correctly.
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${fileBase}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// REPORTS TAB — Restocking & Reorder Report
+// ============================================================
+// State for the toolbar controls. Defaults: 7-day velocity, 14-day cover,
+// "Needs reorder" filter (highest-value default for a working session).
+let restockAnalyseDays = 7;
+let restockCoverDays   = 14;
+let restockFilter      = 'reorder';
+let __lastRestockData  = null;
+
+function onRestockControlChange() {
+  const w = parseInt(document.getElementById('restock-window').value, 10);
+  const c = parseInt(document.getElementById('restock-cover').value, 10);
+  const f = document.getElementById('restock-filter').value;
+  restockAnalyseDays = (Number.isFinite(w) && w > 0) ? w : 7;
+  restockCoverDays   = (Number.isFinite(c) && c > 0 && c <= 90) ? c : 14;
+  restockFilter      = ['reorder','critical','oos','all'].includes(f) ? f : 'reorder';
+  renderRestockingReport();
+}
+
+// Per-row computation:
+//   stock      — current units on hand (variants summed; null = unlimited tracking)
+//   sold       — units shipped on confirmed orders within analyse-window
+//   dailyRate  — sold / analyseDays
+//   daysLeft   — stock / dailyRate (Infinity when rate is 0)
+//   suggested  — max(0, ceil(coverDays * dailyRate − stock))
+//   urgency    — oos | critical | watch | healthy | no-data
+function classifyUrgency(stock, daysLeft, hasVelocity) {
+  if (stock === null) return 'no-data';  // unlimited stock — restocking N/A
+  if (stock <= 0) return 'oos';
+  if (!hasVelocity) return 'no-data';
+  if (daysLeft < 3)  return 'critical';
+  if (daysLeft < 7)  return 'watch';
+  return 'healthy';
+}
+
+function urgencyRank(u) {
+  return ({ oos: 0, critical: 1, watch: 2, healthy: 3, 'no-data': 4 })[u] ?? 5;
+}
+
+function renderRestockingReport() {
+  if (!document.getElementById('restock-section')) return;
+  const meta = document.getElementById('restock-meta');
+  const tableEl = document.getElementById('restock-table');
+  const kpisEl  = document.getElementById('restock-kpis');
+  if (!tableEl) return;
+
+  const N = restockAnalyseDays;
+  const cutoffMs = Date.now() - N * 24 * 60 * 60 * 1000;
+
+  // Build product → units sold map across the window. Variant-level sales
+  // collapse to product-level since most owners reorder at the product
+  // level (variants share supplier + reorder cycle).
+  const soldByPid = {};
+  (orders || []).forEach(o => {
+    if (o.status !== 'confirmed') return;
+    const t = o.createdAt;
+    if (!t) return;
+    const ms = t.toMillis ? t.toMillis() : (t.seconds ? t.seconds * 1000 : 0);
+    if (ms < cutoffMs) return;
+    (o.confirmedItems || o.items || []).forEach(item => {
+      const pid = String(item.productId);
+      soldByPid[pid] = (soldByPid[pid] || 0) + (parseInt(item.qty) || 0);
+    });
+  });
+
+  // Build supplier index: category → list of suppliers covering it.
+  const byCategory = {};
+  (suppliers || []).forEach(s => {
+    if (!Array.isArray(s.categories)) return;
+    s.categories.forEach(c => {
+      if (!byCategory[c]) byCategory[c] = [];
+      byCategory[c].push({ id: s.id, name: s.businessName || '(unnamed)' });
+    });
+  });
+
+  // Per-product row
+  const rows = [];
+  (products || []).forEach(p => {
+    if (p.hidden === true) return;  // not visible to customers — skip
+    let stock;
+    if (p.variants && p.variants.length > 0) {
+      stock = p.variants.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
+    } else if (p.stock === null || p.stock === undefined || p.stock === '') {
+      stock = null;  // unlimited
+    } else {
+      stock = parseInt(p.stock) || 0;
+    }
+    const sold = soldByPid[String(p.id)] || 0;
+    const dailyRate = sold / N;
+    const hasVelocity = sold > 0;
+    const daysLeft = (stock === null) ? Infinity
+                  : (!hasVelocity ? Infinity : stock / dailyRate);
+    const suggested = (stock === null || !hasVelocity)
+                    ? 0
+                    : Math.max(0, Math.ceil(restockCoverDays * dailyRate - stock));
+    const urgency = classifyUrgency(stock, daysLeft, hasVelocity);
+    const supplierMatches = (p.category && byCategory[p.category]) ? byCategory[p.category] : [];
+    rows.push({
+      id: p.id, name: p.name, category: p.category || '',
+      stock, sold, dailyRate, daysLeft, suggested, urgency,
+      supplierMatches
+    });
+  });
+
+  // Sort: urgency (worst first), then by suggested-reorder desc,
+  // then by name. Owner sees what to act on first.
+  rows.sort((a, b) => {
+    const ru = urgencyRank(a.urgency) - urgencyRank(b.urgency);
+    if (ru !== 0) return ru;
+    if (b.suggested !== a.suggested) return b.suggested - a.suggested;
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  // Summary tiles — always counted from the full filtered set (not the
+  // currently-visible filter) so the KPIs reflect the catalog truth.
+  const tally = { oos: 0, critical: 0, watch: 0, healthy: 0, 'no-data': 0 };
+  rows.forEach(r => { tally[r.urgency]++; });
+  const needsCount = tally.oos + tally.critical + tally.watch;
+
+  kpisEl.innerHTML = [
+    { label: 'Out of stock',    value: tally.oos,      cls: tally.oos > 0 ? 'urg' : '' },
+    { label: 'Critical (<3d)',  value: tally.critical, cls: tally.critical > 0 ? 'urg' : '' },
+    { label: 'Watch (<7d)',     value: tally.watch,    cls: '' },
+    { label: 'Healthy',         value: tally.healthy,  cls: '' },
+    { label: 'No velocity',     value: tally['no-data'], cls: '' },
+    { label: 'Items to reorder',value: needsCount,     cls: needsCount > 0 ? 'urg' : '' }
+  ].map(t => `
+    <div class="report-kpi">
+      <div class="report-kpi-label">${t.label}</div>
+      <div class="report-kpi-value" style="${t.cls === 'urg' ? 'color:#dc2626;' : ''}">${t.value}</div>
+    </div>`).join('');
+
+  // Apply visible filter
+  const visible = rows.filter(r => {
+    if (restockFilter === 'all') return true;
+    if (restockFilter === 'oos') return r.urgency === 'oos';
+    if (restockFilter === 'critical') return r.urgency === 'oos' || r.urgency === 'critical';
+    // 'reorder' — anything that has a suggested qty OR is out of stock
+    return r.urgency === 'oos' || r.suggested > 0;
+  });
+
+  meta.textContent = `Velocity over last ${N} days · target ${restockCoverDays}-day cover · ${visible.length} of ${rows.length} product${rows.length === 1 ? '' : 's'} shown`;
+
+  // Cache for CSV (full list, not filtered — owners often want everything)
+  __lastRestockData = {
+    analyseDays: N, coverDays: restockCoverDays,
+    generatedAt: new Date(),
+    rows
+  };
+
+  // Render rows
+  const fmtStock = (s) => s === null ? '∞' : String(s);
+  const fmtDaysLeft = (d) => {
+    if (!isFinite(d)) return '—';
+    if (d < 1) return d.toFixed(1);
+    return d < 10 ? d.toFixed(1) : Math.round(d);
+  };
+  const renderSupplier = (matches) => {
+    if (matches.length === 0) return `<span class="restock-supplier-none">No supplier yet</span>`;
+    const head = matches[0];
+    const more = matches.length > 1 ? `<span class="restock-supplier-extra">+${matches.length - 1} more</span>` : '';
+    return `<button class="restock-supplier-link" onclick="openSupplierView('${escAttr(head.id)}')">${head.name}</button>${more}`;
+  };
+
+  tableEl.innerHTML = `
+    <thead><tr>
+      <th class="rank">#</th>
+      <th>Urgency</th>
+      <th>Product</th>
+      <th>Category</th>
+      <th class="numeric">Stock</th>
+      <th class="numeric">Sold (${N}d)</th>
+      <th class="numeric">Days left</th>
+      <th class="numeric">Reorder</th>
+      <th>Supplier</th>
+    </tr></thead>
+    <tbody>
+      ${visible.length === 0
+        ? `<tr><td colspan="9" class="restock-empty">Nothing to reorder. Either you have no stock-tracked products, or every tracked product is in healthy shape for your cover window.</td></tr>`
+        : visible.map((r, i) => {
+          const badgeLabel = ({
+            oos: 'Out of stock', critical: 'Critical', watch: 'Watch',
+            healthy: 'Healthy', 'no-data': 'No velocity'
+          })[r.urgency];
+          return `<tr>
+            <td class="rank">${i + 1}</td>
+            <td><span class="restock-badge ${r.urgency}">${badgeLabel}</span></td>
+            <td><button class="pt-pname" style="font-weight:500;" onclick="openProductView(${r.id})">${r.name}</button></td>
+            <td>${r.category || '<span class="restock-supplier-none">—</span>'}</td>
+            <td class="numeric">${fmtStock(r.stock)}</td>
+            <td class="numeric">${r.sold}</td>
+            <td class="numeric">${fmtDaysLeft(r.daysLeft)}</td>
+            <td class="numeric restock-suggested-cell">${r.suggested > 0 ? r.suggested : (r.urgency === 'oos' ? '—' : 0)}</td>
+            <td>${renderSupplier(r.supplierMatches)}</td>
+          </tr>`;
+        }).join('')}
+    </tbody>`;
+}
+
+function exportRestockingReportCSV() {
+  if (!__lastRestockData) renderRestockingReport();
+  const d = __lastRestockData;
+  if (!d) return;
+  const slug = (typeof TENANT_ID === 'string' ? TENANT_ID : 'store');
+  const today = manilaDateStr(new Date());
+  const fileBase = `${slug}_restocking_report_${today}`.replace(/[^a-z0-9_]/gi, '_');
+
+  const lines = [];
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const r = (...cells) => lines.push(cells.map(esc).join(','));
+
+  r('Restocking & Reorder Report');
+  r('Generated', d.generatedAt.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' }));
+  r('Analysis window (days)', d.analyseDays);
+  r('Cover target (days)',    d.coverDays);
+  r('Tenant', slug);
+  r();
+  r('Rank','Urgency','Product','Category','Stock','Sold','Days left','Suggested reorder','Suppliers');
+  d.rows.forEach((row, i) => {
+    const badgeLabel = ({
+      oos: 'Out of stock', critical: 'Critical', watch: 'Watch',
+      healthy: 'Healthy', 'no-data': 'No velocity'
+    })[row.urgency];
+    const stock = row.stock === null ? 'Unlimited' : row.stock;
+    const daysLeft = !isFinite(row.daysLeft) ? '' : (row.daysLeft < 1 ? row.daysLeft.toFixed(2) : (row.daysLeft < 10 ? row.daysLeft.toFixed(1) : Math.round(row.daysLeft)));
+    const sup = row.supplierMatches.length === 0 ? '(none)' : row.supplierMatches.map(s => s.name).join(' | ');
+    r(i + 1, badgeLabel, row.name, row.category, stock, row.sold, daysLeft, row.suggested, sup);
+  });
+
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
