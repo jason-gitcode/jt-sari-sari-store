@@ -99,6 +99,23 @@ function validateGcashNumber(raw) {
   return v;
 }
 
+// ============================================================
+// Invite-code helpers
+// ============================================================
+// Codes are 8 chars from an unambiguous alphabet (no 0/O/1/I) so they're
+// easy to share verbally / via SMS without confusion.
+const INVITE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomInviteCode() {
+  let s = '';
+  for (let i = 0; i < 8; i++) {
+    s += INVITE_CODE_ALPHABET.charAt(Math.floor(Math.random() * INVITE_CODE_ALPHABET.length));
+  }
+  return s;
+}
+function normalizeInviteCode(raw) {
+  return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 exports.createTenant = onCall(async (request) => {
   // ---------- AUTH ----------
   if (!request.auth) {
@@ -123,10 +140,43 @@ exports.createTenant = onCall(async (request) => {
   const gcashAccountName = validateGcashAccountName(data.gcashAccountName);
   const gcashNumber = validateGcashNumber(data.gcashNumber);
 
+  // ---------- INVITE-CODE GATE (non-superadmin only) ----------
+  // Self-serve signup requires a valid invite code minted by a superadmin.
+  // Superadmins bypass — they can spin up tenants directly without a code.
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+  const inviteCode = normalizeInviteCode(data.inviteCode);
+  let inviteRef = null;
+  let inviteSnap = null;
+  if (!isSuperadmin) {
+    if (!inviteCode) {
+      throw new HttpsError('failed-precondition',
+        'An invite code is required to create a store. If you don\'t have one, contact support.');
+    }
+    inviteRef = db.collection('invite_codes').doc(inviteCode);
+    inviteSnap = await inviteRef.get();
+    if (!inviteSnap.exists) {
+      throw new HttpsError('not-found',
+        'That invite code doesn\'t exist. Double-check the code and try again.');
+    }
+    const inv = inviteSnap.data() || {};
+    if (inv.revoked === true) {
+      throw new HttpsError('failed-precondition',
+        'That invite code has been revoked. Contact support for a new one.');
+    }
+    if (inv.redeemedAt) {
+      throw new HttpsError('failed-precondition',
+        'That invite code has already been used.');
+    }
+    if (inv.email && String(inv.email).toLowerCase() !== email.toLowerCase()) {
+      throw new HttpsError('permission-denied',
+        `That invite code is bound to a different email address (${inv.email}). Sign in with that account to use it.`);
+    }
+  }
+
   // ---------- PER-EMAIL TENANT CAP ----------
   // Note: this check is racy under high-concurrency parallel calls from the
   // same user; acceptable for pilot scale (sari-sari store SaaS).
-  if (!SUPERADMIN_EMAILS.has(email)) {
+  if (!isSuperadmin) {
     const existing = await db.collection('tenants')
       .where('createdByEmail', '==', email)
       .limit(MAX_TENANTS_PER_EMAIL + 1)
@@ -138,12 +188,26 @@ exports.createTenant = onCall(async (request) => {
     }
   }
 
-  // ---------- CREATE (transactional uniqueness check) ----------
+  // ---------- CREATE (transactional uniqueness + invite redemption) ----------
   const ref = db.collection('tenants').doc(slug);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (snap.exists) {
       throw new HttpsError('already-exists', 'That store URL is already taken.');
+    }
+    // Re-read the invite under the transaction so a parallel redemption
+    // can't slip through between the pre-check above and the create.
+    if (inviteRef) {
+      const freshInv = await tx.get(inviteRef);
+      if (!freshInv.exists) throw new HttpsError('not-found', 'Invite code disappeared.');
+      const fd = freshInv.data() || {};
+      if (fd.revoked === true) throw new HttpsError('failed-precondition', 'Invite code was just revoked.');
+      if (fd.redeemedAt) throw new HttpsError('failed-precondition', 'Invite code was just used by another account.');
+      tx.update(inviteRef, {
+        redeemedAt: FieldValue.serverTimestamp(),
+        redeemedBy: email,
+        redeemedSlug: slug
+      });
     }
     tx.set(ref, {
       name,
@@ -151,7 +215,8 @@ exports.createTenant = onCall(async (request) => {
       plan: 'starter',
       createdAt: FieldValue.serverTimestamp(),
       createdBy: uid,
-      createdByEmail: email
+      createdByEmail: email,
+      inviteCode: inviteCode || null
     });
   });
 
@@ -275,6 +340,101 @@ exports.deleteTenant = onCall(async (request) => {
 // firestore.rules `list` restriction (which only allows superadmin) by
 // running with admin privileges server-side.
 // ============================================================
+// ============================================================
+// generateInviteCode — superadmin mints a single-use signup code.
+// Optionally binds the code to a specific email (only that email can
+// redeem it) and attaches a free-text note for tracking.
+// ============================================================
+exports.generateInviteCode = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const boundEmail = String(data.email || '').trim().toLowerCase();
+  const note = String(data.note || '').trim().slice(0, 200);
+
+  // Generate-and-retry on the extremely unlikely chance we collide.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = randomInviteCode();
+    const ref = db.collection('invite_codes').doc(code);
+    const snap = await ref.get();
+    if (snap.exists) continue;
+    await ref.set({
+      code,
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: token.email,
+      email: boundEmail || null,
+      note: note || null,
+      revoked: false,
+      redeemedAt: null,
+      redeemedBy: null,
+      redeemedSlug: null
+    });
+    return {
+      code,
+      email: boundEmail || null,
+      note: note || null,
+      shareUrl: `https://jsminimart.com/signup/?code=${code}`
+    };
+  }
+  throw new HttpsError('internal', 'Could not allocate a unique code. Try again.');
+});
+
+// ============================================================
+// listInviteCodes — superadmin lists all minted codes with status.
+// ============================================================
+exports.listInviteCodes = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const snap = await db.collection('invite_codes')
+    .orderBy('createdAt', 'desc')
+    .limit(200)
+    .get();
+  return {
+    codes: snap.docs.map(d => {
+      const v = d.data() || {};
+      return {
+        code: d.id,
+        email: v.email || null,
+        note: v.note || null,
+        revoked: v.revoked === true,
+        createdAt: v.createdAt ? v.createdAt.toMillis() : null,
+        createdBy: v.createdBy || null,
+        redeemedAt: v.redeemedAt ? v.redeemedAt.toMillis() : null,
+        redeemedBy: v.redeemedBy || null,
+        redeemedSlug: v.redeemedSlug || null
+      };
+    })
+  };
+});
+
+// ============================================================
+// revokeInviteCode — superadmin invalidates a pending code so it can no
+// longer be redeemed. Already-redeemed codes return an error since
+// revoking them would do nothing meaningful (tenant already exists).
+// ============================================================
+exports.revokeInviteCode = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const code = normalizeInviteCode((request.data || {}).code);
+  if (!code) throw new HttpsError('invalid-argument', 'code is required');
+  const ref = db.collection('invite_codes').doc(code);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'Code not found.');
+  const v = snap.data() || {};
+  if (v.redeemedAt) throw new HttpsError('failed-precondition', 'Code is already redeemed; cannot revoke.');
+  await ref.update({ revoked: true, revokedAt: FieldValue.serverTimestamp(), revokedBy: token.email });
+  return { code, revoked: true };
+});
+
 exports.getMyTenant = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');

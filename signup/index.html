@@ -193,6 +193,12 @@
       </div>
 
       <form id="store-form" onsubmit="submitForm(event)">
+        <div class="field" id="invite-field">
+          <label for="store-invite-code">Invite code</label>
+          <input class="input" id="store-invite-code" type="text" placeholder="e.g. K8X3M9PQ" maxlength="12" required autocapitalize="characters" autocorrect="off" spellcheck="false" style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase;" />
+          <div class="help">Sign-up is invite-only. Paste the 8-character code we sent you. If you don't have one, contact support.</div>
+        </div>
+
         <div class="field">
           <label for="store-name">Store name</label>
           <input class="input" id="store-name" type="text" placeholder="e.g. Tina's Mini Mart" maxlength="100" required />
@@ -307,6 +313,26 @@ const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
 const getMyTenant  = functions.httpsCallable('getMyTenant');
 
+// Pre-fill the invite code field from the URL — share-link friendly:
+//   https://jsminimart.com/signup/?code=K8X3M9PQ
+(() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = (params.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (fromUrl) {
+      const ready = () => {
+        const el = document.getElementById('store-invite-code');
+        if (el) el.value = fromUrl;
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ready);
+      } else {
+        ready();
+      }
+    }
+  } catch (_) { /* ignore */ }
+})();
+
 const slugInput = document.getElementById('store-slug');
 const slugPreview = document.getElementById('slug-preview');
 slugInput.addEventListener('input', () => {
@@ -367,10 +393,11 @@ async function submitForm(e) {
   const pickupAddress = document.getElementById('store-pickup-address').value.trim();
   const gcashAccountName = document.getElementById('store-gcash-name').value.trim();
   const gcashNumber = document.getElementById('store-gcash-number').value.trim();
+  const inviteCode = (document.getElementById('store-invite-code').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   btn.disabled = true;
   btn.textContent = 'Creating your store...';
   try {
-    const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber });
+    const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber, inviteCode });
     const r = result.data;
     document.getElementById('success-name').textContent = r.name;
     const seededEl = document.getElementById('success-seeded');

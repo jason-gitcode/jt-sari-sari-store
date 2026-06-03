@@ -114,6 +114,16 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // INVITE CODES — fully closed to clients. All access (mint, list,
+    // revoke, redeem) goes through Cloud Functions running with admin
+    // privileges, so codes can never be enumerated or tampered with from
+    // the browser even if a malicious user is signed in.
+    // ============================================================
+    match /invite_codes/{code} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
     // DEFAULT DENY for everything else (including legacy root paths
     // /products, /orders, /settings left behind after migration)
     // ============================================================
