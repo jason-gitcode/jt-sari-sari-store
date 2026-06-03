@@ -1529,9 +1529,21 @@
 
     .report-kpis {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      /* Sales Report = 8 tiles → 4 columns × 2 rows. Restocking overrides
+         to 3 columns below (6 tiles → 3 × 2). Both layouts read as
+         deliberate balanced grids, never as "wrapped accidentally". */
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 22px;
+    }
+    #restock-kpis {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 700px) {
+      .report-kpis,
+      #restock-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     .report-kpi {
       background: var(--surface-2);
