@@ -1879,45 +1879,6 @@
         <div class="dash-chart-canvas"><canvas id="daily-chart"></canvas></div>
       </div>
 
-      <div class="dash-section">
-        <div class="dash-section-header">
-          <div>
-            <h3>📦 Inventory — All Items Ranked by Sales</h3>
-            <div class="sub" id="items-ranked-sub">Click a row to view item analytics.</div>
-          </div>
-          <div class="dash-section-actions">
-            <input type="search" id="dash-item-search" class="dash-search-inline" placeholder="Search items…" oninput="filterDashItems(this.value)">
-            <button class="dash-export-btn dash-export-btn--ghost" onclick="exportPDF()" id="export-pdf-btn">⬇ Export as PDF</button>
-            <button class="dash-export-btn" onclick="exportCSV()">⬇ Export as CSV</button>
-          </div>
-        </div>
-        <div class="dash-table-wrap">
-          <table class="dash-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th class="sortable"        data-sort="name"     onclick="sortItemsTable('name')">Product <span class="sort-ind"></span></th>
-                <th class="sortable"        data-sort="category" onclick="sortItemsTable('category')">Category <span class="sort-ind"></span></th>
-                <th class="sortable"        data-sort="price"    onclick="sortItemsTable('price')">Unit Price <span class="sort-ind"></span></th>
-                <th class="sortable"        data-sort="cost"     onclick="sortItemsTable('cost')">Cost per Item <span class="sort-ind"></span></th>
-                <th class="sortable active" data-sort="qty"      onclick="sortItemsTable('qty')">Qty Sold <span class="sort-ind"></span></th>
-                <th class="sortable"        data-sort="revenue"  onclick="sortItemsTable('revenue')">Revenue <span class="sort-ind"></span></th>
-                <th class="sortable"        data-sort="profit"   onclick="sortItemsTable('profit')">Profit <span class="sort-ind"></span></th>
-              </tr>
-            </thead>
-            <tbody id="top-items-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="dash-item-detail" id="dash-item-detail" style="display:none;">
-        <div class="dash-item-detail-header">
-          <h3 id="dash-item-name">Item Detail</h3>
-          <button class="dash-close-btn" onclick="closeDashItemDetail()">✕ Close</button>
-        </div>
-        <div class="dash-cards" id="dash-item-cards"></div>
-        <div class="dash-item-chart"><canvas id="item-daily-chart"></canvas></div>
-      </div>
     </div>
 
     <!-- ORDERS -->
@@ -2165,6 +2126,54 @@
             <span class="restock-badge no-data">No velocity</span>
           </div>
         </div>
+      </div>
+
+      <!-- ============================================================
+           INVENTORY ANALYTICS — sortable per-item ranking with click-row
+           drill-down to per-item time-series. Reuses the existing
+           renderTopItems / renderItemDetail render path; only its data
+           source changed (now reports-tab period filter instead of the
+           dashboard's).
+           ============================================================ -->
+      <div class="report-section" id="inventory-section">
+        <div class="report-section-head">
+          <div>
+            <h2 class="report-section-title">📦 Inventory — All Items Ranked by Sales</h2>
+            <div class="report-section-period" id="items-ranked-sub">Click a row to view item analytics.</div>
+          </div>
+          <div class="report-actions">
+            <input type="search" id="dash-item-search" class="dash-search-inline" placeholder="Search items…" oninput="filterDashItems(this.value)">
+            <button class="dash-export-btn dash-export-btn--ghost" onclick="exportPDF()" id="export-pdf-btn">⬇ Export as PDF</button>
+            <button class="dash-export-btn" onclick="exportCSV()">⬇ Export as CSV</button>
+          </div>
+        </div>
+        <div class="dash-table-wrap">
+          <table class="dash-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th class="sortable"        data-sort="name"     onclick="sortItemsTable('name')">Product <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="category" onclick="sortItemsTable('category')">Category <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="price"    onclick="sortItemsTable('price')">Unit Price <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="cost"     onclick="sortItemsTable('cost')">Cost per Item <span class="sort-ind"></span></th>
+                <th class="sortable active" data-sort="qty"      onclick="sortItemsTable('qty')">Qty Sold <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="revenue"  onclick="sortItemsTable('revenue')">Revenue <span class="sort-ind"></span></th>
+                <th class="sortable"        data-sort="profit"   onclick="sortItemsTable('profit')">Profit <span class="sort-ind"></span></th>
+              </tr>
+            </thead>
+            <tbody id="top-items-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Per-item drill-down: opens below the Inventory table when a row is clicked. -->
+      <div class="dash-item-detail" id="dash-item-detail" style="display:none;">
+        <div class="dash-item-detail-header">
+          <h3 id="dash-item-name">Item Detail</h3>
+          <button class="dash-close-btn" onclick="closeDashItemDetail()">✕ Close</button>
+        </div>
+        <div class="dash-cards" id="dash-item-cards"></div>
+        <div class="dash-item-chart"><canvas id="item-daily-chart"></canvas></div>
       </div>
     </div>
 
@@ -5081,6 +5090,7 @@ function switchTab(tab, reset = true) {
     }
     renderSalesReport();
     renderRestockingReport();
+    renderInventoryReport();
   }
 }
 
@@ -6023,7 +6033,10 @@ function setReportPreset(preset, doRender = true) {
   const toInp   = document.getElementById('report-to');
   if (fromInp) fromInp.value = reportFromDate || '';
   if (toInp)   toInp.value   = reportToDate   || '';
-  if (doRender) renderSalesReport();
+  if (doRender) {
+    renderSalesReport();
+    renderInventoryReport();
+  }
 }
 
 function onReportDateChange() {
@@ -6031,6 +6044,7 @@ function onReportDateChange() {
   reportToDate   = document.getElementById('report-to').value   || null;
   document.querySelectorAll('[data-rpreset]').forEach(b => b.classList.remove('active'));
   renderSalesReport();
+  renderInventoryReport();
 }
 
 function filterOrdersForReport(arr) {
@@ -6546,6 +6560,18 @@ function renderRestockingReport() {
     </tbody>`;
 }
 
+// Wrap the existing per-item ranking + drill-down so it can be driven by
+// the Reports tab period (instead of the Home dashboard's date range as
+// before). The interior renderTopItems / renderItemDetail functions are
+// unchanged — they're shared with the per-item analytics drill-down.
+function renderInventoryReport() {
+  if (!document.getElementById('inventory-section')) return;
+  const fil  = filterOrdersForReport(orders || []);
+  const conf = fil.filter(o => o.status === 'confirmed');
+  renderTopItems(conf);
+  if (dashSelectedItem) renderItemDetail(dashSelectedItem);
+}
+
 function exportRestockingReportCSV() {
   if (!__lastRestockData) renderRestockingReport();
   const d = __lastRestockData;
@@ -6723,8 +6749,9 @@ function renderDashboard() {
   renderCatChart();
   renderSoldByCategoryChart(conf);
   renderDailyChart(fil);
-  renderTopItems(conf);
-  if (dashSelectedItem) renderItemDetail(dashSelectedItem);
+  // Inventory ranking (renderTopItems + per-item drill-down) lives in the
+  // Reports tab now and is driven by the Reports period filter, not the
+  // dashboard's date range.
 }
 
 function renderCatChart() {
@@ -7117,7 +7144,11 @@ function closeDashItemDetail() {
 }
 
 function renderItemDetail(productName) {
-  const fil  = filterOrdersByDate(orders);
+  // Now driven by the Reports tab period (was the dashboard's range when
+  // this section lived on Home). All three sections — Sales Report,
+  // Restocking summary KPIs (independent window), and Inventory — share
+  // the Reports filter so the owner picks one period and everything aligns.
+  const fil  = filterOrdersForReport(orders);
   const conf = fil.filter(o => o.status === 'confirmed');
   const map  = buildItemSalesMap(conf);
   const item = map[productName];
@@ -7165,7 +7196,10 @@ function renderItemDetail(productName) {
 }
 
 function exportCSV() {
-  const fil  = filterOrdersByDate(orders);
+  // Inventory exports follow the Reports tab period now that the table
+  // lives there. Was `filterOrdersByDate` (dashboard range) when this
+  // section was still on Home.
+  const fil  = filterOrdersForReport(orders);
   const conf = fil.filter(o => o.status === 'confirmed');
   const map  = buildItemSalesMap(conf);
   const sold = Object.entries(map).map(([name, v]) => ({ name, ...v }))
@@ -7204,8 +7238,10 @@ function exportCSV() {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const from = document.getElementById('dash-from').value || 'all';
-  const to   = document.getElementById('dash-to').value   || 'time';
+  // Filename suffix follows the Reports tab period (was the dashboard's
+  // when this section was still on Home).
+  const from = document.getElementById('report-from').value || 'all';
+  const to   = document.getElementById('report-to').value   || 'time';
   a.href = url; a.download = `jsminimart-sales-${from}-to-${to}.csv`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -7238,7 +7274,9 @@ async function exportPDF() {
     await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js');
 
-    const fil  = filterOrdersByDate(orders);
+    // Inventory PDF follows the Reports tab period (was the dashboard's
+    // range when this section was still on Home).
+    const fil  = filterOrdersForReport(orders);
     const conf = fil.filter(o => o.status === 'confirmed');
     const map  = buildItemSalesMap(conf);
     const sold = Object.entries(map).map(([name, v]) => ({ name, ...v }))
@@ -7279,8 +7317,9 @@ async function exportPDF() {
       ]);
     });
 
-    const from = document.getElementById('dash-from').value || '';
-    const to   = document.getElementById('dash-to').value   || '';
+    // Period label in PDF header tracks the Reports tab now.
+    const from = document.getElementById('report-from').value || '';
+    const to   = document.getElementById('report-to').value   || '';
     const periodLabel = (!from && !to) ? 'All time'
                        : (from === to)  ? from
                        : `${from || '…'} → ${to || '…'}`;
