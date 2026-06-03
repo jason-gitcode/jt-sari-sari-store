@@ -330,6 +330,14 @@ function showStep(id) {
   ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
+  // Hide the "Already have a store? Sign in to your admin:" footer on
+  // steps where it's redundant — the user already has a clear admin
+  // link in front of them (existing-owner card, just-created success card).
+  const foot = document.querySelector('.footer-links');
+  if (foot) {
+    const redundantOn = (id === 'step-already-owner' || id === 'step-success');
+    foot.style.display = redundantOn ? 'none' : '';
+  }
 }
 
 document.getElementById('signin-btn').addEventListener('click', async () => {
