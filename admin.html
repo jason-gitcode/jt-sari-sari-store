@@ -1618,7 +1618,31 @@
        and remove screen-only chrome (filter bar, export buttons, scroll
        containers' overflow). Stays in one column even on dark theme. */
     @media print {
-      body.printing-report { background: #fff !important; color: #000 !important; }
+      /* Release the app-style viewport lock. `html, body` are
+         `position: fixed; overflow: hidden` on screen to stop iOS
+         rubber-band — during print, those rules pin the report inside a
+         viewport-sized box and only the first page renders. Set everything
+         in the ancestor chain back to static block + visible overflow + auto
+         height so the report flows across pages naturally. */
+      html.printing-report,
+      body.printing-report {
+        position: static !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: auto !important;
+        background: #fff !important;
+        color: #000 !important;
+      }
+      body.printing-report #admin-area,
+      body.printing-report .container {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
       body.printing-report header,
       body.printing-report .tabs,
       body.printing-report #report-filter-bar,
@@ -1629,19 +1653,34 @@
       body.printing-report .receipt-modal-overlay,
       body.printing-report .confirm-overlay { display: none !important; }
       body.printing-report .tab-panel { display: none !important; }
+      body.printing-report #reports-tab,
       body.printing-report #reports-tab.active {
         display: block !important;
         overflow: visible !important;
         height: auto !important;
+        max-height: none !important;
         padding: 0 !important;
+        margin: 0 !important;
       }
       body.printing-report .report-section {
         background: #fff !important; border: 0 !important;
-        padding: 0 !important; margin: 0 !important;
+        padding: 0 !important; margin: 0 0 14px !important;
         box-shadow: none !important;
       }
-      body.printing-report .report-table-wrap { overflow: visible !important; border: 1px solid #ccc !important; }
-      body.printing-report .report-block { break-inside: avoid; page-break-inside: avoid; }
+      body.printing-report .report-section-head { margin-bottom: 14px !important; }
+      body.printing-report .report-table-wrap {
+        overflow: visible !important;
+        border: 1px solid #ccc !important;
+      }
+      body.printing-report .report-block { break-inside: avoid; page-break-inside: avoid; margin-top: 18px !important; }
+      body.printing-report .report-table { font-size: 11px !important; }
+      body.printing-report .report-table th, body.printing-report .report-table td { padding: 6px 8px !important; }
+      body.printing-report .report-kpis { gap: 6px !important; }
+      body.printing-report .report-kpi { background: #fff !important; border: 1px solid #ccc !important; padding: 8px 10px !important; }
+      /* Repeat table headers on each printed page when a long table breaks. */
+      body.printing-report .report-table thead { display: table-header-group; }
+      body.printing-report .report-table tr { page-break-inside: avoid; }
+      @page { margin: 12mm; }
     }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -6145,8 +6184,13 @@ function exportSalesReportCSV() {
 function printSalesReport() {
   // Make sure the latest data is rendered before the print dialog opens.
   renderSalesReport();
+  // Flag both <html> and <body> so the print stylesheet can break the
+  // position:fixed app-viewport lock all the way at the root, otherwise
+  // only the first viewport-sized page renders.
+  document.documentElement.classList.add('printing-report');
   document.body.classList.add('printing-report');
   const cleanup = () => {
+    document.documentElement.classList.remove('printing-report');
     document.body.classList.remove('printing-report');
     window.removeEventListener('afterprint', cleanup);
   };
