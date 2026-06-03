@@ -234,7 +234,7 @@
     grid-template-columns: repeat(4, 1fr);   /* desktop: max 4 columns so names + prices have room */
     gap: 14px;
     flex: 1;
-    align-items: start;
+    align-items: stretch;                    /* every card in a row matches the tallest — no jagged heights from uneven descriptions */
   }
   .card {
     width: 100%;
@@ -276,7 +276,8 @@
   }
   .card-unit { font-size: 12px; color: var(--muted); }
   .card-bottom {
-    margin-top: 8px;
+    margin-top: auto;                         /* push to the bottom of the card so price + add-btn align across the row even when descriptions differ in length */
+    padding-top: 8px;
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px;
   }
@@ -563,7 +564,7 @@
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 10px;
       justify-content: start;
-      align-items: start;        /* cards take their natural height — no stretch gap */
+      align-items: stretch;       /* match card heights row-by-row so different description lengths don't produce jagged tile heights */
     }
     .card { max-width: 100%; }
     .thumb { font-size: 40px; }
