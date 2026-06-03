@@ -2049,6 +2049,18 @@
                 </div>
               </div>
             </div>
+
+            <div class="setting-row" id="cat-order-row">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-title">Category display order</div>
+                <div class="setting-desc">Reorder how categories appear on your storefront — in the sidebar chips (grid layout) and as section headings (list layout). Use the arrows to move a category up or down. Categories from new products are auto-added at the bottom; categories with no products fall off the list automatically.</div>
+                <div id="cat-order-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;"></div>
+                <div id="cat-order-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
+              </div>
+              <div class="setting-control">
+                <button class="btn-logout-settings" id="cat-order-save-btn" onclick="saveCategoryOrder()">Save order</button>
+              </div>
+            </div>
           </section>
 
           <section class="settings-section" id="set-notifications">
@@ -2424,6 +2436,91 @@ function syncStorefrontLayoutPicker() {
     b.classList.toggle('active', b.dataset.layout === layout);
   });
   syncProductDescField(layout);
+  renderCategoryOrderEditor();
+}
+
+// ============================================================
+// CATEGORY DISPLAY ORDER EDITOR
+// ============================================================
+// In-memory working copy. Null = not yet seeded; once seeded, owner edits
+// freely and clicks Save to persist. Save writes `categoryOrder` (array of
+// strings) to settings/store; the storefront reads it back via the same
+// snapshot listener it already uses for layout, hours, etc.
+let categoryOrderRows = null;
+
+function currentProductCategoryList() {
+  const set = new Set();
+  (products || []).forEach(p => { if (p.category) set.add(p.category); });
+  return [...set];
+}
+
+function renderCategoryOrderEditor() {
+  const list = document.getElementById('cat-order-list');
+  if (!list) return;
+  const productCats = currentProductCategoryList();
+  const productCatSet = new Set(productCats);
+
+  if (categoryOrderRows === null) {
+    // First seed: keep saved order for entries that still have products,
+    // then append any new product categories alphabetically.
+    const saved = Array.isArray(storeSettingsData.categoryOrder) ? storeSettingsData.categoryOrder : [];
+    const seen = new Set();
+    const ordered = [];
+    saved.forEach(c => {
+      if (productCatSet.has(c) && !seen.has(c)) { ordered.push(c); seen.add(c); }
+    });
+    const remaining = productCats.filter(c => !seen.has(c)).sort((a, b) => a.localeCompare(b));
+    categoryOrderRows = [...ordered, ...remaining];
+  } else {
+    // Already seeded — keep the owner's working order, but drop categories
+    // that no longer exist and append any new ones at the bottom alphabetically.
+    categoryOrderRows = categoryOrderRows.filter(c => productCatSet.has(c));
+    const current = new Set(categoryOrderRows);
+    const newCats = productCats.filter(c => !current.has(c)).sort((a, b) => a.localeCompare(b));
+    if (newCats.length > 0) categoryOrderRows = [...categoryOrderRows, ...newCats];
+  }
+
+  if (categoryOrderRows.length === 0) {
+    list.innerHTML = `<div style="font-size:13px;color:var(--muted);font-style:italic;padding:8px 0;">No categories yet — add products with categories in the Products tab and they'll show up here.</div>`;
+    return;
+  }
+
+  list.innerHTML = categoryOrderRows.map((cat, i) => {
+    const upDisabled = i === 0;
+    const downDisabled = i === categoryOrderRows.length - 1;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;">
+      <span style="flex:1;min-width:0;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cat}</span>
+      <button type="button" onclick="moveCategoryRow(${i}, -1)" ${upDisabled ? 'disabled' : ''} title="Move up" aria-label="Move ${cat} up" style="padding:4px 10px;background:var(--surface);border:1px solid var(--line);border-radius:4px;cursor:${upDisabled ? 'not-allowed' : 'pointer'};opacity:${upDisabled ? '0.35' : '1'};font-size:14px;line-height:1;">↑</button>
+      <button type="button" onclick="moveCategoryRow(${i}, 1)" ${downDisabled ? 'disabled' : ''} title="Move down" aria-label="Move ${cat} down" style="padding:4px 10px;background:var(--surface);border:1px solid var(--line);border-radius:4px;cursor:${downDisabled ? 'not-allowed' : 'pointer'};opacity:${downDisabled ? '0.35' : '1'};font-size:14px;line-height:1;">↓</button>
+    </div>`;
+  }).join('');
+}
+
+function moveCategoryRow(idx, delta) {
+  if (!categoryOrderRows) return;
+  const target = idx + delta;
+  if (target < 0 || target >= categoryOrderRows.length) return;
+  [categoryOrderRows[idx], categoryOrderRows[target]] = [categoryOrderRows[target], categoryOrderRows[idx]];
+  renderCategoryOrderEditor();
+}
+
+async function saveCategoryOrder() {
+  if (!categoryOrderRows) return;
+  const status = document.getElementById('cat-order-status');
+  const btn = document.getElementById('cat-order-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
+  try {
+    await tdoc('settings', 'store').set({ categoryOrder: categoryOrderRows.slice() }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = '✅ Saved — your storefront now shows categories in this order.';
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save order';
+  }
 }
 
 // In list mode the storefront shows the description prominently under each
@@ -3470,6 +3567,9 @@ function subscribeToProducts() {
     products.sort((a, b) => a.id - b.id);
     renderAdminCategories();
     renderProducts();
+    // Keep the Settings → Appearance category-order editor live as new
+    // product categories appear (or last products of a category are deleted).
+    if (typeof renderCategoryOrderEditor === 'function') renderCategoryOrderEditor();
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');

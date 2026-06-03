@@ -1212,8 +1212,15 @@ tdoc('settings', 'store').onSnapshot(snap => {
   // (default) for sari-sari stores. Switches via a data attribute on the
   // root so CSS picks up the right layout without re-mounting.
   const layout = (storeSettingsData.storefrontLayout === 'list') ? 'list' : 'grid';
-  if (document.documentElement.getAttribute('data-layout') !== layout) {
-    document.documentElement.setAttribute('data-layout', layout);
+  const layoutChanged = document.documentElement.getAttribute('data-layout') !== layout;
+  if (layoutChanged) document.documentElement.setAttribute('data-layout', layout);
+
+  // Re-render on layout flip OR when the owner saves a new category order
+  // so the storefront updates live without the customer reloading.
+  const newOrderKey = JSON.stringify(Array.isArray(storeSettingsData.categoryOrder) ? storeSettingsData.categoryOrder : []);
+  const orderChanged = (window.__lastCategoryOrderKey !== newOrderKey);
+  window.__lastCategoryOrderKey = newOrderKey;
+  if (layoutChanged || orderChanged) {
     if (typeof renderCategories === 'function') renderCategories();
     if (typeof renderProducts === 'function') renderProducts();
   }
@@ -1475,6 +1482,25 @@ function clearSearch() {
 }
 
 // ---------- CATEGORIES ----------
+// Apply the owner's saved `settings/store.categoryOrder` to a list of
+// category names: entries from the saved order come first (in order),
+// then any category not in that list is appended alphabetically. The
+// owner doesn't need to re-save every time they add a product with a
+// new category — new ones just fall to the end until they decide to
+// reorder. Used by both grid (sidebar chips) and list (section order).
+function applyCategoryOrder(allCats) {
+  const saved = Array.isArray(storeSettingsData.categoryOrder) ? storeSettingsData.categoryOrder : [];
+  if (saved.length === 0) return allCats.slice().sort();
+  const allSet = new Set(allCats);
+  const seen = new Set();
+  const ordered = [];
+  saved.forEach(c => {
+    if (allSet.has(c) && !seen.has(c)) { ordered.push(c); seen.add(c); }
+  });
+  const remaining = allCats.filter(c => !seen.has(c)).sort();
+  return [...ordered, ...remaining];
+}
+
 function renderCategories() {
   const wrap = document.getElementById('categories');
   // Mirror admin exactly: categories derived from products in product-id order.
@@ -1482,7 +1508,7 @@ function renderCategories() {
   // category list and chip counts only reflect what's actually shoppable.
   const catSet = new Set();
   PRODUCTS.forEach(p => { if (p.category && p.hidden !== true) catSet.add(p.category); });
-  const cats = ['All', ...[...catSet].sort()];
+  const cats = ['All', ...applyCategoryOrder([...catSet])];
   const layout = document.documentElement.getAttribute('data-layout');
   if (layout === 'list') {
     // List mode: chips are jump-to-section anchors, not filters. "All" jumps
@@ -1717,7 +1743,7 @@ function renderListLayout(list, isSearching, isOos) {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(p);
   });
-  const cats = Object.keys(grouped).sort();
+  const cats = applyCategoryOrder(Object.keys(grouped));
   return cats.map(cat => `
     <div class="list-section" id="${listSectionId(cat)}" data-cat="${cat.replace(/"/g, '&quot;')}">
       <div class="list-section-title">${cat}</div>
