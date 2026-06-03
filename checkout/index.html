@@ -85,6 +85,11 @@
   .map-edit-btn:hover { background: var(--soft); }
   .locate-btn { font-size: 13px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 4px 0; display: block; }
   .locate-btn:hover { text-decoration: underline; }
+  /* Visible confirmation that geolocation captured coords AND set locPicked.
+     If this pill is hidden when the customer taps Place Order, no lat/lng
+     will be attached to the order doc and the admin won't see a map pin. */
+  .loc-status { display: none; margin-top: 6px; padding: 4px 10px; background: #dcfce7; color: #15803d; border-radius: 999px; font-size: 12px; font-weight: 600; width: fit-content; }
+  .loc-status.shown { display: inline-block; }
 
   /* Location picker modal */
   .loc-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 500; }
@@ -737,6 +742,7 @@ function init() {
           <button type="button" class="map-edit-btn" onclick="openLocPicker()">Edit</button>
         </div>
         <button type="button" class="locate-btn" onclick="locateMe()">📍 Use my location</button>
+        <span class="loc-status" id="loc-status">✓ Location attached — the store will get a map pin on your order</span>
       </div>
       <div class="field">
         <label for="cust-lot-block">Lot, Block, Phase Number</label>
@@ -838,6 +844,10 @@ function init() {
     locLon = savedAddress.lng;
     locPicked = true;
   }
+  // Reflect the loaded state in the visible badge. Runs after the
+  // updateLocStatus declaration because init() executes after the script
+  // body has loaded both functions.
+  if (typeof updateLocStatus === 'function') updateLocStatus();
 
   // Attach real-time phone validation after HTML is rendered
   const phoneInput = document.getElementById('cust-phone');
@@ -884,10 +894,21 @@ function locateMe() {
         locMap.setView([lat, lon], 17);
         locMarker.setLatLng([lat, lon]);
       }
+      updateLocStatus();
+      console.log('[locateMe] captured', { lat, lon, locPicked });
       showToast('📍 Location captured — the store will get a map link on your order.');
     },
     () => showToast('Unable to retrieve your location.')
   );
+}
+
+// Visible "✓ Location attached" pill. Reflects locPicked so the customer
+// can confirm coords are armed before Place Order, and so we can debug
+// from a screenshot whether the order should have shipped with a pin.
+function updateLocStatus() {
+  const badge = document.getElementById('loc-status');
+  if (!badge) return;
+  badge.classList.toggle('shown', locPicked === true);
 }
 
 function pickPay(method) {
@@ -1177,6 +1198,7 @@ async function placeOrder() {
     ? tcol('orders').doc(gcashOrderRefId)
     : tcol('orders').doc();
   console.log('[checkout] payMethod=', payMethod, 'hasReceipt=', !!orderData.gcashReceipt, 'receiptBytes=', orderData.gcashReceipt ? orderData.gcashReceipt.length : 0);
+  console.log('[checkout] locPicked=', locPicked, 'address.lat=', orderData.address?.lat, 'address.lng=', orderData.address?.lng);
   let stockErrorMsg = null;
   console.log('[checkout] Starting order. TENANT_ID=', TENANT_ID, 'orderRef.path=', orderRef.path, 'items=', items.length);
 
@@ -1454,6 +1476,7 @@ tcol('products').get().then(snapshot => {
     const iframe = document.getElementById('map-iframe');
     if (iframe) iframe.src = `https://maps.google.com/maps?q=${locLat},${locLon}&z=17&output=embed`;
     locPicked = true;
+    if (typeof updateLocStatus === 'function') updateLocStatus();
     closeLocPicker();
   }
 </script>
