@@ -411,7 +411,14 @@
     padding: 16px; border-bottom: 1px solid var(--line);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .modal-head h2 { flex: 1; min-width: 0; word-break: break-word; line-height: 1.3; font-size: clamp(13px, 3.5vw, 17px); }
+  .modal-head h2 {
+    flex: 1; min-width: 0;
+    word-break: break-word; line-height: 1.25;
+    font-size: clamp(20px, 5.5vw, 26px);
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0;
+  }
   .modal-body { padding: 16px; }
   .field { margin-bottom: 12px; }
   .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
@@ -667,25 +674,30 @@
   .list-item-add {
     position: absolute;
     right: 6px; bottom: 6px;
-    width: 30px; height: 30px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     background: #fff;
     border: 1px solid var(--line);
-    font-size: 20px; font-weight: 700;
+    font-size: 22px; font-weight: 700;
     color: var(--primary);
     display: grid; place-items: center;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.18);
     z-index: 1;
     padding: 0;
+    line-height: 1;
   }
   .list-item-add:hover:not(:disabled) {
     background: var(--primary); color: #fff;
   }
   .list-item-add:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* In-cart state — bigger digits and a white ring around the badge so
+     it stands clearly off the food thumbnail behind it. */
   .list-item-add.in-cart {
     background: var(--primary); color: #fff;
-    font-size: 14px;
+    font-size: 17px;
+    font-weight: 800;
+    box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,0.3);
   }
   .list-item-oos-tag {
     font-size: 11px; color: #dc2626;

@@ -536,11 +536,19 @@
     .pt-cell { display: flex; align-items: center; min-width: 0; }
     .pt-check input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
     .pt-name-col { flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+    /* `.pt-pname` is a button now (clicking the product name opens the
+       view modal — same pattern as Suppliers' business name link). Reset
+       button chrome and style it as an accent-coloured link. */
     .pt-pname {
       font-size: var(--fs-base); font-weight: 500; line-height: 1.35;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden; overflow-wrap: anywhere; word-break: break-word;
+      background: none; border: 0; padding: 0; margin: 0;
+      cursor: pointer; text-align: left;
+      color: var(--accent);
+      font-family: inherit;
     }
+    .pt-pname:hover { text-decoration: underline; color: var(--accent-dark, var(--accent)); }
     .pt-pmeta { font-size: var(--fs-sm); color: var(--muted); }
     .pt-stock { font-size: var(--fs-sm); }
     .pt-price-col { font-size: var(--fs-sm); font-weight: 600; }
@@ -1214,6 +1222,20 @@
     }
     .theme-picker button.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
     .theme-picker button:hover:not(.active) { color: var(--ink); }
+    /* Layout picker gets a stronger active state than the theme picker —
+       owners are choosing between two visually-different storefront modes
+       and the contrast on the previous subtle surface-on-surface treatment
+       was hard to read in both light and dark themes. */
+    #layout-picker button.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+    [data-theme="dark"] #layout-picker button.active {
+      background: var(--accent);
+      color: #fff;
+    }
 
     .threshold-input {
       width: 100px;
@@ -2153,6 +2175,21 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- PRODUCT VIEW MODAL (read-only quick look; Edit button hands off to the add/edit modal) -->
+<div class="supp-modal-overlay" id="product-view-modal" onclick="closeProductView(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()">
+    <div class="supp-modal-header">
+      <h2 id="product-view-title">Product Details</h2>
+      <button type="button" class="close-btn" onclick="closeProductView()">×</button>
+    </div>
+    <div class="supp-modal-body" id="product-view-body"></div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeProductView()">Close</button>
+      <button type="button" class="btn-primary" onclick="editFromProductView()">Edit</button>
+    </div>
   </div>
 </div>
 
@@ -4777,7 +4814,7 @@ function renderProducts() {
           <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
           <div class="pt-cell">${thumb}</div>
           <div class="pt-cell pt-name-col">
-            <div class="pt-pname">${p.name}</div>
+            <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>
             <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
           </div>
           <div class="pt-cell pt-stock">${stockCell}</div>
@@ -4855,6 +4892,121 @@ async function confirmDelete() {
 function closeConfirmModal() {
   document.getElementById('confirm-modal').classList.remove('show');
   window._pendingDeleteIds = [];
+}
+
+// ---------- PRODUCT VIEW (read-only quick look) ----------
+// Same pattern as the supplier view modal: clicking the product name in the
+// table opens a snapshot card with all key fields. "Edit" hands off to the
+// existing add/edit modal so we don't duplicate the form.
+let currentViewProductId = null;
+
+function openProductView(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  currentViewProductId = id;
+  document.getElementById('product-view-title').textContent = p.name || 'Product Details';
+  document.getElementById('product-view-body').innerHTML = renderProductViewBody(p);
+  document.getElementById('product-view-modal').classList.add('show');
+}
+function closeProductView(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('product-view-modal').classList.remove('show');
+  currentViewProductId = null;
+}
+function editFromProductView() {
+  const id = currentViewProductId;
+  closeProductView();
+  if (id !== null) editProduct(id);
+}
+
+function renderProductViewBody(p) {
+  const row = (label, value, isEmpty) =>
+    `<div class="supp-view-row"><div class="supp-view-label">${label}</div><div class="supp-view-value${isEmpty ? ' empty' : ''}">${isEmpty ? 'Not set' : value}</div></div>`;
+
+  // Image (first one if any) — small preview at the top.
+  const imgHtml = (p.images && p.images.length > 0)
+    ? `<img src="${p.images[0]}" alt="${p.name}" style="width:100%;max-height:240px;object-fit:cover;border-radius:8px;margin-bottom:16px;display:block;" />`
+    : '';
+
+  // Price (range when variants are present).
+  let priceHtml;
+  if (p.variants && p.variants.length > 0) {
+    const vp = p.variants.map(v => parseFloat(v.price || p.price));
+    const mn = Math.min(...vp), mx = Math.max(...vp);
+    priceHtml = (mn === mx) ? `₱${fmt(mn)}` : `₱${fmt(mn)} – ₱${fmt(mx)}`;
+  } else {
+    priceHtml = `₱${fmt(p.price)}`;
+  }
+
+  // Cost / profit / margin — only meaningful for products with a cost set.
+  const costNum = parseFloat(p.cost);
+  const priceNum = parseFloat(p.price);
+  let costHtml = 'Not set';
+  let costEmpty = true;
+  let profitHtml = 'Not available — set Cost on the product to calculate profit and margin.';
+  let profitEmpty = true;
+  let marginHtml = 'Not available';
+  let marginEmpty = true;
+  if (!isNaN(costNum) && costNum > 0) {
+    costHtml = `₱${fmt(costNum)}`;
+    costEmpty = false;
+    if (!isNaN(priceNum)) {
+      const profit = priceNum - costNum;
+      profitHtml = `₱${fmt(profit)}`;
+      profitEmpty = false;
+      if (priceNum > 0) {
+        marginHtml = `${(profit / priceNum * 100).toFixed(1)}%`;
+        marginEmpty = false;
+      }
+    }
+  }
+
+  // Stock / availability
+  let stockHtml;
+  if (p.variants && p.variants.length > 0) {
+    const stockSum = p.variants.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
+    stockHtml = `${stockSum} (across ${p.variants.length} variant${p.variants.length === 1 ? '' : 's'})`;
+  } else if (p.stock === null || p.stock === undefined || p.stock === '') {
+    stockHtml = 'Unlimited';
+  } else {
+    stockHtml = String(p.stock);
+  }
+
+  // Variants list
+  let variantsHtml = '';
+  if (p.variants && p.variants.length > 0) {
+    variantsHtml = `<div class="supp-view-row">
+      <div class="supp-view-label">Variants</div>
+      <div class="supp-view-value">
+        ${p.variants.map(v => `<div style="padding:4px 0;border-bottom:1px dashed var(--line);">
+          <strong>${v.name}</strong> — ₱${fmt(v.price || p.price)} · stock: ${v.stock ?? '∞'}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Status pills (Available / Out of stock, Hidden)
+  const availOk = p.available !== false;
+  const statusPills = `
+    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;background:${availOk ? 'var(--ok-soft)' : 'var(--surface-3)'};color:${availOk ? '#166534' : 'var(--muted)'};">${availOk ? 'Available' : 'Out of stock'}</span>
+    ${p.hidden ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;background:var(--warn-soft);color:#92400e;margin-left:6px;">Hidden from storefront</span>` : ''}
+  `;
+
+  return `
+    ${imgHtml}
+    <div style="margin-bottom:14px;">${statusPills}</div>
+    <div class="supp-view-grid">
+      ${row('Category', p.category, !p.category)}
+      ${row('Unit', p.unit, !p.unit)}
+      ${row('Price', priceHtml, false)}
+      ${row('Cost per item', costHtml, costEmpty)}
+      ${row('Profit per item', profitHtml, profitEmpty)}
+      ${row('Profit margin', marginHtml, marginEmpty)}
+      ${row('Stock', stockHtml, false)}
+      ${row('Description', p.description ? p.description.replace(/\n/g, '<br>') : '', !p.description)}
+      ${variantsHtml}
+    </div>
+  `;
 }
 
 function editProduct(id) {
