@@ -6053,7 +6053,7 @@ function renderSalesReport() {
   // Top by units
   const topUnitsEl = document.getElementById('report-top-units-table');
   topUnitsEl.innerHTML = `
-    <thead><tr><th>#</th><th>Product</th><th class="numeric">Units</th><th class="numeric">Revenue</th></tr></thead>
+    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Units</th><th class="numeric">Revenue</th></tr></thead>
     <tbody>
       ${topByUnits.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
@@ -6068,7 +6068,7 @@ function renderSalesReport() {
   // Top by revenue
   const topRevEl = document.getElementById('report-top-revenue-table');
   topRevEl.innerHTML = `
-    <thead><tr><th>#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
     <tbody>
       ${topByRevenue.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
@@ -6083,7 +6083,7 @@ function renderSalesReport() {
   // Worst by revenue
   const worstEl = document.getElementById('report-worst-table');
   worstEl.innerHTML = `
-    <thead><tr><th>#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
     <tbody>
       ${worstByRevenue.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
