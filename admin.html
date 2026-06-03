@@ -1606,6 +1606,14 @@
     .report-table td.numeric, .report-table th.numeric {
       text-align: right; font-variant-numeric: tabular-nums;
     }
+    /* Narrow centered column for #1, #2, ... rank numbers. */
+    .report-table td.rank, .report-table th.rank {
+      text-align: center;
+      width: 36px;
+      padding-left: 6px;
+      padding-right: 6px;
+      font-variant-numeric: tabular-nums;
+    }
     .report-table td.muted { color: var(--muted); font-style: italic; }
     .report-empty {
       padding: 24px 12px; text-align: center;
@@ -6053,12 +6061,12 @@ function renderSalesReport() {
   // Top by units
   const topUnitsEl = document.getElementById('report-top-units-table');
   topUnitsEl.innerHTML = `
-    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Units</th><th class="numeric">Revenue</th></tr></thead>
+    <thead><tr><th class="rank">#</th><th>Product</th><th class="numeric">Units</th><th class="numeric">Revenue</th></tr></thead>
     <tbody>
       ${topByUnits.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
         : topByUnits.map((it, i) => `<tr>
-            <td class="numeric">${i + 1}</td>
+            <td class="rank">${i + 1}</td>
             <td>${it.name}</td>
             <td class="numeric">${it.units}</td>
             <td class="numeric">₱${fmt(it.revenue)}</td>
@@ -6068,12 +6076,12 @@ function renderSalesReport() {
   // Top by revenue
   const topRevEl = document.getElementById('report-top-revenue-table');
   topRevEl.innerHTML = `
-    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <thead><tr><th class="rank">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
     <tbody>
       ${topByRevenue.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
         : topByRevenue.map((it, i) => `<tr>
-            <td class="numeric">${i + 1}</td>
+            <td class="rank">${i + 1}</td>
             <td>${it.name}</td>
             <td class="numeric">₱${fmt(it.revenue)}</td>
             <td class="numeric">${it.units}</td>
@@ -6083,12 +6091,12 @@ function renderSalesReport() {
   // Worst by revenue
   const worstEl = document.getElementById('report-worst-table');
   worstEl.innerHTML = `
-    <thead><tr><th class="numeric">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <thead><tr><th class="rank">#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
     <tbody>
       ${worstByRevenue.length === 0
         ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
         : worstByRevenue.map((it, i) => `<tr>
-            <td class="numeric">${i + 1}</td>
+            <td class="rank">${i + 1}</td>
             <td>${it.name}</td>
             <td class="numeric">₱${fmt(it.revenue)}</td>
             <td class="numeric">${it.units}</td>
