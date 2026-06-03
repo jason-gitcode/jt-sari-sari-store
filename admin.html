@@ -1529,10 +1529,7 @@
 
     .report-kpis {
       display: grid;
-      /* 115px min lets 8 sales-report tiles fit on one row at typical
-         laptop widths (~1000px+) while still wrapping cleanly on iPads /
-         phones. 150px was forcing Delivery Collected to a lonely 2nd row. */
-      grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px;
       margin-bottom: 22px;
     }
@@ -1701,14 +1698,6 @@
       }
       body.printing-report .restock-controls,
       body.printing-report .restock-legend { display: none !important; }
-      /* Always start Restocking on a fresh page so the report header
-         "Restocking & Reorder" lands at the top of a clean sheet instead
-         of being squashed under the Sales Report's last few rows. Both
-         legacy and modern break-before keywords for cross-browser safety. */
-      body.printing-report #restock-section {
-        page-break-before: always !important;
-        break-before: page !important;
-      }
       @page { margin: 12mm; }
     }
 
