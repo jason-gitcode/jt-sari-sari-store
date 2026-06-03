@@ -355,11 +355,34 @@
     [data-theme="dark"] .supp-modal-footer .supp-del-btn:hover { background: rgba(248,113,113,0.12); }
 
     /* View modal layout */
-    .supp-view-grid { display: grid; gap: 14px; }
-    .supp-view-row .supp-view-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
-    .supp-view-row .supp-view-value { font-size: 14px; color: var(--ink); margin-top: 4px; word-break: break-word; }
+    /* View-modal field rows — used by both the supplier and the product
+       view popups. Two-column layout (label | value) so the modal stays
+       compact vertically; on narrow phones we fall back to a stacked single
+       column since the value would otherwise get squeezed unreadable. */
+    .supp-view-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      row-gap: 12px;
+    }
+    .supp-view-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      column-gap: 14px;
+      align-items: baseline;
+    }
+    .supp-view-row .supp-view-label {
+      font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      font-weight: 600;
+      padding-top: 2px;
+    }
+    .supp-view-row .supp-view-value {
+      font-size: 14px; color: var(--ink);
+      word-break: break-word;
+      min-width: 0;
+    }
     .supp-view-row .supp-view-value.empty { color: var(--muted); font-style: italic; }
-    .supp-view-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .supp-view-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .supp-view-chips .cat-chip { cursor: default; }
     /* Chip-based category input */
     .cat-chip-wrap {
