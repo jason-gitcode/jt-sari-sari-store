@@ -327,7 +327,7 @@ function clearStatus() {
 }
 
 function showStep(id) {
-  ['step-signin', 'step-details', 'step-success'].forEach(s => {
+  ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
 }
