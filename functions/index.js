@@ -232,6 +232,10 @@ exports.createTenant = onCall(async (request) => {
     pickupAddress,
     gcashAccountName,
     gcashNumber,
+    // Storefront layout — 'grid' (default, sari-sari style) or 'list'
+    // (FoodPanda-style stacked rows with description, for restaurants /
+    // carinderias / cafés). Editable later in admin → Appearance.
+    storefrontLayout: 'grid',
     // Service & payment defaults — new tenants start with everything ON.
     deliveryEnabled: true,
     pickupEnabled: true,

@@ -562,6 +562,144 @@
     .info-inner { font-size: 12px; gap: 10px; flex-direction: column; align-items: flex-start; }
     .footer-inner { grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 16px 16px 12px; }
   }
+
+  /* ====================================================================
+     LIST LAYOUT — FoodPanda-style stacked rows for restaurants/carinderias.
+     Activated by `<html data-layout="list">` (set when settings/store loads).
+     Falls back to grid otherwise. All rules are scoped under [data-layout="list"]
+     so they never affect grid-mode tenants.
+     ==================================================================== */
+  html[data-layout="list"] .container {
+    flex-direction: column;
+    padding: 0;
+    max-width: 800px;
+    gap: 0;
+    overflow-y: auto;
+  }
+  html[data-layout="list"] .categories {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    overscroll-behavior-x: none;
+    gap: 6px;
+    padding: 10px 16px;
+    flex-shrink: 0;
+    position: sticky; top: 0;
+    z-index: 10;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  html[data-layout="list"] .categories::-webkit-scrollbar { display: none; }
+  html[data-layout="list"] .chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+    scroll-snap-align: center;
+  }
+  html[data-layout="list"] .products-col {
+    flex: unset; min-height: unset;
+    overflow-y: unset;
+    padding: 0;
+  }
+  /* The same #products container is reused; in list mode JS renders
+     sections of items instead of grid cards, and CSS strips the grid. */
+  html[data-layout="list"] .grid {
+    display: block;
+    padding: 0 16px 32px;
+  }
+  .list-section {
+    padding: 18px 0 4px;
+    scroll-margin-top: 60px;     /* sticky chip-nav offset for anchor jumps */
+  }
+  .list-section + .list-section { border-top: 0; }
+  .list-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+  .list-item {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background-color 0.12s;
+  }
+  .list-item:hover { background-color: var(--soft); }
+  .list-item-info {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+    gap: 4px; justify-content: center;
+  }
+  .list-item-name {
+    font-size: 15px; font-weight: 600; line-height: 1.3;
+    color: var(--ink);
+  }
+  .list-item-price {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+  }
+  .list-item-desc {
+    font-size: 13px; color: var(--muted); line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .list-item-thumb {
+    position: relative;
+    width: 100px; height: 100px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--soft);
+    display: grid; place-items: center;
+    font-size: 36px;
+  }
+  .list-item-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .list-item-add {
+    position: absolute;
+    right: 6px; bottom: 6px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid var(--line);
+    font-size: 20px; font-weight: 700;
+    color: var(--primary);
+    display: grid; place-items: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    z-index: 1;
+    padding: 0;
+  }
+  .list-item-add:hover:not(:disabled) {
+    background: var(--primary); color: #fff;
+  }
+  .list-item-add:disabled { opacity: 0.4; cursor: not-allowed; }
+  .list-item-add.in-cart {
+    background: var(--primary); color: #fff;
+    font-size: 14px;
+  }
+  .list-item-oos-tag {
+    font-size: 11px; color: #dc2626;
+    font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .list-item.is-oos { opacity: 0.55; }
+  .list-item.is-oos:hover { background-color: transparent; cursor: default; }
+  @media (max-width: 600px) {
+    html[data-layout="list"] .list-item-thumb { width: 88px; height: 88px; }
+    html[data-layout="list"] .list-section-title { font-size: 16px; }
+    html[data-layout="list"] .list-item-name { font-size: 14px; }
+    html[data-layout="list"] .list-item-desc { font-size: 12px; }
+  }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -1070,6 +1208,15 @@ tdoc('settings', 'store').onSnapshot(snap => {
   lastRainMode      = rainMode;
   applyRainMode(rainMode);
   buildTicker(rainMode, storeClosedMode, maintenanceMode);
+  // Storefront layout — 'list' for restaurants/carinderias, 'grid'
+  // (default) for sari-sari stores. Switches via a data attribute on the
+  // root so CSS picks up the right layout without re-mounting.
+  const layout = (storeSettingsData.storefrontLayout === 'list') ? 'list' : 'grid';
+  if (document.documentElement.getAttribute('data-layout') !== layout) {
+    document.documentElement.setAttribute('data-layout', layout);
+    if (typeof renderCategories === 'function') renderCategories();
+    if (typeof renderProducts === 'function') renderProducts();
+  }
   // Apply tenant-specific display name dynamically.
   const dynName = storeSettingsData.storeName;
   const nameEl = document.getElementById('store-name');
@@ -1331,6 +1478,17 @@ function renderCategories() {
   const catSet = new Set();
   PRODUCTS.forEach(p => { if (p.category && p.hidden !== true) catSet.add(p.category); });
   const cats = ['All', ...[...catSet].sort()];
+  const layout = document.documentElement.getAttribute('data-layout');
+  if (layout === 'list') {
+    // List mode: chips are jump-to-section anchors, not filters. "All" jumps
+    // to the top. The clicked chip becomes active until another is clicked
+    // (Phase 2 will add scroll-spy that updates this as the user scrolls).
+    if (!cats.includes(jumpActiveCategory)) jumpActiveCategory = 'All';
+    wrap.innerHTML = cats.map(cat =>
+      `<button class="chip ${cat === jumpActiveCategory ? 'active' : ''}" onclick="jumpToCategory('${cat.replace(/'/g, "\\'")}')">${cat}</button>`
+    ).join('');
+    return;
+  }
   if (activeCategory !== 'All' && !cats.includes(activeCategory)) activeCategory = 'All';
   wrap.innerHTML = cats.map(cat =>
     `<button class="chip ${cat === activeCategory ? 'active' : ''}" onclick="pickCategory('${cat.replace(/'/g, "\\'")}')">${cat}</button>`
@@ -1341,16 +1499,40 @@ function pickCategory(cat) {
   renderCategories();
   renderProducts();
 }
+// Tracks which list-mode chip is currently highlighted; updated on click.
+let jumpActiveCategory = 'All';
+function listSectionId(cat) {
+  return 'list-section-' + String(cat).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+}
+function jumpToCategory(cat) {
+  jumpActiveCategory = cat;
+  // Re-render chips so the new active state is reflected.
+  document.querySelectorAll('#categories .chip').forEach(b => {
+    b.classList.toggle('active', b.textContent === cat);
+  });
+  if (cat === 'All') {
+    const sc = document.querySelector('.container');
+    if (sc && typeof sc.scrollTo === 'function') sc.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  const el = document.getElementById(listSectionId(cat));
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 // ---------- PRODUCTS ----------
 function renderProducts() {
   const grid = document.getElementById('products');
-  // Hidden products never appear in the storefront grid, even when their
-  // category is selected or they match the active search term. PRODUCTS
-  // itself stays untouched so cart resolution for items already in cart
-  // (added before the admin hid them) keeps working at checkout.
-  let list = PRODUCTS.filter(p => p.hidden !== true)
-                     .filter(p => activeCategory === "All" || p.category === activeCategory);
+  const layout = document.documentElement.getAttribute('data-layout');
+  // Hidden products never appear in the storefront, even when their category
+  // is selected or they match the active search term. PRODUCTS itself stays
+  // untouched so cart resolution for items already in cart (added before the
+  // admin hid them) keeps working at checkout.
+  let list = PRODUCTS.filter(p => p.hidden !== true);
+  // Grid mode filters by activeCategory; list mode always shows all
+  // categories (chips jump to sections, they don't filter).
+  if (layout !== 'list') {
+    list = list.filter(p => activeCategory === "All" || p.category === activeCategory);
+  }
   if (searchTerm) {
     list = list.filter(p => {
       const text = `${p.name} ${p.description || ''}`.toLowerCase();
@@ -1365,6 +1547,10 @@ function renderProducts() {
   list = [...list.filter(p => !isOos(p)), ...list.filter(p => isOos(p))];
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty">No products found.</div>`;
+    return;
+  }
+  if (layout === 'list') {
+    grid.innerHTML = renderListLayout(list, !!searchTerm, isOos);
     return;
   }
   grid.innerHTML = list.map(p => {
@@ -1406,6 +1592,75 @@ function renderProducts() {
       </div>
     </div>
   `;}).join('');
+}
+
+// ---------- LIST LAYOUT (FoodPanda-style stacked rows) ----------
+// Reuses renderProducts's filter pipeline (hidden/search/oos handled there).
+// In search mode, items render as one flat "Search results" section.
+// Otherwise items are grouped under per-category headings; the chip nav
+// at the top is a jump-to-section index (see `jumpToCategory`).
+function renderListLayout(list, isSearching, isOos) {
+  const renderItem = (p) => {
+    const ok = p.available !== false && !isOos(p);
+    const cartQty = productCartQty(p.id);
+    const displayStock = (() => {
+      if (p.variants && p.variants.length > 0) return p.variants.reduce((s, v) => s + (v.stock ?? 0), 0);
+      return p.stock;
+    })();
+    const atMax = ok && displayStock !== null && displayStock !== undefined && displayStock > 0 && cartQty >= displayStock;
+    const btnDisabled = !ok || atMax;
+    let priceStr;
+    if (p.variants && p.variants.length > 0) {
+      const vp = p.variants.map(v => parseFloat(v.price || p.price));
+      const mn = Math.min(...vp), mx = Math.max(...vp);
+      priceStr = (mn === mx) ? `${STORE.currency}${fmt(mn)}` : `from ${STORE.currency}${fmt(mn)}`;
+    } else {
+      priceStr = `${STORE.currency}${fmt(p.price)}`;
+    }
+    const imgHtml = (p.images && p.images.length > 0)
+      ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async">`
+      : (p.image
+          ? `<img src="${p.image}" alt="${p.name}" loading="lazy" decoding="async" style="object-fit:contain;width:80%;height:80%;">`
+          : (p.emoji || '📦'));
+    const descSafe = p.description ? p.description.replace(/[<>]/g, '') : '';
+    const onClickRow = ok ? `showProductDetail(${p.id})` : '';
+    const addBtnLabel = ok && cartQty > 0 ? String(cartQty) : '+';
+    const addBtnClass = `list-item-add${ok && cartQty > 0 ? ' in-cart' : ''}`;
+    const addOnClick = btnDisabled ? 'event.stopPropagation()' : `event.stopPropagation(); addToCart(${p.id})`;
+    return `
+      <div class="list-item${!ok ? ' is-oos' : ''}" onclick="${onClickRow}">
+        <div class="list-item-info">
+          <div class="list-item-name">${p.name}</div>
+          <div class="list-item-price">${priceStr}</div>
+          ${descSafe ? `<div class="list-item-desc">${descSafe}</div>` : ''}
+          ${!ok ? `<div class="list-item-oos-tag">Out of stock</div>` : ''}
+        </div>
+        <div class="list-item-thumb">
+          ${imgHtml}
+          <button class="${addBtnClass}" ${btnDisabled ? 'disabled' : ''} onclick="${addOnClick}" title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}">${addBtnLabel}</button>
+        </div>
+      </div>
+    `;
+  };
+  if (isSearching) {
+    return `<div class="list-section">
+      <div class="list-section-title">Search results (${list.length})</div>
+      ${list.map(renderItem).join('')}
+    </div>`;
+  }
+  const grouped = {};
+  list.forEach(p => {
+    const cat = p.category || 'Uncategorized';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(p);
+  });
+  const cats = Object.keys(grouped).sort();
+  return cats.map(cat => `
+    <div class="list-section" id="${listSectionId(cat)}">
+      <div class="list-section-title">${cat}</div>
+      ${grouped[cat].map(renderItem).join('')}
+    </div>
+  `).join('');
 }
 
 // ---------- CART ----------

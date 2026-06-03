@@ -2037,6 +2037,18 @@
                 </div>
               </div>
             </div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">Storefront layout</div>
+                <div class="setting-desc">How customers see your products. <strong>Grid</strong> works for sari-sari stores — visual cards in columns. <strong>List</strong> is for restaurants and carinderias — full-width rows with the item description visible so people can read what's on offer. Switch any time.</div>
+              </div>
+              <div class="setting-control">
+                <div class="theme-picker" id="layout-picker">
+                  <button data-layout="grid" onclick="setStorefrontLayout('grid')">🧱 Grid</button>
+                  <button data-layout="list" onclick="setStorefrontLayout('list')">📋 List</button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="settings-section" id="set-notifications">
@@ -2401,8 +2413,32 @@ tdoc('settings', 'store').onSnapshot(snap => {
   syncOperatingModeToggles();
   syncStoreInfoForm();
   syncServiceToggles();
+  syncStorefrontLayoutPicker();
   applyTenantBranding();
 });
+
+function syncStorefrontLayoutPicker() {
+  const layout = (storeSettingsData.storefrontLayout === 'list') ? 'list' : 'grid';
+  document.querySelectorAll('#layout-picker button').forEach(b => {
+    b.classList.toggle('active', b.dataset.layout === layout);
+  });
+}
+
+async function setStorefrontLayout(layout) {
+  const next = (layout === 'list') ? 'list' : 'grid';
+  // Optimistic UI: flip the picker now; snapshot listener will confirm.
+  document.querySelectorAll('#layout-picker button').forEach(b => {
+    b.classList.toggle('active', b.dataset.layout === next);
+  });
+  try {
+    await tdoc('settings', 'store').set({ storefrontLayout: next }, { merge: true });
+    showToast(`Storefront layout set to ${next === 'list' ? 'List (restaurant)' : 'Grid (sari-sari)'}.`, 'success');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to update: ' + (err && err.message ? err.message : err));
+    syncStorefrontLayoutPicker();
+  }
+}
 
 function applyTenantBranding() {
   // For jsminimart we keep the hardcoded "JS / JS Mini Mart" header; for
