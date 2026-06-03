@@ -2185,8 +2185,9 @@
       </div>
 
       <div class="field form-grid full">
-        <label>Description</label>
+        <label id="product-desc-label">Description</label>
         <textarea id="product-description" placeholder="Add product description (optional)"></textarea>
+        <div id="product-desc-helper" style="font-size:11px;color:var(--muted);margin-top:4px;display:none;">Required while Storefront layout = List — your customers see this line under each item.</div>
       </div>
 
       <div class="form-grid">
@@ -2422,6 +2423,25 @@ function syncStorefrontLayoutPicker() {
   document.querySelectorAll('#layout-picker button').forEach(b => {
     b.classList.toggle('active', b.dataset.layout === layout);
   });
+  syncProductDescField(layout);
+}
+
+// In list mode the storefront shows the description prominently under each
+// item, so blank descriptions look broken. Toggle the product form's
+// description field between optional (grid) and required (list).
+function syncProductDescField(layout) {
+  const isList = layout === 'list';
+  const ta  = document.getElementById('product-description');
+  const lbl = document.getElementById('product-desc-label');
+  const help = document.getElementById('product-desc-helper');
+  if (ta) {
+    ta.required = isList;
+    ta.placeholder = isList
+      ? 'Required — what makes this dish or item worth ordering? Customers will read this on the storefront.'
+      : 'Add product description (optional)';
+  }
+  if (lbl) lbl.textContent = isList ? 'Description *' : 'Description';
+  if (help) help.style.display = isList ? '' : 'none';
 }
 
 async function setStorefrontLayout(layout) {

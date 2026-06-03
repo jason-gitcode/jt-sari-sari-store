@@ -1217,6 +1217,11 @@ tdoc('settings', 'store').onSnapshot(snap => {
     if (typeof renderCategories === 'function') renderCategories();
     if (typeof renderProducts === 'function') renderProducts();
   }
+  // In list mode, attach the chip-nav scroll-spy. Idempotent — internal
+  // flag prevents double-attach if settings/store fires again.
+  if (layout === 'list' && typeof attachListScrollSpy === 'function') {
+    attachListScrollSpy();
+  }
   // Apply tenant-specific display name dynamically.
   const dynName = storeSettingsData.storeName;
   const nameEl = document.getElementById('store-name');
@@ -1499,14 +1504,17 @@ function pickCategory(cat) {
   renderCategories();
   renderProducts();
 }
-// Tracks which list-mode chip is currently highlighted; updated on click.
+// Tracks which list-mode chip is currently highlighted; updated by either
+// a tap on a chip (jumpToCategory) or by scroll-spy (listScrollSpyTick).
 let jumpActiveCategory = 'All';
 function listSectionId(cat) {
   return 'list-section-' + String(cat).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
 }
 function jumpToCategory(cat) {
+  // Suppress scroll-spy for the duration of the smooth-scroll so the chip
+  // doesn't flicker through every category the animation crosses.
+  _listSpyLockUntil = Date.now() + 700;
   jumpActiveCategory = cat;
-  // Re-render chips so the new active state is reflected.
   document.querySelectorAll('#categories .chip').forEach(b => {
     b.classList.toggle('active', b.textContent === cat);
   });
@@ -1517,6 +1525,61 @@ function jumpToCategory(cat) {
   }
   const el = document.getElementById(listSectionId(cat));
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- LIST MODE: scroll-spy ----------
+// Mirrors the Settings sub-nav scroll-spy in admin: rAF-throttled scroll
+// listener on the container, finds whichever .list-section is currently
+// anchored just below the sticky chip nav, marks its chip active, and
+// horizontally recenters that chip in the bar so the user can always
+// see which section they're in and what's around it.
+let _listSpyRafRequested = false;
+let _listSpyLockUntil = 0;
+let _listSpyAttached = false;
+
+function listScrollSpyTick() {
+  _listSpyRafRequested = false;
+  if (Date.now() < _listSpyLockUntil) return;
+  if (document.documentElement.getAttribute('data-layout') !== 'list') return;
+  const sc = document.querySelector('.container');
+  if (!sc) return;
+  const sections = document.querySelectorAll('.list-section');
+  if (!sections.length) return;
+  const nav = document.getElementById('categories');
+  const navH = nav ? nav.offsetHeight : 0;
+  // Trigger line just below the sticky chip nav; the +24 keeps the active
+  // chip from flipping one pixel too early as the user scrolls.
+  const triggerLine = sc.getBoundingClientRect().top + navH + 24;
+  let activeIdx = 0;
+  for (let i = 0; i < sections.length; i++) {
+    if (sections[i].getBoundingClientRect().top <= triggerLine) activeIdx = i;
+    else break;
+  }
+  const catName = sections[activeIdx].dataset.cat || '';
+  if (!catName || catName === jumpActiveCategory) return;
+  jumpActiveCategory = catName;
+  let activeBtn = null;
+  document.querySelectorAll('#categories .chip').forEach(b => {
+    const isActive = b.textContent === catName;
+    b.classList.toggle('active', isActive);
+    if (isActive) activeBtn = b;
+  });
+  if (activeBtn && nav && nav.scrollWidth > nav.clientWidth) {
+    const targetLeft = activeBtn.offsetLeft - (nav.clientWidth - activeBtn.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+  }
+}
+
+function attachListScrollSpy() {
+  if (_listSpyAttached) return;
+  const sc = document.querySelector('.container');
+  if (!sc) return;
+  _listSpyAttached = true;
+  sc.addEventListener('scroll', () => {
+    if (_listSpyRafRequested) return;
+    _listSpyRafRequested = true;
+    requestAnimationFrame(listScrollSpyTick);
+  }, { passive: true });
 }
 
 // ---------- PRODUCTS ----------
@@ -1656,7 +1719,7 @@ function renderListLayout(list, isSearching, isOos) {
   });
   const cats = Object.keys(grouped).sort();
   return cats.map(cat => `
-    <div class="list-section" id="${listSectionId(cat)}">
+    <div class="list-section" id="${listSectionId(cat)}" data-cat="${cat.replace(/"/g, '&quot;')}">
       <div class="list-section-title">${cat}</div>
       ${grouped[cat].map(renderItem).join('')}
     </div>
