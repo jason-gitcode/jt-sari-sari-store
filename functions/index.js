@@ -267,3 +267,43 @@ exports.deleteTenant = onCall(async (request) => {
   await db.recursiveDelete(tref);
   return { slug, deleted: true };
 });
+
+// ============================================================
+// getMyTenant — returns the list of tenants this signed-in account owns.
+// Used by the signup page to swap the create-store form for a "you already
+// have a store" landing card when the per-email cap is hit. Bypasses the
+// firestore.rules `list` restriction (which only allows superadmin) by
+// running with admin privileges server-side.
+// ============================================================
+exports.getMyTenant = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) {
+    return { tenants: [], isSuperadmin: false, cap: MAX_TENANTS_PER_EMAIL };
+  }
+  const email = token.email;
+  if (!email) return { tenants: [], isSuperadmin: false, cap: MAX_TENANTS_PER_EMAIL };
+
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+  const snap = await db.collection('tenants')
+    .where('createdByEmail', '==', email)
+    .limit(10)
+    .get();
+
+  return {
+    email,
+    isSuperadmin,
+    cap: isSuperadmin ? null : MAX_TENANTS_PER_EMAIL,
+    tenants: snap.docs.map(d => {
+      const data = d.data() || {};
+      return {
+        slug: d.id,
+        name: data.name || d.id,
+        url: `https://jsminimart.com/${d.id}/`,
+        adminUrl: `https://jsminimart.com/${d.id}/admin/`
+      };
+    })
+  };
+});

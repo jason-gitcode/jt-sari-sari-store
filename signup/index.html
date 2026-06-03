@@ -86,6 +86,17 @@
     padding: 0;
   }
   .link-btn:hover { text-decoration: underline; }
+  /* "You already have a store" card — listed after sign-in if the account
+     has already used its 1-store cap (or each tenant of a superadmin). */
+  .owner-tenant-card {
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 12px;
+    background: #f8fafc;
+  }
+  .owner-tenant-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .owner-tenant-url { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; margin-bottom: 12px; word-break: break-all; }
+  .owner-tenant-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .owner-tenant-actions .btn { flex: 1 1 0; min-width: 130px; text-align: center; text-decoration: none; }
   label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
   .input {
     width: 100%;
@@ -225,6 +236,24 @@
     </div>
   </div>
 
+  <!-- STEP 2b: ALREADY OWNS A STORE (replaces the form when cap is hit) -->
+  <div id="step-already-owner" class="hidden">
+    <div class="step-title">🎉 Your store is ready</div>
+    <div class="step-body">
+      <div class="signed-in-as">
+        <span>Signed in as <strong id="owner-email">—</strong></span>
+        <button class="link-btn" onclick="signOut()">Switch account</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+        This Google account already owns a store. Jump straight into it:
+      </p>
+      <div id="already-owner-list"></div>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px;">
+        Each Google account can manage 1 store. To create another store, switch to a different Google account.
+      </p>
+    </div>
+  </div>
+
   <!-- STEP 3: SUCCESS -->
   <div id="step-success" class="hidden">
     <div class="step-title">🎉 Your store is ready!</div>
@@ -276,6 +305,7 @@ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(err => {
 });
 const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
+const getMyTenant  = functions.httpsCallable('getMyTenant');
 
 const slugInput = document.getElementById('store-slug');
 const slugPreview = document.getElementById('slug-preview');
@@ -358,9 +388,52 @@ async function submitForm(e) {
   }
 }
 
-auth.onAuthStateChanged(user => {
+function escText(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+function renderAlreadyOwner(email, tenants) {
+  document.getElementById('owner-email').textContent = email;
+  const list = document.getElementById('already-owner-list');
+  list.innerHTML = tenants.map(t => `
+    <div class="owner-tenant-card">
+      <div class="owner-tenant-name">${escText(t.name)}</div>
+      <div class="owner-tenant-url">${escText(t.url)}</div>
+      <div class="owner-tenant-actions">
+        <a href="${escText(t.adminUrl)}" class="btn btn-primary">Open admin →</a>
+        <a href="${escText(t.url)}" target="_blank" class="btn">View storefront</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+auth.onAuthStateChanged(async user => {
   if (user && user.emailVerified) {
     document.getElementById('signed-email').textContent = user.email;
+
+    // Ask the backend whether this account already owns a tenant. The
+    // firestore.rules don't allow client-side listing of tenants, so we
+    // can't do this query directly. The function bypasses with admin
+    // privileges and only returns this user's own tenants.
+    try {
+      const { data } = await getMyTenant({});
+      const tenants = Array.isArray(data?.tenants) ? data.tenants : [];
+      const cap = (typeof data?.cap === 'number') ? data.cap : 1;
+      // Superadmins can create more, so skip the gate even if they already own.
+      if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
+        renderAlreadyOwner(user.email, tenants);
+        showStep('step-already-owner');
+        return;
+      }
+    } catch (err) {
+      // If the function call fails (e.g. cold start hiccup, network), fall
+      // through to the form. createTenant will still enforce the cap on
+      // submit, so the user just sees the slower error path — same as before.
+      console.warn('getMyTenant failed', err);
+    }
+
     showStep('step-details');
   } else {
     if (user && !user.emailVerified) {
