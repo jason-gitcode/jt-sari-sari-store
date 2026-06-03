@@ -674,15 +674,15 @@
   .list-item-add {
     position: absolute;
     right: 6px; bottom: 6px;
-    width: 36px; height: 36px;
+    width: 30px; height: 30px;
     border-radius: 50%;
     background: #fff;
     border: 1px solid var(--line);
-    font-size: 22px; font-weight: 700;
+    font-size: 20px; font-weight: 700;
     color: var(--primary);
     display: grid; place-items: center;
     cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     z-index: 1;
     padding: 0;
     line-height: 1;
@@ -691,13 +691,17 @@
     background: var(--primary); color: #fff;
   }
   .list-item-add:disabled { opacity: 0.4; cursor: not-allowed; }
-  /* In-cart state — bigger digits and a white ring around the badge so
-     it stands clearly off the food thumbnail behind it. */
+  /* In-cart state — same compact 30×30 size, but flips to the success
+     green so the cart count clearly registers as "this item is in cart"
+     against any food thumbnail behind it. */
   .list-item-add.in-cart {
-    background: var(--primary); color: #fff;
-    font-size: 17px;
-    font-weight: 800;
-    box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,0.3);
+    background: var(--ok); color: #fff;
+    border-color: var(--ok);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .list-item-add.in-cart:hover:not(:disabled) {
+    background: #15803d; border-color: #15803d;
   }
   .list-item-oos-tag {
     font-size: 11px; color: #dc2626;

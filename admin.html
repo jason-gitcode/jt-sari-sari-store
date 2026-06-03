@@ -2275,16 +2275,6 @@
           <label>Unit/Measurement *</label>
           <select id="product-unit-select" onchange="handleUnitChange(this.value)" required>
             <option value="">Select Unit</option>
-            <option value="per pc">per pc</option>
-            <option value="per pack">per pack</option>
-            <option value="per can">per can</option>
-            <option value="per bottle">per bottle</option>
-            <option value="per kilo">per kilo</option>
-            <option value="per sachet">per sachet</option>
-            <option value="per set">per set</option>
-            <option value="per ream">per ream</option>
-            <option value="per roll">per roll</option>
-            <option value="__custom__">+ Create a new unit/measurement</option>
           </select>
           <input type="text" id="custom-unit-input" placeholder="Type new unit (e.g., per tray, per box)"
             style="display:none; margin-top:6px; width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:14px; outline:none; background:var(--surface); color:var(--ink);" />
@@ -4718,6 +4708,24 @@ function updateCategorySelect(selectedValue = '') {
     `<option value="__custom__">+ Create new category…</option>`;
 }
 
+// Default units shipped out of the box. Custom ones the owner has typed
+// into any product get unioned in on every form open, so a new unit they
+// add once is available everywhere going forward — same UX as Category.
+const DEFAULT_UNITS = [
+  'per pc', 'per pack', 'per can', 'per bottle', 'per kilo',
+  'per sachet', 'per set', 'per ream', 'per roll'
+];
+function updateUnitSelect(selectedValue = '') {
+  const sel = document.getElementById('product-unit-select');
+  if (!sel) return;
+  const units = new Set(DEFAULT_UNITS);
+  (products || []).forEach(p => { if (p.unit) units.add(p.unit); });
+  sel.innerHTML =
+    `<option value="">Select Unit</option>` +
+    [...units].sort((a, b) => a.localeCompare(b)).map(u => `<option value="${u}" ${selectedValue === u ? 'selected' : ''}>${u}</option>`).join('') +
+    `<option value="__custom__">+ Create a new unit/measurement</option>`;
+}
+
 function handleCategoryChange(val) {
   const inp = document.getElementById('custom-category-input');
   if (val === '__custom__') {
@@ -5045,16 +5053,13 @@ function editProduct(id) {
   document.getElementById('custom-category-input').style.display = 'none';
   document.getElementById('product-price').value = p.price;
   document.getElementById('product-cost').value = (p.cost !== null && p.cost !== undefined) ? p.cost : '';
-  const unitSelect = document.getElementById('product-unit-select');
+  // Unit dropdown is rebuilt from default-units ∪ every product's saved
+  // unit, so a custom unit added on any earlier product (e.g. "per serving")
+  // is selectable here instead of falling through to the custom-input path.
+  updateUnitSelect(p.unit);
   const unitCustom = document.getElementById('custom-unit-input');
-  const knownUnits = Array.from(unitSelect.options).map(o => o.value);
-  if (knownUnits.includes(p.unit)) {
-    unitSelect.value = p.unit;
-    unitCustom.style.display = 'none'; unitCustom.value = '';
-  } else {
-    unitSelect.value = '__custom__';
-    unitCustom.style.display = 'block'; unitCustom.value = p.unit;
-  }
+  unitCustom.style.display = 'none';
+  unitCustom.value = '';
   document.getElementById('product-stock').value = p.stock || '';
   currentImages = p.images ? [...p.images] : [];
   renderPhotoPreviews();
@@ -5163,7 +5168,7 @@ function resetForm() {
   if (customInp) { customInp.style.display = 'none'; customInp.value = ''; }
   const customUnit = document.getElementById('custom-unit-input');
   if (customUnit) { customUnit.style.display = 'none'; customUnit.value = ''; }
-  document.getElementById('product-unit-select').value = '';
+  updateUnitSelect();
   updateCategorySelect();
   variantCount = 0;
   editingProductId = null;
