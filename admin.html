@@ -284,6 +284,7 @@
     #products-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
     #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    #reports-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     /* Supplier table — mirrors the Home Inventory ranking table (.dash-table)
        in font scale, padding, sticky header, and box treatment. Wrapper
        scrolls horizontally when the table is wider than the viewport so
@@ -1503,6 +1504,145 @@
       .setting-row:has(.toggle-sw) { flex-direction: row; align-items: flex-start; gap: 12px; }
       .setting-row:has(.toggle-sw) .setting-control { align-self: flex-start; padding-top: 2px; width: auto; }
     }
+
+    /* ====================================================================
+       REPORTS TAB — print-friendly summary screens. The Sales Report is the
+       first one; future reports (Restocking, Cash Reconciliation, etc.)
+       reuse the same `.report-*` shell so they look like one product line.
+       ==================================================================== */
+    .report-section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+    .report-section-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 14px; flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .report-section-title { font-size: var(--fs-lg); font-weight: 700; margin: 0; line-height: 1.2; }
+    .report-section-period { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
+    .report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .report-kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .report-kpi {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+    }
+    .report-kpi-label {
+      font-size: var(--fs-xs); color: var(--muted);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .report-kpi-value {
+      font-size: var(--fs-xl); font-weight: 700;
+      color: var(--ink); line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .report-block { margin-top: 24px; }
+    .report-block-title {
+      font-size: var(--fs-md); font-weight: 700; margin: 0 0 12px;
+      color: var(--ink);
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    }
+    .report-block-sub { font-size: var(--fs-xs); font-weight: 400; color: var(--muted); }
+
+    /* Payment-method mix horizontal stacked bar — pure CSS, prints cleanly. */
+    .report-paymix-bar {
+      display: flex; height: 32px;
+      border-radius: 6px; overflow: hidden;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .report-paymix-seg {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      color: #fff; min-width: 0;
+      padding: 0 8px; white-space: nowrap; overflow: hidden;
+    }
+    .report-paymix-seg.cash  { background: #0891b2; }
+    .report-paymix-seg.gcash { background: #2563eb; }
+    .report-paymix-seg.cod   { background: #d97706; }
+    .report-paymix-seg.other { background: #6b7280; }
+    .report-paymix-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--muted); font-style: italic;
+    }
+
+    /* Reports table shell: a leaner cousin of `.dash-table` / supplier table.
+       Wrapper allows horizontal scroll on phones so wide tables don't clip. */
+    .report-table-wrap {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      overflow-x: auto; overflow-y: hidden;
+      overscroll-behavior-x: none;
+      background: var(--surface);
+    }
+    .report-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+    .report-table th, .report-table td {
+      padding: 10px 12px; text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .report-table tr:last-child td { border-bottom: 0; }
+    .report-table th {
+      font-size: var(--fs-xs); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--muted); background: var(--surface-2);
+    }
+    .report-table td.numeric, .report-table th.numeric {
+      text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .report-table td.muted { color: var(--muted); font-style: italic; }
+    .report-empty {
+      padding: 24px 12px; text-align: center;
+      color: var(--muted); font-style: italic;
+      font-size: var(--fs-sm);
+    }
+
+    /* Print stylesheet: when the owner taps "Print / Save as PDF" we add
+       `.printing-report` to body, hide everything except the report panel,
+       and remove screen-only chrome (filter bar, export buttons, scroll
+       containers' overflow). Stays in one column even on dark theme. */
+    @media print {
+      body.printing-report { background: #fff !important; color: #000 !important; }
+      body.printing-report header,
+      body.printing-report .tabs,
+      body.printing-report #report-filter-bar,
+      body.printing-report .report-actions,
+      body.printing-report .toast-stack,
+      body.printing-report .product-form-overlay,
+      body.printing-report .supp-modal-overlay,
+      body.printing-report .receipt-modal-overlay,
+      body.printing-report .confirm-overlay { display: none !important; }
+      body.printing-report .tab-panel { display: none !important; }
+      body.printing-report #reports-tab.active {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+      }
+      body.printing-report .report-section {
+        background: #fff !important; border: 0 !important;
+        padding: 0 !important; margin: 0 !important;
+        box-shadow: none !important;
+      }
+      body.printing-report .report-table-wrap { overflow: visible !important; border: 1px solid #ccc !important; }
+      body.printing-report .report-block { break-inside: avoid; page-break-inside: avoid; }
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -1552,6 +1692,7 @@
       <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">📋 Orders<span class="order-badge" id="order-badge" style="display:none;"></span></button>
       <button class="tab-btn" data-tab="products" onclick="switchTab('products')">📦 Products</button>
       <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">🏭 Suppliers</button>
+      <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">📊 Reports</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -1731,6 +1872,96 @@
     <div class="receipt-modal-overlay" id="receipt-modal" onclick="closeReceiptModal(event)">
       <button type="button" class="receipt-modal-close" onclick="closeReceiptModal()" aria-label="Close">×</button>
       <img id="receipt-modal-img" src="" alt="GCash Receipt" onclick="event.stopPropagation()" />
+    </div>
+
+    <!-- REPORTS -->
+    <div class="tab-panel" id="reports-tab">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Reports</div>
+          <div class="page-subtitle">Period summaries you can save, print, or send to a bookkeeper.</div>
+        </div>
+      </div>
+
+      <!-- Period filter: same shape as the dashboard's so the UX is familiar,
+           but its own state so picking a period in Reports doesn't move the dashboard. -->
+      <div class="dash-filter-bar" id="report-filter-bar">
+        <button class="dash-preset-btn"        data-rpreset="today"     onclick="setReportPreset('today')">Today</button>
+        <button class="dash-preset-btn"        data-rpreset="yesterday" onclick="setReportPreset('yesterday')">Yesterday</button>
+        <button class="dash-preset-btn"        data-rpreset="7d"        onclick="setReportPreset('7d')">Last 7 Days</button>
+        <button class="dash-preset-btn active" data-rpreset="30d"       onclick="setReportPreset('30d')">Last 30 Days</button>
+        <button class="dash-preset-btn"        data-rpreset="all"       onclick="setReportPreset('all')">All Time</button>
+        <div class="dash-date-range">
+          <input type="date" id="report-from" onchange="onReportDateChange()">
+          <span style="font-size:var(--fs-sm);color:var(--muted);">to</span>
+          <input type="date" id="report-to" onchange="onReportDateChange()">
+        </div>
+      </div>
+
+      <div class="report-section">
+        <div class="report-section-head">
+          <div>
+            <h2 class="report-section-title">Sales Report</h2>
+            <div class="report-section-period" id="report-meta">For period: —</div>
+          </div>
+          <div class="report-actions">
+            <button class="dash-export-btn"             onclick="exportSalesReportCSV()">⬇ Download CSV</button>
+            <button class="dash-export-btn dash-export-btn--ghost" onclick="printSalesReport()">🖨 Print / Save as PDF</button>
+          </div>
+        </div>
+
+        <!-- KPI strip — print-friendly, mirrors the dashboard tile data -->
+        <div class="report-kpis" id="report-kpis"></div>
+
+        <!-- Payment-method mix -->
+        <div class="report-block">
+          <h3 class="report-block-title">Payment method mix</h3>
+          <div class="report-paymix-bar" id="report-paymix-bar"></div>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-paymix-table"></table>
+          </div>
+        </div>
+
+        <!-- Daily breakdown -->
+        <div class="report-block">
+          <h3 class="report-block-title">Daily breakdown</h3>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-daily-table"></table>
+          </div>
+        </div>
+
+        <!-- Top 10 by units sold -->
+        <div class="report-block">
+          <h3 class="report-block-title">Top 10 items by units sold</h3>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-top-units-table"></table>
+          </div>
+        </div>
+
+        <!-- Top 10 by revenue -->
+        <div class="report-block">
+          <h3 class="report-block-title">Top 10 items by revenue</h3>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-top-revenue-table"></table>
+          </div>
+        </div>
+
+        <!-- Worst 10 (with at least one sale) -->
+        <div class="report-block">
+          <h3 class="report-block-title">Worst 10 sellers <span class="report-block-sub">(with at least one sale)</span></h3>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-worst-table"></table>
+          </div>
+        </div>
+
+        <!-- Cancellations & refunds -->
+        <div class="report-block">
+          <h3 class="report-block-title">Cancellations &amp; refunds</h3>
+          <div class="report-table-wrap">
+            <table class="report-table" id="report-cr-table"></table>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- SETTINGS -->
@@ -4638,6 +4869,13 @@ function switchTab(tab, reset = true) {
     });
   } else if (tab === 'settings') {
     setupSettingsScrollSpy();
+  } else if (tab === 'reports') {
+    // First open: seed default period (Last 30 Days). Subsequent re-opens
+    // keep whatever range the owner left set.
+    if (reportFromDate === undefined) {
+      setReportPreset('30d', false);
+    }
+    renderSalesReport();
   }
 }
 
@@ -5546,6 +5784,377 @@ function filterOrdersByDate(arr) {
     return true;
   });
 }
+
+// ============================================================
+// REPORTS TAB — Sales Report
+// ============================================================
+// Independent date-range state so picking a period under Reports doesn't
+// shift the Home dashboard's view. `undefined` here is the "never set"
+// sentinel (so switchTab knows to seed it on first open); `null` means
+// "All Time" (no bounds).
+let reportFromDate; // undefined initially
+let reportToDate;
+let __lastReportData = null;
+
+function setReportPreset(preset, doRender = true) {
+  document.querySelectorAll('[data-rpreset]').forEach(b =>
+    b.classList.toggle('active', b.dataset.rpreset === preset));
+  const today = manilaDateStr(new Date());
+  if (preset === 'today') {
+    reportFromDate = today; reportToDate = today;
+  } else if (preset === 'yesterday') {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    reportFromDate = manilaDateStr(y); reportToDate = reportFromDate;
+  } else if (preset === '7d') {
+    const d = new Date(); d.setDate(d.getDate() - 6);
+    reportFromDate = manilaDateStr(d); reportToDate = today;
+  } else if (preset === '30d') {
+    const d = new Date(); d.setDate(d.getDate() - 29);
+    reportFromDate = manilaDateStr(d); reportToDate = today;
+  } else {
+    reportFromDate = null; reportToDate = null;
+  }
+  const fromInp = document.getElementById('report-from');
+  const toInp   = document.getElementById('report-to');
+  if (fromInp) fromInp.value = reportFromDate || '';
+  if (toInp)   toInp.value   = reportToDate   || '';
+  if (doRender) renderSalesReport();
+}
+
+function onReportDateChange() {
+  reportFromDate = document.getElementById('report-from').value || null;
+  reportToDate   = document.getElementById('report-to').value   || null;
+  document.querySelectorAll('[data-rpreset]').forEach(b => b.classList.remove('active'));
+  renderSalesReport();
+}
+
+function filterOrdersForReport(arr) {
+  if (!reportFromDate && !reportToDate) return arr;
+  return arr.filter(o => {
+    const ds = getOrderDateStr(o);
+    if (!ds) return false;
+    if (reportFromDate && ds < reportFromDate) return false;
+    if (reportToDate   && ds > reportToDate)   return false;
+    return true;
+  });
+}
+
+function reportFmtPeriodLabel() {
+  if (!reportFromDate && !reportToDate) return 'All Time';
+  const f = reportFromDate, t = reportToDate;
+  if (f && t && f === t) return f;
+  return `${f || '—'} → ${t || '—'}`;
+}
+
+// Compute everything once, render to DOM, cache for CSV export.
+function renderSalesReport() {
+  if (!document.getElementById('reports-tab')) return;
+
+  const fil  = filterOrdersForReport(orders || []);
+  const conf = fil.filter(o => o.status === 'confirmed');
+  const canc = fil.filter(o => o.status === 'cancelled');
+  const refu = fil.filter(o => o.status === 'refunded');
+
+  // --- KPIs ---
+  const revenue   = conf.reduce((s, o) => s + parseFloat(o.total || 0), 0);
+  const delivery  = conf.reduce((s, o) => s + parseFloat(o.deliveryFee || 0), 0);
+  const itemsSold = conf.reduce((s, o) =>
+    s + (o.confirmedItems || o.items || []).reduce((ss, i) => ss + (parseInt(i.qty) || 0), 0), 0);
+  const aov = conf.length > 0 ? revenue / conf.length : 0;
+
+  let totalCost = 0;
+  let profitableLineRevenue = 0;
+  let linesMissingCost = 0;
+  conf.forEach(o => {
+    (o.confirmedItems || o.items || []).forEach(item => {
+      const cost = getItemCost({ productId: item.productId, variantIdx: item.variantIdx === undefined ? null : item.variantIdx });
+      const qty = parseInt(item.qty) || 0;
+      const line = parseFloat(item.lineTotal) || 0;
+      if (cost === null) { linesMissingCost++; return; }
+      totalCost += cost * qty;
+      profitableLineRevenue += line;
+    });
+  });
+  const totalProfit = profitableLineRevenue - totalCost;
+  const marginPct = profitableLineRevenue > 0 ? (totalProfit / profitableLineRevenue) * 100 : null;
+
+  // --- Payment-method mix ---
+  const paymix = {
+    cash:  { count: 0, revenue: 0 },
+    gcash: { count: 0, revenue: 0 },
+    cod:   { count: 0, revenue: 0 },
+    other: { count: 0, revenue: 0 }
+  };
+  conf.forEach(o => {
+    const m = String(o.payment || '').toLowerCase();
+    const bucket = paymix[m] ? m : 'other';
+    paymix[bucket].count++;
+    paymix[bucket].revenue += parseFloat(o.total || 0);
+  });
+
+  // --- Daily breakdown (descending date) ---
+  const dailyMap = {};
+  conf.forEach(o => {
+    const ds = getOrderDateStr(o);
+    if (!ds) return;
+    if (!dailyMap[ds]) dailyMap[ds] = { orders: 0, revenue: 0, profit: 0 };
+    dailyMap[ds].orders++;
+    dailyMap[ds].revenue += parseFloat(o.total || 0);
+    (o.confirmedItems || o.items || []).forEach(item => {
+      const cost = getItemCost({ productId: item.productId, variantIdx: item.variantIdx === undefined ? null : item.variantIdx });
+      const qty = parseInt(item.qty) || 0;
+      const line = parseFloat(item.lineTotal) || 0;
+      if (cost === null) return;
+      dailyMap[ds].profit += (line - cost * qty);
+    });
+  });
+  const dailyRows = Object.entries(dailyMap)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, v]) => ({ date, ...v }));
+
+  // --- Item ranking (across confirmed orders' confirmed items) ---
+  const itemStats = {};
+  conf.forEach(o => {
+    (o.confirmedItems || o.items || []).forEach(item => {
+      const pid = String(item.productId);
+      const vi  = item.variantIdx !== undefined && item.variantIdx !== null ? item.variantIdx : '';
+      const key = `${pid}__${vi}`;
+      const p = products.find(x => String(x.id) === pid);
+      const baseName = p ? p.name : (item.name || `Product ${pid}`);
+      const variantName = (p && p.variants && vi !== '' && p.variants[vi]) ? p.variants[vi].name : '';
+      const display = baseName + (variantName ? ` (${variantName})` : '');
+      if (!itemStats[key]) itemStats[key] = { name: display, units: 0, revenue: 0 };
+      itemStats[key].units   += parseInt(item.qty) || 0;
+      itemStats[key].revenue += parseFloat(item.lineTotal) || 0;
+    });
+  });
+  const itemArr = Object.values(itemStats);
+  const topByUnits    = [...itemArr].sort((a, b) => b.units   - a.units  ).slice(0, 10);
+  const topByRevenue  = [...itemArr].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  const worstByRevenue = [...itemArr].sort((a, b) => a.revenue - b.revenue).slice(0, 10);
+
+  // --- Cancellation / refund peso value ---
+  const cancRevenue   = canc.reduce((s, o) => s + parseFloat(o.total || 0), 0);
+  const refundRevenue = refu.reduce((s, o) => s + parseFloat(o.total || 0), 0);
+
+  // Cache for CSV.
+  __lastReportData = {
+    period: { from: reportFromDate, to: reportToDate, label: reportFmtPeriodLabel() },
+    kpis: { revenue, orders: conf.length, aov, itemsSold, totalCost, totalProfit, marginPct, delivery, linesMissingCost },
+    paymix,
+    daily: dailyRows,
+    topByUnits, topByRevenue, worstByRevenue,
+    cancellations: { count: canc.length, revenue: cancRevenue },
+    refunds:       { count: refu.length, revenue: refundRevenue }
+  };
+
+  // --- Render ---
+  document.getElementById('report-meta').textContent =
+    `For period: ${reportFmtPeriodLabel()} · Generated ${new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' })}`;
+
+  // KPI tiles
+  const kpiTiles = [
+    { label: 'Total Revenue',     value: '₱' + fmt(revenue) },
+    { label: 'Confirmed Orders',  value: conf.length },
+    { label: 'Avg Order Value',   value: '₱' + fmt(aov) },
+    { label: 'Items Sold',        value: itemsSold },
+    { label: 'Total Cost',        value: linesMissingCost > 0 && profitableLineRevenue === 0 ? '—' : '₱' + fmt(totalCost) },
+    { label: 'Total Profit',      value: profitableLineRevenue > 0 ? '₱' + fmt(totalProfit) : '—' },
+    { label: 'Profit Margin',     value: marginPct === null ? '—' : marginPct.toFixed(1) + '%' },
+    { label: 'Delivery Collected',value: '₱' + fmt(delivery) }
+  ];
+  document.getElementById('report-kpis').innerHTML = kpiTiles.map(t => `
+    <div class="report-kpi">
+      <div class="report-kpi-label">${t.label}</div>
+      <div class="report-kpi-value">${t.value}</div>
+    </div>`).join('');
+
+  // Payment-method mix — stacked bar + table
+  const totalConfRevenue = revenue || 0;
+  const bar = document.getElementById('report-paymix-bar');
+  const paymixTable = document.getElementById('report-paymix-table');
+  if (totalConfRevenue === 0) {
+    bar.innerHTML = '<div class="report-paymix-empty">No confirmed revenue in this period.</div>';
+  } else {
+    const order = ['cash', 'gcash', 'cod', 'other'];
+    bar.innerHTML = order.filter(m => paymix[m].revenue > 0).map(m => {
+      const pct = (paymix[m].revenue / totalConfRevenue) * 100;
+      return `<div class="report-paymix-seg ${m}" style="flex:${pct.toFixed(2)} 0 0;">${pct >= 8 ? m.toUpperCase() + ' ' + pct.toFixed(0) + '%' : ''}</div>`;
+    }).join('');
+  }
+  paymixTable.innerHTML = `
+    <thead><tr><th>Method</th><th class="numeric">Orders</th><th class="numeric">Revenue</th><th class="numeric">% of revenue</th></tr></thead>
+    <tbody>
+      ${['cash','gcash','cod','other'].filter(m => paymix[m].count > 0).map(m => {
+        const pct = totalConfRevenue > 0 ? (paymix[m].revenue / totalConfRevenue) * 100 : 0;
+        return `<tr>
+          <td>${m === 'cod' ? 'COD (Cash on Delivery)' : m === 'gcash' ? 'GCash' : m === 'cash' ? 'Cash (at pickup)' : 'Other'}</td>
+          <td class="numeric">${paymix[m].count}</td>
+          <td class="numeric">₱${fmt(paymix[m].revenue)}</td>
+          <td class="numeric">${pct.toFixed(1)}%</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="4" class="report-empty">No confirmed orders.</td></tr>`}
+    </tbody>`;
+
+  // Daily breakdown
+  const daily = document.getElementById('report-daily-table');
+  daily.innerHTML = `
+    <thead><tr><th>Date</th><th class="numeric">Orders</th><th class="numeric">Revenue</th><th class="numeric">Profit</th></tr></thead>
+    <tbody>
+      ${dailyRows.length === 0
+        ? `<tr><td colspan="4" class="report-empty">No confirmed orders in this period.</td></tr>`
+        : dailyRows.map(r => `<tr>
+            <td>${r.date}</td>
+            <td class="numeric">${r.orders}</td>
+            <td class="numeric">₱${fmt(r.revenue)}</td>
+            <td class="numeric">₱${fmt(r.profit)}</td>
+          </tr>`).join('')}
+    </tbody>`;
+
+  // Top by units
+  const topUnitsEl = document.getElementById('report-top-units-table');
+  topUnitsEl.innerHTML = `
+    <thead><tr><th>#</th><th>Product</th><th class="numeric">Units</th><th class="numeric">Revenue</th></tr></thead>
+    <tbody>
+      ${topByUnits.length === 0
+        ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
+        : topByUnits.map((it, i) => `<tr>
+            <td class="numeric">${i + 1}</td>
+            <td>${it.name}</td>
+            <td class="numeric">${it.units}</td>
+            <td class="numeric">₱${fmt(it.revenue)}</td>
+          </tr>`).join('')}
+    </tbody>`;
+
+  // Top by revenue
+  const topRevEl = document.getElementById('report-top-revenue-table');
+  topRevEl.innerHTML = `
+    <thead><tr><th>#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <tbody>
+      ${topByRevenue.length === 0
+        ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
+        : topByRevenue.map((it, i) => `<tr>
+            <td class="numeric">${i + 1}</td>
+            <td>${it.name}</td>
+            <td class="numeric">₱${fmt(it.revenue)}</td>
+            <td class="numeric">${it.units}</td>
+          </tr>`).join('')}
+    </tbody>`;
+
+  // Worst by revenue
+  const worstEl = document.getElementById('report-worst-table');
+  worstEl.innerHTML = `
+    <thead><tr><th>#</th><th>Product</th><th class="numeric">Revenue</th><th class="numeric">Units</th></tr></thead>
+    <tbody>
+      ${worstByRevenue.length === 0
+        ? `<tr><td colspan="4" class="report-empty">No sales in this period.</td></tr>`
+        : worstByRevenue.map((it, i) => `<tr>
+            <td class="numeric">${i + 1}</td>
+            <td>${it.name}</td>
+            <td class="numeric">₱${fmt(it.revenue)}</td>
+            <td class="numeric">${it.units}</td>
+          </tr>`).join('')}
+    </tbody>`;
+
+  // Cancellations & refunds
+  const crEl = document.getElementById('report-cr-table');
+  crEl.innerHTML = `
+    <thead><tr><th>Type</th><th class="numeric">Count</th><th class="numeric">Revenue value</th></tr></thead>
+    <tbody>
+      <tr><td>Cancelled</td><td class="numeric">${canc.length}</td><td class="numeric">₱${fmt(cancRevenue)}</td></tr>
+      <tr><td>Refunded</td><td class="numeric">${refu.length}</td><td class="numeric">₱${fmt(refundRevenue)}</td></tr>
+    </tbody>`;
+}
+
+// ---------- CSV Export ----------
+function exportSalesReportCSV() {
+  if (!__lastReportData) renderSalesReport();
+  const d = __lastReportData;
+  if (!d) return;
+  const slug = (typeof TENANT_ID === 'string' ? TENANT_ID : 'store');
+  const fileBase = `${slug}_sales_report_${d.period.from || 'all'}_to_${d.period.to || 'all'}`.replace(/[^a-z0-9_]/gi, '_');
+
+  const lines = [];
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const r = (...cells) => lines.push(cells.map(esc).join(','));
+
+  r('Sales Report');
+  r('Period', d.period.label);
+  r('Generated', new Date().toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' }));
+  r();
+
+  r('-- Period summary --');
+  r('Metric', 'Value');
+  r('Total Revenue (PHP)', d.kpis.revenue.toFixed(2));
+  r('Confirmed Orders', d.kpis.orders);
+  r('Avg Order Value (PHP)', d.kpis.aov.toFixed(2));
+  r('Items Sold', d.kpis.itemsSold);
+  r('Total Cost (PHP)', d.kpis.totalCost.toFixed(2));
+  r('Total Profit (PHP)', d.kpis.totalProfit.toFixed(2));
+  r('Profit Margin (%)', d.kpis.marginPct !== null ? d.kpis.marginPct.toFixed(1) : 'N/A');
+  r('Delivery Collected (PHP)', d.kpis.delivery.toFixed(2));
+  if (d.kpis.linesMissingCost > 0) r('Note', `${d.kpis.linesMissingCost} sold line(s) excluded from cost/profit/margin (cost not set on product).`);
+  r();
+
+  r('-- Payment method mix --');
+  r('Method', 'Orders', 'Revenue (PHP)');
+  ['cash','gcash','cod','other'].forEach(m => {
+    if (d.paymix[m].count > 0) r(m === 'cod' ? 'COD' : m, d.paymix[m].count, d.paymix[m].revenue.toFixed(2));
+  });
+  r();
+
+  r('-- Daily breakdown --');
+  r('Date', 'Orders', 'Revenue (PHP)', 'Profit (PHP)');
+  d.daily.forEach(row => r(row.date, row.orders, row.revenue.toFixed(2), row.profit.toFixed(2)));
+  r();
+
+  r('-- Top 10 by units sold --');
+  r('Rank', 'Product', 'Units', 'Revenue (PHP)');
+  d.topByUnits.forEach((it, i) => r(i + 1, it.name, it.units, it.revenue.toFixed(2)));
+  r();
+
+  r('-- Top 10 by revenue --');
+  r('Rank', 'Product', 'Revenue (PHP)', 'Units');
+  d.topByRevenue.forEach((it, i) => r(i + 1, it.name, it.revenue.toFixed(2), it.units));
+  r();
+
+  r('-- Worst 10 by revenue (items with at least one sale) --');
+  r('Rank', 'Product', 'Revenue (PHP)', 'Units');
+  d.worstByRevenue.forEach((it, i) => r(i + 1, it.name, it.revenue.toFixed(2), it.units));
+  r();
+
+  r('-- Cancellations & refunds --');
+  r('Type', 'Count', 'Revenue Value (PHP)');
+  r('Cancelled', d.cancellations.count, d.cancellations.revenue.toFixed(2));
+  r('Refunded',  d.refunds.count,       d.refunds.revenue.toFixed(2));
+
+  // Prepend BOM so Excel opens UTF-8 + the peso sign correctly.
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${fileBase}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Print handler ----------
+function printSalesReport() {
+  // Make sure the latest data is rendered before the print dialog opens.
+  renderSalesReport();
+  document.body.classList.add('printing-report');
+  const cleanup = () => {
+    document.body.classList.remove('printing-report');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  // Slight delay so layout reflows before the print dialog samples it.
+  setTimeout(() => window.print(), 50);
+}
+
 
 // Chart.js plugin: draws a percentage label on each doughnut slice. Tiny
 // slices (<4%) are skipped so the chart doesn't end up cluttered with
