@@ -46,8 +46,10 @@
      is a deliberate exception. Keeps the page readable as one rhythm. */
   header { text-align: center; margin: 0 0 32px; max-width: 520px; }
   header h1 { font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
-  header .lede   { color: var(--muted); margin-top: 10px; font-size: 15px; }
-  header .pricing { color: var(--muted); margin-top: 6px; font-size: 13px; }
+  /* Lede + pricing line use the same body size (15px) so they read as one
+     subtitle on two lines, not as a primary-and-fine-print pair. */
+  header .lede,
+  header .pricing { color: var(--muted); margin-top: 8px; font-size: 15px; }
 
   .card {
     background: var(--surface);
@@ -204,7 +206,7 @@
 <body>
 
 <header>
-  <h1>Start your own sari-sari store</h1>
+  <h1>Start your own online store today!</h1>
   <p class="lede">Get a free online storefront and admin panel.</p>
   <p class="pricing">No credit card needed for the first month.</p>
 </header>
@@ -242,7 +244,7 @@
       <form id="store-form" onsubmit="submitForm(event)">
         <div class="field">
           <label for="store-name">Store name</label>
-          <input class="input" id="store-name" type="text" placeholder="e.g. Tina's Mini Mart" maxlength="100" required />
+          <input class="input" id="store-name" type="text" placeholder="Tindahan ni Manilyn" maxlength="100" required />
           <div class="help">This is what customers will see at the top of your storefront.</div>
         </div>
 
@@ -250,23 +252,23 @@
           <label for="store-slug">Store URL</label>
           <div class="slug-row">
             <span class="slug-prefix">pabilimart.com/</span>
-            <input class="input" id="store-slug" type="text" placeholder="tinastore" minlength="3" maxlength="32" pattern="[a-z][a-z0-9-]*" required autocapitalize="none" autocorrect="off" spellcheck="false" />
+            <input class="input" id="store-slug" type="text" placeholder="tindahan-ni-manilyn" minlength="3" maxlength="32" pattern="[a-z][a-z0-9-]*" required autocapitalize="none" autocorrect="off" spellcheck="false" />
           </div>
           <div class="slug-preview">
-            Your store will be at <span class="url-host">https://pabilimart.com/</span><span class="url-slug" id="slug-preview">tinastore</span><span class="url-host">/</span>
+            Your store will be at <span class="url-host">https://pabilimart.com/</span><span class="url-slug" id="slug-preview">tindahan-ni-manilyn</span><span class="url-host">/</span>
           </div>
           <div class="help">Auto-filled from your store name. You can edit it. Lowercase letters, numbers, and hyphens. 3–32 characters.</div>
         </div>
 
         <div class="field">
           <label for="store-pickup-address">Store address (for pickup)</label>
-          <textarea class="input" id="store-pickup-address" rows="2" placeholder="e.g. Block 8 Lot 47 Phase 3 Jade St., Valle Verde Subdivision, Dasmariñas City." maxlength="300" required></textarea>
+          <textarea class="input" id="store-pickup-address" rows="2" placeholder="Block 10 Lot 9 Phase 7 Smallville Subdivision Dasmarinas City" maxlength="300" required></textarea>
           <div class="help">Customers see this on the checkout page when they choose pickup.</div>
         </div>
 
         <div class="field">
           <label for="store-gcash-name">GCash account name</label>
-          <input class="input" id="store-gcash-name" type="text" placeholder="e.g. Jason T. (Jason Tubilag)" maxlength="100" required />
+          <input class="input" id="store-gcash-name" type="text" placeholder="Ma****n T." maxlength="100" required />
           <div class="help">Shown to customers paying via GCash. Use the exact name on your GCash account so customers know what to look for.</div>
         </div>
 
@@ -386,7 +388,7 @@ const slugPreview = document.getElementById('slug-preview');
 slugInput.addEventListener('input', () => {
   const cleaned = slugInput.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (cleaned !== slugInput.value) slugInput.value = cleaned;
-  slugPreview.textContent = cleaned || 'tinastore';
+  slugPreview.textContent = cleaned || 'tindahan-ni-manilyn';
 });
 
 function showStatus(msg, kind) {
@@ -541,7 +543,7 @@ nameInput.addEventListener('input', () => {
     .replace(/^[^a-z]+/, '')        // must start with a letter
     .slice(0, 32);
   slugInput.value = slug;
-  slugPreview.textContent = slug || 'tinastore';
+  slugPreview.textContent = slug || 'tindahan-ni-manilyn';
 });
 </script>
 </body>
