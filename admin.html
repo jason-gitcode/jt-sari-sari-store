@@ -205,19 +205,21 @@
     header { position: relative; }
     .storefront-btn {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 7px 14px; border: 1px solid var(--line);
-      border-radius: 8px; background: var(--surface);
-      color: var(--ink); font-size: 13px; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 22px; border: 1px solid var(--ok, #16a34a);
+      border-radius: 8px; background: var(--ok, #16a34a);
+      color: #ffffff; font-size: 13px; font-weight: 600;
       text-decoration: none; cursor: pointer;
-      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      transition: background 0.12s, border-color 0.12s, transform 0.05s;
       z-index: 1;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
     }
-    .storefront-btn:hover { background: var(--surface-2); border-color: var(--line-strong); color: var(--accent); }
+    .storefront-btn:hover { background: #15803d; border-color: #15803d; color: #ffffff; }
+    .storefront-btn:active { transform: translate(-50%, -50%) scale(0.97); }
     .storefront-btn svg { flex-shrink: 0; }
     @media (max-width: 700px) {
       .storefront-btn span { display: none; }
-      .storefront-btn { padding: 7px 9px; }
+      .storefront-btn { padding: 8px 12px; }
     }
     .icon-btn {
       width: 36px; height: 36px;
@@ -1040,11 +1042,29 @@
     .dash-card-value.blue  { color: var(--accent); }
     .dash-card-value.amber { color: var(--warn); }
 
-    .dash-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; flex-shrink: 0; }
+    /* `minmax(0, 1fr)` (not just `1fr`) so each grid track CAN actually
+       shrink to fit half the row. Plain `1fr` resolves to `minmax(auto, 1fr)`
+       which lets content force the column wider, which is exactly the
+       chart-stretch bug we're fixing. */
+    .dash-charts-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 14px; flex-shrink: 0; }
     .dash-chart-full { margin-bottom: 18px; flex-shrink: 0; }
-    .dash-chart-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+    /* min-width: 0 lets the grid item shrink below its content's natural
+       width — without it, a wide canvas would force the grid track wider
+       than 1fr, blowing out the layout. */
+    .dash-chart-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; min-width: 0; }
     .dash-chart-box h3 { font-size: var(--fs-md); font-weight: 600; margin: 0 0 14px; color: var(--ink); }
-    .dash-chart-canvas { position: relative; height: 240px; }
+    /* Explicit width + min-width:0 so Chart.js's responsive canvas can't
+       claim more than the grid track allocates. Without this, on the very
+       first dashboard paint (immediately after signup / login) the
+       doughnut canvases sometimes pre-size before the grid layout has
+       fully resolved and end up stretched comically wide. */
+    .dash-chart-canvas {
+      position: relative;
+      height: 240px;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
 
     .dash-section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; flex-shrink: 0; }
     .dash-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
@@ -1827,7 +1847,9 @@
       </div>
     </div>
     <a class="storefront-btn" id="storefront-link" target="_blank" rel="noopener" href="#" title="Open your storefront in a new tab">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M3 9l1-5h16l1 5"></path><path d="M5 9v11h14V9"></path><path d="M9 22v-7h6v7"></path></svg>
+      <!-- Lucide "house" icon: classic peaked roof with door — clearer
+           read at small size than the previous shop-awning shape. -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M3 12 12 3l9 9"></path><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10"></path></svg>
       <span>Storefront</span>
     </a>
     <div class="header-actions">
