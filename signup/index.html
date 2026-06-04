@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<!-- Soft-cutover redirect: jsminimart.com → pabilimart.com (path-preserving).
+     Runs before any other script/render. Pure client-side replace. -->
+<script>
+  if (location.hostname === 'jsminimart.com' || location.hostname === 'www.jsminimart.com') {
+    location.replace('https://pabilimart.com' + location.pathname + location.search + location.hash);
+  }
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Start Your Sari-Sari Store — Pabili Mart</title>
 <base href="/">
@@ -293,7 +300,7 @@
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
-  authDomain: "jsminimart.com",
+  authDomain: "pabilimart.com",
   projectId: "jt-sari-sari-store",
   storageBucket: "jt-sari-sari-store.firebasestorage.app",
   messagingSenderId: "625852109606",
