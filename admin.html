@@ -2852,11 +2852,6 @@
 
 <script>
 
-const ADMIN_CATEGORIES = [
-  "Bakery", "Bathroom Essentials", "Beverages", "Canned Goods", "Condiments",
-  "Cooking Essentials", "Noodles", "Pet Care", "School Supplies", "Slippers", "Snacks"
-];
-
 const firebaseConfig = {
   apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
   authDomain: "pabilimart.com",
@@ -5297,7 +5292,11 @@ function deleteCategory(cat) {
 function updateCategorySelect(selectedValue = '') {
   const sel = document.getElementById('product-category');
   if (!sel) return;
-  const cats = new Set([...ADMIN_CATEGORIES]);
+  // Derive the dropdown ENTIRELY from the live products array — same source
+  // of truth as the category filter chips above the product table. When the
+  // last product of a category is deleted, the category disappears from
+  // both surfaces. Owners create new categories via "+ Create new category…".
+  const cats = new Set();
   products.forEach(p => { if (p.category) cats.add(p.category); });
   sel.innerHTML =
     `<option value="">Select Category</option>` +
