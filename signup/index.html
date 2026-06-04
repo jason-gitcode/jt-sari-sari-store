@@ -23,6 +23,7 @@
     --text: #0f172a;
     --muted: #64748b;
     --line: #e2e8f0;
+    --soft: #f8fafc;
     --accent: #2563eb;
     --accent-dark: #1d4ed8;
     --success: #16a34a;
@@ -36,114 +37,143 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 24px 16px;
+    padding: 32px 16px 48px;
     min-height: 100vh;
+    line-height: 1.5;
   }
-  header { text-align: center; margin: 24px 0 32px; }
-  header img { width: 64px; height: 64px; border-radius: 16px; }
-  header h1 { font-size: 28px; margin-top: 12px; font-weight: 700; }
-  header p { color: var(--muted); margin-top: 8px; font-size: 15px; max-width: 520px; }
+  /* ---------- Type scale ---------- */
+  /* Strict 3-size scale: 28 (hero) / 15 (body) / 13 (meta). Anything else
+     is a deliberate exception. Keeps the page readable as one rhythm. */
+  header { text-align: center; margin: 0 0 32px; max-width: 520px; }
+  header h1 { font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+  header .lede   { color: var(--muted); margin-top: 10px; font-size: 15px; }
+  header .pricing { color: var(--muted); margin-top: 6px; font-size: 13px; }
+
   .card {
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: 14px;
     padding: 28px;
     width: 100%;
-    max-width: 480px;
+    max-width: 460px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.04);
   }
-  .step-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-  .step-body { margin-bottom: 24px; }
+  .step-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+  .step-body { margin-bottom: 0; }
+
+  /* ---------- Buttons ---------- */
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 10px;
     width: 100%; padding: 12px 16px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #fff;
+    background: #fff; color: var(--text);
     font-size: 15px; font-weight: 500;
+    font-family: inherit;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, border-color 0.15s;
   }
-  .btn:hover { background: #f8fafc; }
+  .btn:hover { background: var(--soft); }
   .btn-primary {
     background: var(--accent); border-color: var(--accent); color: #fff;
+    font-weight: 600;
   }
   .btn-primary:hover { background: var(--accent-dark); }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .gicon { width: 18px; height: 18px; }
+
+  /* ---------- "Signed in as" pill + switch link ---------- */
   .signed-in-as {
-    background: #f1f5f9;
+    background: var(--soft);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 10px 12px;
     font-size: 13px;
     color: var(--muted);
-    margin-bottom: 16px;
+    margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
-  .signed-in-as strong { color: var(--text); }
+  .signed-in-as strong { color: var(--text); font-weight: 600; }
   .link-btn {
-    background: none;
-    border: none;
+    background: none; border: none; padding: 0;
     color: var(--accent);
-    font-size: 13px;
+    font-size: 13px; font-family: inherit;
     cursor: pointer;
-    padding: 0;
   }
   .link-btn:hover { text-decoration: underline; }
-  /* "You already have a store" card — listed after sign-in if the account
-     has already used its 1-store cap (or each tenant of a superadmin). */
-  .owner-tenant-card {
-    border: 1px solid var(--line); border-radius: 10px;
-    padding: 14px 16px; margin-bottom: 12px;
-    background: #f8fafc;
-  }
-  .owner-tenant-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-  .owner-tenant-url { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; margin-bottom: 12px; word-break: break-all; }
-  .owner-tenant-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .owner-tenant-actions .btn { flex: 1 1 0; min-width: 130px; text-align: center; text-decoration: none; }
-  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+
+  /* ---------- Form fields ---------- */
+  .field { margin-bottom: 18px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
   .input {
     width: 100%;
-    padding: 10px 12px;
+    padding: 11px 12px;
     border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 15px;
     font-family: inherit;
+    color: var(--text);
+    background: #fff;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .input:focus { outline: none; border-color: var(--accent); }
-  .help { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+  /* Lighter, italic, smaller placeholder hint — same pattern across every
+     field so the example text reads as quiet guidance, not a label. */
+  .input::placeholder {
+    color: rgba(15, 23, 42, 0.32);
+    font-style: italic;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .help { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+
+  /* ---------- Store URL row (prefix + slug input + live preview) ---------- */
+  .slug-row { display: flex; align-items: stretch; }
+  .slug-prefix {
+    display: inline-flex; align-items: center;
+    padding: 0 12px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .slug-row .input {
+    border-radius: 0 8px 8px 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
   .slug-preview {
-    background: #f8fafc;
+    background: var(--soft);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 10px 12px;
     margin-top: 8px;
     font-size: 13px;
     color: var(--muted);
-    font-family: monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     word-break: break-all;
   }
   .slug-preview .url-host { color: var(--text); }
   .slug-preview .url-slug { color: var(--accent); font-weight: 600; }
-  .slug-row { display: flex; align-items: stretch; }
-  .slug-prefix {
-    display: inline-flex; align-items: center;
-    padding: 0 12px;
-    background: #f8fafc;
-    border: 1px solid var(--line);
-    border-right: none;
-    border-radius: 8px 0 0 8px;
-    font-size: 13px;
-    color: var(--muted);
-    font-family: monospace;
+
+  /* ---------- Invite code (now optional, at the bottom of the form) ---------- */
+  .invite-code-field {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--line);
   }
-  .slug-row .input {
-    border-radius: 0 8px 8px 0;
-    font-family: monospace;
+  .invite-code-field .input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
+
+  /* ---------- Status pill (success / error feedback) ---------- */
   .status {
     margin-top: 16px;
     padding: 12px;
@@ -154,10 +184,20 @@
   .status.show { display: block; }
   .status.error { background: #fee2e2; color: var(--error); border: 1px solid #fecaca; }
   .status.success { background: #dcfce7; color: var(--success); border: 1px solid #bbf7d0; }
-  .field { margin-bottom: 16px; }
-  .footer-links { margin-top: 24px; text-align: center; font-size: 13px; color: var(--muted); }
-  .footer-links a { color: var(--accent); text-decoration: none; }
-  .footer-links a:hover { text-decoration: underline; }
+
+  /* ---------- "Already have a store" landing card (after sign-in if owned) ---------- */
+  .owner-tenant-card {
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 12px;
+    background: var(--soft);
+  }
+  .owner-tenant-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .owner-tenant-url { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-bottom: 12px; word-break: break-all; }
+  .owner-tenant-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .owner-tenant-actions .btn { flex: 1 1 0; min-width: 130px; text-align: center; text-decoration: none; }
+
+  .submit-btn-wrap { margin-top: 28px; }
+
   .hidden { display: none !important; }
 </style>
 </head>
@@ -165,7 +205,8 @@
 
 <header>
   <h1>Start your own sari-sari store</h1>
-  <p>Get a free online storefront and admin panel. No credit card needed for the first month.</p>
+  <p class="lede">Get a free online storefront and admin panel.</p>
+  <p class="pricing">No credit card needed for the first month.</p>
 </header>
 
 <div class="card">
@@ -199,12 +240,6 @@
       </div>
 
       <form id="store-form" onsubmit="submitForm(event)">
-        <div class="field" id="invite-field">
-          <label for="store-invite-code">Invite code</label>
-          <input class="input" id="store-invite-code" type="text" placeholder="e.g. K8X3M9PQ" maxlength="12" required autocapitalize="characters" autocorrect="off" spellcheck="false" style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase;" />
-          <div class="help">Sign-up is invite-only. Paste the 8-character code we sent you. If you don't have one, contact support.</div>
-        </div>
-
         <div class="field">
           <label for="store-name">Store name</label>
           <input class="input" id="store-name" type="text" placeholder="e.g. Tina's Mini Mart" maxlength="100" required />
@@ -220,7 +255,7 @@
           <div class="slug-preview">
             Your store will be at <span class="url-host">https://pabilimart.com/</span><span class="url-slug" id="slug-preview">tinastore</span><span class="url-host">/</span>
           </div>
-          <div class="help">Lowercase letters, numbers, and hyphens. 3–32 characters. Must start with a letter.</div>
+          <div class="help">Auto-filled from your store name. You can edit it. Lowercase letters, numbers, and hyphens. 3–32 characters.</div>
         </div>
 
         <div class="field">
@@ -232,7 +267,7 @@
         <div class="field">
           <label for="store-gcash-name">GCash account name</label>
           <input class="input" id="store-gcash-name" type="text" placeholder="e.g. Jason T. (Jason Tubilag)" maxlength="100" required />
-          <div class="help">Shown to customers paying via GCash. Best to use the exact name on your GCash account so customers know what to look for.</div>
+          <div class="help">Shown to customers paying via GCash. Use the exact name on your GCash account so customers know what to look for.</div>
         </div>
 
         <div class="field">
@@ -241,7 +276,15 @@
           <div class="help">11 digits, starts with 09. This is where customers send GCash payments.</div>
         </div>
 
-        <button type="submit" id="submit-btn" class="btn btn-primary">Create my store</button>
+        <div class="field invite-code-field" id="invite-field">
+          <label for="store-invite-code">Invite code <span style="color: var(--muted); font-weight: 400;">— optional</span></label>
+          <input class="input" id="store-invite-code" type="text" placeholder="e.g. K8X3M9PQ" maxlength="12" autocapitalize="characters" autocorrect="off" spellcheck="false" />
+          <div class="help">Have an invite code? Paste it here. Otherwise leave blank — sign-up is free either way.</div>
+        </div>
+
+        <div class="submit-btn-wrap">
+          <button type="submit" id="submit-btn" class="btn btn-primary">Create my store</button>
+        </div>
 
         <div id="status" class="status"></div>
       </form>
@@ -281,16 +324,6 @@
       <a id="open-admin-btn" href="#" class="btn btn-primary" style="text-decoration: none;">Open my admin →</a>
     </div>
   </div>
-</div>
-
-<div class="footer-links">
-  <div style="margin-bottom:8px;">Already have a store? Sign in to your admin:</div>
-  <form id="admin-go-form" onsubmit="goToAdmin(event)" style="display:inline-flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;max-width:100%;">
-    <span style="font-family:monospace;font-size:12px;color:var(--muted);">pabilimart.com/</span>
-    <input type="text" id="admin-go-slug" placeholder="your-store" required pattern="[a-z][a-z0-9-]*" minlength="3" maxlength="32" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:monospace;width:140px;" />
-    <span style="font-family:monospace;font-size:12px;color:var(--muted);">/admin/</span>
-    <button type="submit" style="padding:6px 14px;background:var(--accent);color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;">Go</button>
-  </form>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -371,14 +404,6 @@ function showStep(id) {
   ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
-  // Hide the "Already have a store? Sign in to your admin:" footer on
-  // steps where it's redundant — the user already has a clear admin
-  // link in front of them (existing-owner card, just-created success card).
-  const foot = document.querySelector('.footer-links');
-  if (foot) {
-    const redundantOn = (id === 'step-already-owner' || id === 'step-success');
-    foot.style.display = redundantOn ? 'none' : '';
-  }
 }
 
 document.getElementById('signin-btn').addEventListener('click', async () => {
@@ -494,12 +519,30 @@ auth.onAuthStateChanged(async user => {
   }
 });
 
-function goToAdmin(e) {
-  e.preventDefault();
-  const slug = (document.getElementById('admin-go-slug').value || '').trim().toLowerCase();
-  if (!/^[a-z][a-z0-9-]*$/.test(slug)) return;
-  window.location.href = '/' + slug + '/admin/';
-}
+// Auto-fill the Store URL slug from the Store name as the user types.
+// Stops auto-filling the moment the user manually edits the slug field
+// (so they can keep typing their store name without it overwriting their
+// chosen URL). Filter to slug rules: lowercase, alphanumeric + hyphens,
+// must start with a letter, max 32 chars.
+const nameInput = document.getElementById('store-name');
+let slugAutoFilled = true;
+slugInput.addEventListener('input', () => {
+  // Mark user-edited if they typed into the slug field directly.
+  if (document.activeElement === slugInput) slugAutoFilled = false;
+});
+nameInput.addEventListener('input', () => {
+  if (!slugAutoFilled) return;
+  const slug = nameInput.value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')   // strip punctuation
+    .replace(/\s+/g, '-')           // spaces → hyphens
+    .replace(/-+/g, '-')            // collapse repeated hyphens
+    .replace(/^-+/, '')             // strip leading hyphens
+    .replace(/^[^a-z]+/, '')        // must start with a letter
+    .slice(0, 32);
+  slugInput.value = slug;
+  slugPreview.textContent = slug || 'tinastore';
+});
 </script>
 </body>
 </html>

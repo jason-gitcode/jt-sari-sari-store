@@ -145,31 +145,31 @@ exports.createTenant = onCall(async (request) => {
   // Superadmins bypass — they can spin up tenants directly without a code.
   const isSuperadmin = SUPERADMIN_EMAILS.has(email);
   const inviteCode = normalizeInviteCode(data.inviteCode);
+  // Signup is OPEN: invite codes are now an optional attribution layer, not
+  // a gate. If a code is provided we validate + redeem it (still useful for
+  // marketing attribution + Phase 8 paid-tier perks). If empty, skip the
+  // lookup entirely — the per-email cap below is the spam ceiling.
   let inviteRef = null;
   let inviteSnap = null;
-  if (!isSuperadmin) {
-    if (!inviteCode) {
-      throw new HttpsError('failed-precondition',
-        'An invite code is required to create a store. If you don\'t have one, contact support.');
-    }
+  if (!isSuperadmin && inviteCode) {
     inviteRef = db.collection('invite_codes').doc(inviteCode);
     inviteSnap = await inviteRef.get();
     if (!inviteSnap.exists) {
       throw new HttpsError('not-found',
-        'That invite code doesn\'t exist. Double-check the code and try again.');
+        'That invite code doesn\'t exist. Double-check the code and try again, or leave the field blank.');
     }
     const inv = inviteSnap.data() || {};
     if (inv.revoked === true) {
       throw new HttpsError('failed-precondition',
-        'That invite code has been revoked. Contact support for a new one.');
+        'That invite code has been revoked. Leave it blank or contact support for a new one.');
     }
     if (inv.redeemedAt) {
       throw new HttpsError('failed-precondition',
-        'That invite code has already been used.');
+        'That invite code has already been used. Leave it blank to sign up without a code.');
     }
     if (inv.email && String(inv.email).toLowerCase() !== email.toLowerCase()) {
       throw new HttpsError('permission-denied',
-        `That invite code is bound to a different email address (${inv.email}). Sign in with that account to use it.`);
+        `That invite code is bound to a different email address (${inv.email}). Sign in with that account, or leave the field blank.`);
     }
   }
 
