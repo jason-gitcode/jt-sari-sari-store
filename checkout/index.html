@@ -806,7 +806,12 @@ function init() {
           <div class="gcash-receipt-box">
             <p style="margin:0 0 6px;"><strong style="color:var(--ink);">Upload GCash payment screenshot</strong></p>
             <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">After sending payment, attach a screenshot so the store can verify quickly.</p>
-            <input type="file" id="gcash-receipt-input" accept="image/*" capture="environment" style="display:none;" onchange="handleGcashReceiptUpload(event)" />
+            <!-- No `capture` attribute on purpose: GCash receipts are always
+                 SCREENSHOTS that already exist in the Photos library. Setting
+                 `capture="environment"` forces iOS straight into the rear
+                 camera, skipping the picker that lists the Photo Library —
+                 customers ended up unable to pick the screenshot they took. -->
+            <input type="file" id="gcash-receipt-input" accept="image/*" style="display:none;" onchange="handleGcashReceiptUpload(event)" />
             <label for="gcash-receipt-input" class="gcash-upload-btn">📎 Choose photo</label>
             <div id="gcash-receipt-preview"></div>
           </div>

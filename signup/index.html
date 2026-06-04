@@ -328,7 +328,16 @@ const getMyTenant  = functions.httpsCallable('getMyTenant');
     if (fromUrl) {
       const ready = () => {
         const el = document.getElementById('store-invite-code');
-        if (el) el.value = fromUrl;
+        if (!el) return;
+        el.value = fromUrl;
+        // Lock the field so the recipient can't accidentally edit a code
+        // that came from a trusted share link. readOnly (not disabled) so
+        // the value still submits with the form.
+        el.readOnly = true;
+        el.style.background = 'var(--soft, #f1f5f9)';
+        el.style.cursor = 'not-allowed';
+        el.style.color = 'var(--muted, #64748b)';
+        el.title = 'Code received via your invite link — cannot be edited';
       };
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', ready);
