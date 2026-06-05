@@ -737,9 +737,7 @@
     .order-map-pin:hover { opacity: .75; }
     /* Customer-pin link in the order card. Mirrors checkout's .pickup-pin-link
        style so admin sees the same button shape + URL behaviour as customers
-       (Maps opens straight to Directions with Start / Add stops / Saved).
-       Styles a <button> (not an <a>) — we open the URL via JS window.open to
-       guarantee the URL passes through unchanged. */
+       (Maps opens straight to Directions with Start / Add stops / Saved). */
     .order-nav-link {
       display: inline-flex; align-items: center; gap: 6px;
       /* Negative top margin pulls the button up so the visible gap to the
@@ -4906,17 +4904,6 @@ function formatOrderTime(ts) {
   });
 }
 
-// ----- Open Google Maps directions to a customer pin -----
-// Goes through window.open with a JS-built URL string. Same Maps URL API
-// (dir/?api=1&destination=...) the customer-side checkout uses for the
-// pickup pin, plus travelmode=driving to make the directions intent
-// explicit. Bypasses HTML href parsing so the URL is guaranteed not to
-// be touched by anything between the click and Maps.
-function openCustomerMapsDirections(lat, lng) {
-  const url = 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng + '&travelmode=driving';
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 // ----- GCash receipt lightbox -----
 function openReceiptModal(orderId) {
   const o = orders.find(x => x.orderId === orderId);
@@ -5015,14 +5002,14 @@ function renderOrders() {
     const addr     = isPickup
       ? '🏬 Pick-up at store'
       : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
-    // Use a JS onclick + window.open instead of href + target=_blank. The
-    // anchor href approach was producing a different Google Maps screen
-    // than the customer-side pickup pin even with byte-identical URLs —
-    // window.open with an explicit URL guarantees the URL passes through
-    // exactly as built. travelmode=driving is an explicit Maps URL API
-    // parameter that forces driving directions, matching what the customer
-    // pin needs.
-    const navHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<button type="button" class="order-nav-link" onclick="openCustomerMapsDirections(${o.address.lat}, ${o.address.lng})" aria-label="Open directions to customer in Google Maps">📍 Click here to navigate to customer</button>` : '';
+    // Plain anchor with target=_blank — same pattern as checkout's
+    // pickup-pin-link. On iOS, anchor clicks can trigger a Universal Link
+    // handover to the native Maps app WITHOUT creating an intermediate
+    // blank browser tab; window.open always creates the tab first, which
+    // is why the JS-handler version left a blank page behind.
+    // URL is byte-identical to the customer-side pickup link (no extra
+    // params like travelmode=driving), so Maps treats both the same way.
+    const navHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-nav-link" href="https://www.google.com/maps/dir/?api=1&destination=${o.address.lat},${o.address.lng}" target="_blank" rel="noopener" aria-label="Open directions to customer in Google Maps">📍 Click here to navigate to customer</a>` : '';
     const payLabel = o.payment === 'gcash' ? '📱 GCash'
                    : o.payment === 'cash'  ? '💵 Cash at Pickup'
                    : '🛵 Cash on Delivery';
