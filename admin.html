@@ -1981,6 +1981,22 @@
     .si-loc-use-me-btn { flex: 0 0 auto; padding: 13px 16px; background: var(--surface); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
     .si-loc-submit { flex: 1; padding: 13px; background: var(--accent); color: #fff; border: 0; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: .5px; cursor: pointer; }
     .si-loc-submit:hover { background: var(--accent-dark); }
+
+    /* ===== iOS auto-zoom prevention (site-wide form input rule) =====
+       iOS Safari/Chrome auto-zoom the viewport whenever a focused form
+       input has a computed font-size below 16px. The fix: bump every
+       form-field font-size to >=16px on touch devices, leaving desktop
+       layouts unchanged. (hover: none) and (pointer: coarse) targets
+       phones + tablets specifically; desktops keep their original font
+       sizes. !important is intentional — overrides per-component rules
+       so this works site-wide without auditing every form. */
+    @media (hover: none) and (pointer: coarse) {
+      input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="hidden"]):not([type="file"]),
+      select,
+      textarea {
+        font-size: 16px !important;
+      }
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -7452,22 +7468,31 @@ function renderSoldByCategoryChart(confirmedOrders) {
 
   const canvas = document.getElementById('sold-cat-chart');
   if (!canvas) return;
+  const parent = canvas.parentElement;
+
+  // Remove any prior "no data" placeholder so it doesn't stack across renders.
+  if (parent) parent.querySelectorAll('.dash-chart-empty').forEach(el => el.remove());
 
   if (labels.length === 0) {
-    // No sales in the selected period — paint a centred "no data" message
-    const ctx = canvas.getContext('2d');
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    canvas.width = w * window.devicePixelRatio;
-    canvas.height = h * window.devicePixelRatio;
-    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = c.text;
-    ctx.font = '500 13px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('No products sold in this period', w / 2, h / 2);
+    // Hide the canvas + show a sibling text element. Previously we drew the
+    // "no data" text directly onto the canvas, which mutated its backbuffer
+    // dimensions and left Chart.js mis-sized the next time data came back
+    // (the original "pie chart stretched comically wide" regression).
+    canvas.style.display = 'none';
+    if (parent) {
+      const empty = document.createElement('div');
+      empty.className = 'dash-chart-empty';
+      empty.textContent = 'No products sold in this period';
+      empty.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;width:100%;color:var(--muted);font-size:13px;font-weight:500;text-align:center;padding:0 12px;';
+      parent.appendChild(empty);
+    }
     return;
   }
+
+  // Reset canvas to a clean slate before Chart.js measures the container.
+  canvas.style.display = '';
+  canvas.removeAttribute('width');
+  canvas.removeAttribute('height');
 
   soldByCatChartInst = new Chart(canvas, {
     type: 'doughnut',

@@ -750,6 +750,17 @@
     html[data-layout="list"] .list-item-name { font-size: 14px; }
     html[data-layout="list"] .list-item-desc { font-size: 12px; }
   }
+
+  /* ===== iOS auto-zoom prevention (site-wide form input rule) =====
+     iOS auto-zooms when a focused form input has font-size < 16px.
+     This forces >=16px on touch devices only, leaving desktop unchanged. */
+  @media (hover: none) and (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="hidden"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>

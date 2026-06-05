@@ -204,7 +204,7 @@
   .store-finder {
     width: 100%;
     max-width: 520px;
-    margin: 0 auto 24px;
+    margin: 28px auto 0;
   }
   .store-finder-label {
     display: block;
@@ -295,25 +295,20 @@
   }
 
   .hidden { display: none !important; }
+
+  /* ===== iOS auto-zoom prevention (site-wide form input rule) =====
+     iOS auto-zooms when a focused form input has font-size < 16px.
+     This forces >=16px on touch devices only, leaving desktop unchanged. */
+  @media (hover: none) and (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="hidden"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
 </style>
 </head>
 <body>
-
-<div class="store-finder" id="store-finder">
-  <label for="store-finder-input" class="store-finder-label">Looking for a store? Type a name to find it.</label>
-  <div class="store-finder-row">
-    <input
-      type="text"
-      id="store-finder-input"
-      class="store-finder-input"
-      placeholder="e.g. JS Mini Mart"
-      autocomplete="off"
-      spellcheck="false"
-      aria-label="Search storefronts" />
-    <button type="button" id="store-finder-go" class="store-finder-go" disabled>Go</button>
-    <div id="store-finder-suggestions" class="store-finder-suggestions hidden" role="listbox"></div>
-  </div>
-</div>
 
 <header>
   <h1>Start your online store today!</h1>
@@ -435,6 +430,22 @@
       <a id="success-admin-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 20px;">—</a>
       <a id="open-admin-btn" href="#" class="btn btn-primary" style="text-decoration: none;">Open my admin →</a>
     </div>
+  </div>
+</div>
+
+<div class="store-finder" id="store-finder">
+  <label for="store-finder-input" class="store-finder-label">Looking for a store? Type a name to find it.</label>
+  <div class="store-finder-row">
+    <input
+      type="text"
+      id="store-finder-input"
+      class="store-finder-input"
+      placeholder="e.g. JS Mini Mart"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Search storefronts" />
+    <button type="button" id="store-finder-go" class="store-finder-go" disabled>Go</button>
+    <div id="store-finder-suggestions" class="store-finder-suggestions hidden" role="listbox"></div>
   </div>
 </div>
 

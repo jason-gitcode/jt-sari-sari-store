@@ -254,6 +254,16 @@
   .confirm-back { display: inline-block; margin-top: 24px; padding: 12px 28px; background: var(--accent); color: #fff; border-radius: var(--radius); font-weight: 600; text-decoration: none; font-size: 15px; transition: background .15s; }
   .confirm-back:hover { background: var(--accent-dark); }
 
+  /* ===== iOS auto-zoom prevention (site-wide form input rule) =====
+     iOS auto-zooms when a focused form input has font-size < 16px.
+     This forces >=16px on touch devices only, leaving desktop unchanged. */
+  @media (hover: none) and (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="hidden"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -1016,7 +1026,9 @@ function populateGcashInstructions() {
   if (!gcashOrderRefId) gcashOrderRefId = tcol('orders').doc().id;
   const account = storeSettingsData.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || 'Store GCash';
   const num     = storeSettingsData.gcashNumber || STORE.gcashNumber || '—';
-  const shortRef = '#' + gcashOrderRefId.slice(-6).toUpperCase();
+  // No '#' prefix — GCash's message field rejects special characters,
+  // so the customer would have to strip the '#' before pasting otherwise.
+  const shortRef = gcashOrderRefId.slice(-6).toUpperCase();
   const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   setText('gcash-payee-name', account);
   setText('gcash-payee-number', num);
