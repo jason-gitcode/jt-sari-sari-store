@@ -164,8 +164,10 @@
   .gcash-copy-btn { padding: 2px 10px; font-size: 12px; background: #fff; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--ink); }
   .gcash-copy-btn:hover { background: var(--soft); }
   .gcash-receipt-box { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
-  .gcash-upload-btn { display: inline-block; padding: 8px 16px; background: #fff; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ink); font-weight: 500; }
+  .gcash-upload-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; background: #fff; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ink); font-weight: 500; }
   .gcash-upload-btn:hover { background: var(--soft); border-color: var(--accent); }
+  .gcash-upload-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gcash-upload-row .gcash-upload-btn { flex: 1 1 140px; }
   .gcash-receipt-thumb { position: relative; display: inline-block; max-width: 200px; margin-top: 4px; }
   .gcash-receipt-thumb img { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--line); display: block; }
   .gcash-receipt-remove { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #dc2626; color: white; border: 2px solid #fff; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
@@ -842,13 +844,21 @@ function init() {
           <div class="gcash-receipt-box">
             <p style="margin:0 0 6px;"><strong style="color:var(--ink);">Upload GCash payment screenshot</strong></p>
             <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">After sending payment, attach a screenshot so the store can verify quickly.</p>
-            <!-- No capture attribute on purpose: GCash receipts are always
-                 SCREENSHOTS that already exist in the Photos library. The
-                 capture=environment attribute forces iOS straight into the rear
-                 camera, skipping the picker that lists the Photo Library —
-                 customers ended up unable to pick the screenshot they took. -->
-            <input type="file" id="gcash-receipt-input" accept="image/*" style="display:none;" onchange="handleGcashReceiptUpload(event)" />
-            <label for="gcash-receipt-input" class="gcash-upload-btn">📎 Choose photo</label>
+            <!-- Two explicit inputs. Some iOS Safari + PWA contexts collapse a
+                 single accept=image/* input into a camera-only sheet, leaving
+                 customers unable to pick their GCash screenshot. Splitting the
+                 paths and using a specific MIME list (not the wildcard) on the
+                 library input jumps straight into Photos. -->
+            <input type="file" id="gcash-receipt-input-library"
+                   accept="image/png,image/jpeg,image/jpg,image/heic,image/heif,image/webp"
+                   style="display:none;" onchange="handleGcashReceiptUpload(event)" />
+            <input type="file" id="gcash-receipt-input-camera"
+                   accept="image/*" capture="environment"
+                   style="display:none;" onchange="handleGcashReceiptUpload(event)" />
+            <div class="gcash-upload-row">
+              <label for="gcash-receipt-input-library" class="gcash-upload-btn">🖼️ Choose from Photos</label>
+              <label for="gcash-receipt-input-camera" class="gcash-upload-btn">📷 Take photo</label>
+            </div>
             <div id="gcash-receipt-preview"></div>
           </div>
         </div>
@@ -1049,8 +1059,11 @@ function renderGcashReceiptPreview() {
 function removeGcashReceipt() {
   gcashReceiptData = null;
   gcashReceiptName = null;
-  const input = document.getElementById('gcash-receipt-input');
-  if (input) input.value = '';
+  // Clear both inputs so the same file can be re-picked from either path.
+  ['gcash-receipt-input-library', 'gcash-receipt-input-camera'].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) input.value = '';
+  });
   renderGcashReceiptPreview();
 }
 
