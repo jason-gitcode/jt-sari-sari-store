@@ -16,6 +16,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS for the pickup-location picker (Settings → Store Info).
+       The JS bundle (~150KB) is lazy-loaded on first picker open. -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script>
     (function () {
       try {
@@ -1862,6 +1865,33 @@
       color: var(--muted); font-style: italic; font-size: var(--fs-sm);
     }
     .restock-suggested-cell { font-weight: 700; }
+
+    /* ---------- Pickup location picker (Settings → Store Info) ---------- */
+    /* Mirrors the checkout customer location picker — Leaflet map in a
+       full-height modal with OpenStreetMap tiles, Nominatim search +
+       reverse-geocode, draggable marker. */
+    .si-map-edit-btn { position: absolute; bottom: 10px; right: 10px; background: #fff; border: 1px solid rgba(0,0,0,.18); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-weight: 500; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.18); cursor: pointer; z-index: 10; line-height: 1.4; }
+    .si-map-edit-btn:hover { background: var(--soft); }
+    .si-loc-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9999; }
+    .si-loc-overlay.open { display: flex; flex-direction: column; }
+    .si-loc-modal { background: #fff; width: 100%; max-width: 640px; margin: 0 auto; height: 100dvh; max-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); }
+    .si-loc-header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-shrink: 0; }
+    .si-loc-header-text h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); }
+    .si-loc-header-text p { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+    .si-loc-close { font-size: 20px; color: var(--muted); padding: 0; flex-shrink: 0; line-height: 1; background: none; border: 0; cursor: pointer; }
+    .si-loc-search { padding: 10px 16px; border-bottom: 1px solid var(--line); position: relative; flex-shrink: 0; }
+    .si-loc-search input { width: 100%; padding: 8px 36px 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; outline: none; font-family: inherit; background: var(--surface); color: var(--ink); }
+    .si-loc-search input:focus { border-color: var(--accent); }
+    .si-loc-search-clear { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--muted); cursor: pointer; padding: 0; display: none; background: none; border: 0; }
+    .si-loc-results { position: absolute; left: 16px; right: 16px; top: calc(100% - 1px); background: var(--surface); border: 1px solid var(--line); border-radius: 0 0 8px 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 10000; display: none; max-height: 220px; overflow-y: auto; }
+    .si-loc-result { padding: 10px 14px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--line); line-height: 1.4; color: var(--ink); }
+    .si-loc-result:last-child { border-bottom: none; }
+    .si-loc-result:hover { background: var(--soft); }
+    #si-loc-map { flex: 1; min-height: 0; }
+    .si-loc-footer { padding: 10px 16px; border-top: 1px solid var(--line); flex-shrink: 0; display: flex; gap: 8px; }
+    .si-loc-use-me-btn { flex: 0 0 auto; padding: 13px 16px; background: var(--surface); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .si-loc-submit { flex: 1; padding: 13px; background: var(--accent); color: #fff; border: 0; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: .5px; cursor: pointer; }
+    .si-loc-submit:hover { background: var(--accent-dark); }
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -2348,12 +2378,13 @@
                 <div class="setting-title">Pickup address</div>
                 <div class="setting-desc">Shown to customers who choose pickup at checkout.</div>
                 <textarea id="si-pickup-address" rows="2" maxlength="300" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;"></textarea>
-                <div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
+                <div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;position:relative;">
                   <iframe id="si-pickup-map" title="Pickup location map"
                     src="https://maps.google.com/maps?q=14.3025,120.9437&z=15&output=embed"
                     width="100%" height="180"
                     style="border:0;display:block;background:var(--soft);"
                     loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+                  <button type="button" class="si-map-edit-btn" onclick="siOpenLocPicker()">Edit</button>
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
                   <button type="button" id="si-locate-btn" onclick="siUseMyLocation()"
@@ -7817,6 +7848,176 @@ function playNewOrderSound() {
     });
   } catch (e) { /* sound is non-critical */ }
 }
+</script>
+
+<!-- ===================================================================
+     Pickup Location Picker Modal — admin Settings → Store Info → Pickup
+     address. Mirrors the customer-side checkout picker: full-height
+     modal, Leaflet map, OpenStreetMap tiles + Nominatim search and
+     reverse-geocode, draggable marker. On Submit, the captured coords
+     are pushed into siPickupLat/siPickupLng + the iframe + status pill;
+     the owner still has to click "Save changes" in Store Info to
+     persist them to Firestore (same pattern as Use my location).
+=================================================================== -->
+<div class="si-loc-overlay" id="si-loc-overlay">
+  <div class="si-loc-modal">
+    <div class="si-loc-header">
+      <div class="si-loc-header-text">
+        <h2>📍 Pin your store's pickup location</h2>
+        <p>Drag the marker or search an address. Customers tap this pin to navigate via Google Maps.</p>
+      </div>
+      <button type="button" class="si-loc-close" onclick="siCloseLocPicker()" aria-label="Close">✕</button>
+    </div>
+    <div class="si-loc-search">
+      <input type="text" id="si-loc-search-input" placeholder="Enter your address" autocomplete="off" oninput="siLocSearchInput(this.value)" />
+      <button type="button" class="si-loc-search-clear" id="si-loc-search-clear" onclick="siLocClearSearch()" aria-label="Clear">✕</button>
+      <div class="si-loc-results" id="si-loc-results"></div>
+    </div>
+    <div id="si-loc-map"></div>
+    <div class="si-loc-footer">
+      <button type="button" class="si-loc-use-me-btn" onclick="siLocUseMeFromPicker()">📍 Use my location</button>
+      <button type="button" class="si-loc-submit" onclick="siSubmitLocPicker()">SUBMIT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ----- Pickup location picker state (admin Settings → Store Info) -----
+  // Mirrors checkout's picker. Variables prefixed with `si` to avoid any
+  // chance of clashing with the existing admin code surface.
+  let siLocMap = null, siLocMarker = null;
+  let siLocLat = 14.3025, siLocLon = 120.9437; // Cavite default if nothing pinned yet
+  let siLocSearchTimer = null;
+  let __siLeafletLoadingPromise = null;
+
+  function siEnsureLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (__siLeafletLoadingPromise) return __siLeafletLoadingPromise;
+    __siLeafletLoadingPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.async = true;
+      s.onload  = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load map library'));
+      document.head.appendChild(s);
+    });
+    return __siLeafletLoadingPromise;
+  }
+
+  async function siOpenLocPicker() {
+    // Seed the picker from current siPickupLat/Lng if the owner already
+    // pinned, otherwise from the saved settings, otherwise default.
+    if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+      siLocLat = siPickupLat; siLocLon = siPickupLng;
+    } else if (typeof storeSettingsData.pickupLat === 'number' && typeof storeSettingsData.pickupLng === 'number') {
+      siLocLat = storeSettingsData.pickupLat; siLocLon = storeSettingsData.pickupLng;
+    }
+    document.getElementById('si-loc-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+      await siEnsureLeaflet();
+    } catch (e) {
+      alert('Map library failed to load. Check your connection.');
+      siCloseLocPicker();
+      return;
+    }
+    setTimeout(() => {
+      if (!siLocMap) siInitLocMap();
+      else { siLocMap.setView([siLocLat, siLocLon], 17); siLocMarker.setLatLng([siLocLat, siLocLon]); siLocMap.invalidateSize(); }
+    }, 60);
+  }
+
+  function siCloseLocPicker() {
+    document.getElementById('si-loc-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    document.getElementById('si-loc-results').style.display = 'none';
+  }
+
+  function siInitLocMap() {
+    siLocMap = L.map('si-loc-map', { zoomControl: true }).setView([siLocLat, siLocLon], 17);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(siLocMap);
+    siLocMarker = L.marker([siLocLat, siLocLon], { draggable: true }).addTo(siLocMap);
+    siLocMarker.on('dragend', () => {
+      const p = siLocMarker.getLatLng();
+      siLocLat = p.lat; siLocLon = p.lng;
+      siLocReverseGeocode(siLocLat, siLocLon);
+    });
+    siLocMap.on('click', e => {
+      siLocLat = e.latlng.lat; siLocLon = e.latlng.lng;
+      siLocMarker.setLatLng([siLocLat, siLocLon]);
+      siLocReverseGeocode(siLocLat, siLocLon);
+    });
+  }
+
+  function siLocReverseGeocode(lat, lon) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+      .then(r => r.json())
+      .then(d => { if (d.display_name) document.getElementById('si-loc-search-input').value = d.display_name; })
+      .catch(() => {});
+  }
+
+  function siLocSearchInput(q) {
+    document.getElementById('si-loc-search-clear').style.display = q ? 'block' : 'none';
+    clearTimeout(siLocSearchTimer);
+    if (!q.trim()) { document.getElementById('si-loc-results').style.display = 'none'; return; }
+    siLocSearchTimer = setTimeout(() => {
+      fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=ph`)
+        .then(r => r.json())
+        .then(results => {
+          const box = document.getElementById('si-loc-results');
+          if (!results.length) { box.style.display = 'none'; return; }
+          box.style.display = 'block';
+          box.innerHTML = results.map(r =>
+            `<div class="si-loc-result" onclick="siLocPickResult(${r.lat},${r.lon},this.dataset.name)" data-name="${r.display_name.replace(/"/g,'&quot;')}">${r.display_name}</div>`
+          ).join('');
+        }).catch(() => {});
+    }, 400);
+  }
+
+  function siLocPickResult(lat, lon, name) {
+    siLocLat = parseFloat(lat); siLocLon = parseFloat(lon);
+    if (siLocMarker) siLocMarker.setLatLng([siLocLat, siLocLon]);
+    if (siLocMap) siLocMap.setView([siLocLat, siLocLon], 17);
+    document.getElementById('si-loc-search-input').value = name;
+    document.getElementById('si-loc-results').style.display = 'none';
+  }
+
+  function siLocClearSearch() {
+    document.getElementById('si-loc-search-input').value = '';
+    document.getElementById('si-loc-search-clear').style.display = 'none';
+    document.getElementById('si-loc-results').style.display = 'none';
+  }
+
+  // "Use my location" inside the picker — same behavior as the button
+  // outside, but recenters the open map afterwards so the owner sees the
+  // capture immediately.
+  function siLocUseMeFromPicker() {
+    if (!navigator.geolocation) { alert('Geolocation is not supported on this device.'); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        siLocLat = pos.coords.latitude;
+        siLocLon = pos.coords.longitude;
+        if (siLocMarker) siLocMarker.setLatLng([siLocLat, siLocLon]);
+        if (siLocMap) siLocMap.setView([siLocLat, siLocLon], 17);
+        siLocReverseGeocode(siLocLat, siLocLon);
+      },
+      err => alert(err && err.code === 1 ? 'Permission denied. Allow location access in your browser settings.' : 'Could not get your location.'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
+  function siSubmitLocPicker() {
+    // Push picker coords into the Store Info state so saveStoreInfo writes
+    // them on the next Save changes click. Refresh the embed iframe +
+    // status pill so the owner sees the change immediately.
+    siPickupLat = siLocLat;
+    siPickupLng = siLocLon;
+    siPickupCleared = false;
+    if (typeof siRenderPickupMapAndStatus === 'function') siRenderPickupMapAndStatus();
+    siCloseLocPicker();
+  }
 </script>
 </body>
 </html>
