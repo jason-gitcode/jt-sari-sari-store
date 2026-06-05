@@ -114,6 +114,17 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // PUBLIC DIRECTORY — anonymous-readable list of {slug, name}
+    // pairs used by the signup-page store-finder. Writes happen only
+    // through Cloud Functions (admin SDK) which bypass these rules,
+    // so superadmin-write here is a defense-in-depth backstop.
+    // ============================================================
+    match /public/{doc} {
+      allow read: if true;
+      allow write: if isSuperadmin();
+    }
+
+    // ============================================================
     // INVITE CODES — fully closed to clients. All access (mint, list,
     // revoke, redeem) goes through Cloud Functions running with admin
     // privileges, so codes can never be enumerated or tampered with from

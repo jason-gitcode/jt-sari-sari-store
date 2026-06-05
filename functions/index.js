@@ -116,6 +116,36 @@ function normalizeInviteCode(raw) {
   return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+// ============================================================
+// Public directory helpers
+// ============================================================
+// `public/directory` is the single source of truth for the signup-page
+// store-finder. Anonymous customers read it to discover storefronts by name.
+// Kept in sync from createTenant (add entry) and deleteTenant (remove entry).
+// `rebuildPublicDirectory` rescans all tenants from scratch — used for
+// recovery and one-time backfill after this feature shipped.
+const PUBLIC_DIRECTORY_REF = () => db.collection('public').doc('directory');
+
+async function upsertDirectoryEntry(slug, name) {
+  await PUBLIC_DIRECTORY_REF().set({
+    stores: FieldValue.arrayUnion({ slug, name }),
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+
+async function removeDirectoryEntry(slug) {
+  // arrayRemove needs the exact object; we don't store the name authoritatively
+  // here, so re-read and filter instead.
+  const snap = await PUBLIC_DIRECTORY_REF().get();
+  if (!snap.exists) return;
+  const stores = (snap.data() || {}).stores || [];
+  const next = stores.filter(s => s && s.slug !== slug);
+  await PUBLIC_DIRECTORY_REF().set({
+    stores: next,
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+
 exports.createTenant = onCall(async (request) => {
   // ---------- AUTH ----------
   if (!request.auth) {
@@ -297,6 +327,15 @@ exports.createTenant = onCall(async (request) => {
     console.error('starter_pack copy failed for tenant', slug, err);
   }
 
+  // ---------- ADD TO PUBLIC DIRECTORY ----------
+  // Non-blocking: directory enables storefront discovery on the signup
+  // page, but a failure here shouldn't roll back a successful tenant create.
+  try {
+    await upsertDirectoryEntry(slug, name);
+  } catch (err) {
+    console.error('public directory upsert failed for tenant', slug, err);
+  }
+
   return {
     slug,
     name,
@@ -334,7 +373,43 @@ exports.deleteTenant = onCall(async (request) => {
   // recursiveDelete handles arbitrary nesting and large subcollections
   // server-side; far more reliable than client-side per-doc loops.
   await db.recursiveDelete(tref);
+
+  // Remove from public directory (non-blocking; tenant is already gone).
+  try {
+    await removeDirectoryEntry(slug);
+  } catch (err) {
+    console.error('public directory remove failed for tenant', slug, err);
+  }
+
   return { slug, deleted: true };
+});
+
+// ============================================================
+// rebuildPublicDirectory — superadmin-only. Rescans every tenant doc
+// and rewrites public/directory from scratch. Used for one-time backfill
+// after this feature shipped, and as a recovery tool if the doc drifts.
+// ============================================================
+exports.rebuildPublicDirectory = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const snap = await db.collection('tenants').get();
+  const stores = [];
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    stores.push({ slug: doc.id, name: data.name || doc.id });
+  }
+  // Sort alphabetically by name so the client can show a stable order.
+  stores.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  await PUBLIC_DIRECTORY_REF().set({
+    stores,
+    updatedAt: FieldValue.serverTimestamp(),
+    rebuiltAt: FieldValue.serverTimestamp(),
+    rebuiltBy: token.email
+  });
+  return { count: stores.length, stores };
 });
 
 // ============================================================

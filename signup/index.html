@@ -200,10 +200,119 @@
 
   .submit-btn-wrap { margin-top: 28px; }
 
+  /* ---------- Store finder (customer-facing storefront discovery) ---------- */
+  .store-finder {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto 24px;
+  }
+  .store-finder-label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .store-finder-row {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .store-finder-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .store-finder-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  .store-finder-go {
+    flex: 0 0 auto;
+    padding: 11px 22px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .store-finder-go:hover:not(:disabled) { background: var(--accent-dark); }
+  .store-finder-go:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .store-finder-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    max-height: 260px;
+    overflow-y: auto;
+    z-index: 50;
+  }
+  .store-finder-suggestion {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+  .store-finder-suggestion:last-child { border-bottom: none; }
+  .store-finder-suggestion:hover,
+  .store-finder-suggestion.active {
+    background: var(--soft);
+  }
+  .store-finder-suggestion-name { font-weight: 500; color: var(--text); }
+  .store-finder-suggestion-slug {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-top: 2px;
+  }
+  .store-finder-suggestion-empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
   .hidden { display: none !important; }
 </style>
 </head>
 <body>
+
+<div class="store-finder" id="store-finder">
+  <label for="store-finder-input" class="store-finder-label">Looking for a store? Type a name to find it.</label>
+  <div class="store-finder-row">
+    <input
+      type="text"
+      id="store-finder-input"
+      class="store-finder-input"
+      placeholder="e.g. JS Mini Mart"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Search storefronts" />
+    <button type="button" id="store-finder-go" class="store-finder-go" disabled>Go</button>
+    <div id="store-finder-suggestions" class="store-finder-suggestions hidden" role="listbox"></div>
+  </div>
+</div>
 
 <header>
   <h1>Start your online store today!</h1>
@@ -353,6 +462,145 @@ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(err => {
 const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
 const getMyTenant  = functions.httpsCallable('getMyTenant');
+
+// ============================================================
+// Store finder — discover existing storefronts by name
+// ============================================================
+(() => {
+  const input = document.getElementById('store-finder-input');
+  const goBtn = document.getElementById('store-finder-go');
+  const sugBox = document.getElementById('store-finder-suggestions');
+  if (!input || !goBtn || !sugBox) return;
+
+  let allStores = [];
+  let visible = [];
+  let activeIdx = -1;
+  let selectedSlug = null;
+
+  function loadDirectory() {
+    return firebase.firestore().collection('public').doc('directory').get()
+      .then(snap => {
+        const data = snap.exists ? snap.data() : null;
+        allStores = (data && Array.isArray(data.stores)) ? data.stores : [];
+      })
+      .catch(err => {
+        console.warn('[store-finder] directory load failed:', err);
+        allStores = [];
+      });
+  }
+
+  function renderSuggestions(q) {
+    const needle = (q || '').trim().toLowerCase();
+    if (!needle) {
+      sugBox.classList.add('hidden');
+      sugBox.innerHTML = '';
+      visible = [];
+      activeIdx = -1;
+      return;
+    }
+    visible = allStores
+      .filter(s => {
+        const name = (s.name || '').toLowerCase();
+        const slug = (s.slug || '').toLowerCase();
+        return name.includes(needle) || slug.includes(needle);
+      })
+      .slice(0, 8);
+
+    if (visible.length === 0) {
+      sugBox.innerHTML = '<div class="store-finder-suggestion-empty">No matching stores yet.</div>';
+      sugBox.classList.remove('hidden');
+      activeIdx = -1;
+      return;
+    }
+    sugBox.innerHTML = visible.map((s, i) => `
+      <div class="store-finder-suggestion${i === activeIdx ? ' active' : ''}" data-idx="${i}" role="option">
+        <div class="store-finder-suggestion-name">${escapeHtml(s.name || s.slug)}</div>
+        <div class="store-finder-suggestion-slug">pabilimart.com/${escapeHtml(s.slug)}/</div>
+      </div>
+    `).join('');
+    sugBox.classList.remove('hidden');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function pickStore(store) {
+    if (!store) return;
+    selectedSlug = store.slug;
+    input.value = store.name || store.slug;
+    sugBox.classList.add('hidden');
+    goBtn.disabled = false;
+  }
+
+  function navigateToStore() {
+    if (!selectedSlug) {
+      // If no explicit pick, try first visible suggestion.
+      if (visible.length > 0) { pickStore(visible[0]); }
+      else return;
+    }
+    window.location.href = '/' + encodeURIComponent(selectedSlug) + '/';
+  }
+
+  input.addEventListener('input', () => {
+    selectedSlug = null;
+    goBtn.disabled = true;
+    activeIdx = -1;
+    renderSuggestions(input.value);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (visible.length === 0) return;
+      activeIdx = (activeIdx + 1) % visible.length;
+      renderSuggestions(input.value);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (visible.length === 0) return;
+      activeIdx = (activeIdx - 1 + visible.length) % visible.length;
+      renderSuggestions(input.value);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIdx >= 0 && visible[activeIdx]) {
+        pickStore(visible[activeIdx]);
+        navigateToStore();
+      } else if (visible.length > 0) {
+        pickStore(visible[0]);
+        navigateToStore();
+      }
+    } else if (e.key === 'Escape') {
+      sugBox.classList.add('hidden');
+      activeIdx = -1;
+    }
+  });
+
+  sugBox.addEventListener('mousedown', (e) => {
+    // mousedown (not click) so the input's blur doesn't hide the box before
+    // the click registers.
+    const row = e.target.closest('.store-finder-suggestion');
+    if (!row) return;
+    const idx = parseInt(row.getAttribute('data-idx'), 10);
+    if (visible[idx]) {
+      pickStore(visible[idx]);
+      navigateToStore();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    // Slight delay so a click on a suggestion still registers.
+    setTimeout(() => sugBox.classList.add('hidden'), 150);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) renderSuggestions(input.value);
+  });
+
+  goBtn.addEventListener('click', navigateToStore);
+
+  loadDirectory();
+})();
 
 // Pre-fill the invite code field from the URL — share-link friendly:
 //   https://pabilimart.com/signup/?code=K8X3M9PQ
