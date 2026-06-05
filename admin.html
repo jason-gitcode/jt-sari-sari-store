@@ -2348,6 +2348,23 @@
                 <div class="setting-title">Pickup address</div>
                 <div class="setting-desc">Shown to customers who choose pickup at checkout.</div>
                 <textarea id="si-pickup-address" rows="2" maxlength="300" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;"></textarea>
+                <div style="margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;">
+                  <iframe id="si-pickup-map" title="Pickup location map"
+                    src="https://maps.google.com/maps?q=14.3025,120.9437&z=15&output=embed"
+                    width="100%" height="180"
+                    style="border:0;display:block;background:var(--soft);"
+                    loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
+                  <button type="button" id="si-locate-btn" onclick="siUseMyLocation()"
+                    style="padding:8px 14px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
+                    📍 Use my location
+                  </button>
+                  <span id="si-loc-status" style="font-size:12px;color:var(--muted);"></span>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">
+                  Stand at the spot you want pinned (or wherever you'd like the customer to come for pickup), then tap <strong>Use my location</strong>. The map will update and the pin will save with your Store Info.
+                </div>
               </div>
             </div>
             <div class="setting-row">
@@ -3618,6 +3635,54 @@ function ensureDayCheckboxesPopulated() {
   `).join('');
 }
 
+// Pickup location pin — captured by Use my location, saved by saveStoreInfo
+// alongside the other Store Info fields. Module-level so Save can read them.
+let siPickupLat = null;
+let siPickupLng = null;
+
+function siRenderPickupMapAndStatus() {
+  const iframe = document.getElementById('si-pickup-map');
+  const status = document.getElementById('si-loc-status');
+  const hasPin = (typeof siPickupLat === 'number' && typeof siPickupLng === 'number');
+  if (iframe) {
+    const q = hasPin
+      ? `${siPickupLat},${siPickupLng}&z=17`
+      : '14.3025,120.9437&z=15';
+    iframe.src = `https://maps.google.com/maps?q=${q}&output=embed`;
+  }
+  if (status) {
+    status.textContent = hasPin
+      ? `✓ Pinned at ${siPickupLat.toFixed(5)}, ${siPickupLng.toFixed(5)} — save Store Info to apply`
+      : 'No pin yet — tap Use my location to set one.';
+    status.style.color = hasPin ? '#16a34a' : 'var(--muted)';
+  }
+}
+
+function siUseMyLocation() {
+  const status = document.getElementById('si-loc-status');
+  if (!navigator.geolocation) {
+    if (status) { status.textContent = 'Geolocation is not supported on this device.'; status.style.color = '#dc2626'; }
+    return;
+  }
+  if (status) { status.textContent = 'Locating…'; status.style.color = 'var(--muted)'; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      siPickupLat = pos.coords.latitude;
+      siPickupLng = pos.coords.longitude;
+      siRenderPickupMapAndStatus();
+    },
+    err => {
+      if (status) {
+        status.textContent = err && err.code === 1
+          ? 'Permission denied. Allow location access in your browser settings.'
+          : 'Could not get your location. Try again outdoors.';
+        status.style.color = '#dc2626';
+      }
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
 function syncStoreInfoForm() {
   ensureHourSelectsPopulated();
   ensureDayCheckboxesPopulated();
@@ -3626,6 +3691,14 @@ function syncStoreInfoForm() {
   f('si-pickup-address', storeSettingsData.pickupAddress);
   f('si-gcash-name', storeSettingsData.gcashAccountName);
   f('si-gcash-number', storeSettingsData.gcashNumber);
+  // Pickup pin — load from settings if present, refresh map + status.
+  const savedLat = storeSettingsData.pickupLat;
+  const savedLng = storeSettingsData.pickupLng;
+  if (typeof savedLat === 'number' && typeof savedLng === 'number') {
+    siPickupLat = savedLat;
+    siPickupLng = savedLng;
+  }
+  siRenderPickupMapAndStatus();
   const openH  = (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6;
   const closeH = (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16;
   const oh = document.getElementById('si-open-hour');
@@ -3685,7 +3758,12 @@ async function saveStoreInfo() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays }, { merge: true });
+    const payload = { storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays };
+    if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+      payload.pickupLat = siPickupLat;
+      payload.pickupLng = siPickupLng;
+    }
+    await tdoc('settings', 'store').set(payload, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
   } catch (err) {
