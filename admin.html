@@ -4969,7 +4969,11 @@ function renderOrders() {
     const addr     = isPickup
       ? '🏬 Pick-up at store'
       : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
-    const navHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-nav-link" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.address.lat},${o.address.lng}" target="_blank" rel="noopener" aria-label="Open directions to customer in Google Maps">📍 Click here to navigate to customer</a>` : '';
+    // URL + anchor attributes match checkout's pickup-pin-link exactly so
+    // Google Maps opens the same way (Directions panel with origin=current
+    // location, Start / Add stops / Saved). Same plain & in the URL (not
+    // &amp;) so the rendered href is byte-identical to customer-side.
+    const navHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-nav-link" href="https://www.google.com/maps/dir/?api=1&destination=${o.address.lat},${o.address.lng}" target="_blank" rel="noopener" aria-label="Open directions to customer in Google Maps">📍 Click here to navigate to customer</a>` : '';
     const payLabel = o.payment === 'gcash' ? '📱 GCash'
                    : o.payment === 'cash'  ? '💵 Cash at Pickup'
                    : '🛵 Cash on Delivery';
