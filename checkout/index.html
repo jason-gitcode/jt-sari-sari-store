@@ -133,14 +133,20 @@
     font-size: 13px; color: #166534; line-height: 1.5;
   }
   .pickup-info strong { color: #14532d; display: block; margin-bottom: 4px; font-size: 14px; }
+  .pickup-pin-wrap { margin-top: 12px; }
   .pickup-pin-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    margin-top: 10px; padding: 8px 12px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px 14px;
     background: #166534; color: #fff !important;
-    border-radius: 6px; font-size: 13px; font-weight: 600;
-    text-decoration: none; line-height: 1;
+    border-radius: 8px; font-size: 14px; font-weight: 700;
+    text-decoration: none; line-height: 1.2;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    transition: background .15s;
   }
   .pickup-pin-link:hover { background: #14532d; }
+  .pickup-pin-hint {
+    margin-top: 6px; font-size: 12px; color: #166534; text-align: center;
+  }
   .section.is-disabled { opacity: 0.45; pointer-events: none; }
   .section.is-disabled .section-label::after { content: ' — not required for pickup'; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
 
@@ -553,14 +559,29 @@ function applyTenantStoreConfig() {
   const pickup = storeSettingsData.pickupAddress || '';
   const pickupBox = document.getElementById('pickup-info');
   if (pickupBox) {
-    const pLat = storeSettingsData.pickupLat;
-    const pLng = storeSettingsData.pickupLng;
+    // Defensive numeric coercion — Firestore returns numbers, but tolerate
+    // string-typed coords just in case an older record / future import path
+    // wrote them differently.
+    const latNum = (typeof storeSettingsData.pickupLat === 'number')
+      ? storeSettingsData.pickupLat
+      : parseFloat(storeSettingsData.pickupLat);
+    const lngNum = (typeof storeSettingsData.pickupLng === 'number')
+      ? storeSettingsData.pickupLng
+      : parseFloat(storeSettingsData.pickupLng);
+    const hasPin = Number.isFinite(latNum) && Number.isFinite(lngNum) && (latNum !== 0 || lngNum !== 0);
     let pinHtml = '';
-    if (typeof pLat === 'number' && typeof pLng === 'number') {
-      const href = `https://www.google.com/maps/dir/?api=1&destination=${pLat},${pLng}`;
-      pinHtml = `<a class="pickup-pin-link" href="${href}" target="_blank" rel="noopener" aria-label="Open directions to ${storeName} in Google Maps">📍 Open in Google Maps</a>`;
+    if (hasPin) {
+      const href = `https://www.google.com/maps/dir/?api=1&destination=${latNum},${lngNum}`;
+      pinHtml = `
+        <div class="pickup-pin-wrap">
+          <a class="pickup-pin-link" href="${href}" target="_blank" rel="noopener"
+             aria-label="Open directions to ${storeName} in Google Maps">
+            📍 Click here to navigate to the store
+          </a>
+          <div class="pickup-pin-hint">Opens Google Maps with turn-by-turn directions</div>
+        </div>`;
     }
-    pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}${pinHtml ? '<br>' + pinHtml : ''}`;
+    pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}${pinHtml}`;
   }
   // Fill in the offline-mode notice's address inline.
   const offlineAddrEl = document.getElementById('offline-address');

@@ -3661,10 +3661,10 @@ function siRenderPickupMapAndStatus() {
   }
   if (status) {
     if (hasPin) {
-      status.textContent = `✓ Pinned at ${siPickupLat.toFixed(5)}, ${siPickupLng.toFixed(5)} — save Store Info to apply`;
+      status.innerHTML = `✓ Pinned at ${siPickupLat.toFixed(5)}, ${siPickupLng.toFixed(5)} &nbsp;·&nbsp; <strong>Click "Save changes" below to apply.</strong>`;
       status.style.color = '#16a34a';
     } else if (siPickupCleared) {
-      status.textContent = '🗑️ Pin will be removed — save Store Info to apply';
+      status.innerHTML = '🗑️ Pin will be removed &nbsp;·&nbsp; <strong>Click "Save changes" below to apply.</strong>';
       status.style.color = '#dc2626';
     } else {
       status.textContent = 'No pin yet — tap Use my location to set one.';
