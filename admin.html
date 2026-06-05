@@ -1868,6 +1868,77 @@
       font-size: var(--fs-xs); color: var(--muted);
       align-items: center;
     }
+
+    /* ---------- Budget Planner (inside Restocking & Reorder report) ---------- */
+    .budget-planner {
+      margin: 14px 0 18px;
+      padding: 14px 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .budget-planner-head h3 { font-size: var(--fs-md); margin: 0 0 4px; }
+    .budget-planner-head p {
+      font-size: var(--fs-xs); color: var(--muted);
+      margin: 0 0 10px; line-height: 1.4;
+    }
+    .budget-planner-controls {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      align-items: flex-end;
+    }
+    .bp-control { display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px; min-width: 0; }
+    .bp-control-label { color: var(--muted); font-size: var(--fs-xs); }
+    .bp-control input,
+    .bp-control select {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit; font-size: var(--fs-sm);
+    }
+    .budget-planner .dash-export-btn { padding: 8px 16px; flex-shrink: 0; }
+    .bp-results { margin-top: 12px; }
+    .bp-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: var(--fs-sm);
+      background: var(--surface);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+    }
+    .bp-summary {
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: var(--fs-sm);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .bp-summary .bp-summary-amt { color: var(--accent); font-weight: 700; }
+    .bp-summary .bp-summary-skipped { color: var(--muted); }
+    .bp-skipped-section {
+      margin-top: 10px;
+      font-size: var(--fs-xs);
+      color: var(--muted);
+    }
+    .bp-skipped-toggle {
+      background: none; border: 0; padding: 4px 0;
+      color: var(--accent); cursor: pointer; font: inherit; font-size: var(--fs-xs);
+    }
+    .bp-skipped-list {
+      margin-top: 6px;
+      max-height: 200px; overflow-y: auto;
+      border: 1px dashed var(--line); border-radius: 6px;
+      padding: 8px 10px;
+      background: var(--surface);
+      display: none;
+    }
+    .bp-skipped-list.open { display: block; }
+    .bp-skipped-list .bp-skipped-row { padding: 3px 0; display: flex; gap: 8px; }
+    .bp-skipped-list .bp-skipped-reason { color: var(--muted); font-style: italic; }
     .restock-supplier-link {
       background: none; border: 0; padding: 0;
       color: var(--accent);
@@ -2237,6 +2308,29 @@
 
         <!-- Summary strip -->
         <div class="report-kpis" id="restock-kpis"></div>
+
+        <!-- Budget Planner -->
+        <div class="budget-planner" id="budget-planner">
+          <div class="budget-planner-head">
+            <h3>💰 Budget Planner</h3>
+            <p>Enter a peso amount and we'll pick what to restock first — uses the same velocity + suggested-qty math as the table below, plus product cost.</p>
+          </div>
+          <div class="budget-planner-controls">
+            <label class="bp-control">
+              <span class="bp-control-label">Budget (₱)</span>
+              <input type="number" id="bp-amount" min="0" step="50" placeholder="e.g. 2000" oninput="onBudgetCalculate()" />
+            </label>
+            <label class="bp-control">
+              <span class="bp-control-label">Strategy</span>
+              <select id="bp-strategy" onchange="onBudgetCalculate()">
+                <option value="priority" selected>Priority-first (urgency)</option>
+                <option value="roi">ROI-weighted (profit per peso)</option>
+              </select>
+            </label>
+            <button class="dash-export-btn" onclick="onBudgetCalculate()">Calculate</button>
+          </div>
+          <div id="budget-planner-results" class="bp-results"></div>
+        </div>
 
         <!-- Table -->
         <div class="report-block">
@@ -6902,6 +6996,198 @@ function renderRestockingReport() {
           </tr>`;
         }).join('')}
     </tbody>`;
+
+  // Re-run the budget plan if the owner already calculated one. Without
+  // this the plan goes stale when they change Analyse-last / Cover-next
+  // controls (suggested qtys change → plan should change too).
+  if (budgetPlannerActive) onBudgetCalculate();
+}
+
+// ============================================================
+// BUDGET PLANNER — given a peso amount, return a ranked shopping list of
+// items to restock. Two strategies share the same restock rows + costs:
+//
+//   priority  — fill OOS first, then Critical / Watch / Healthy, sort
+//               within each by velocity desc. Matches how a shopkeeper
+//               thinks ("what's running out?").
+//   roi       — sort by (dailyProfit / cost) desc — pesos of profit per
+//               peso of capital tied up per day. Maximises profit from
+//               the available budget. Falls back to urgency on ties.
+//
+// Items without a cost set are skipped with reason "No cost set" so the
+// owner is nudged to fill the cost field in the product editor (which
+// also improves Sales Report margin math).
+// ============================================================
+let budgetPlannerActive = false;
+let __lastBudgetPlan = null;
+
+function computeBudgetPlan(budget, strategy) {
+  if (!__lastRestockData) renderRestockingReport();
+  const rows = (__lastRestockData && __lastRestockData.rows) || [];
+  const productById = {};
+  (products || []).forEach(p => { productById[String(p.id)] = p; });
+
+  const candidates = [];
+  const skipped = [];
+  rows.forEach(r => {
+    const p = productById[String(r.id)];
+    const cost = p ? parseFloat(p.cost) : NaN;
+    if (!isFinite(cost) || cost <= 0) {
+      // Only flag items that actually need reordering — clutter otherwise.
+      if (r.suggested > 0 || r.urgency === 'oos') {
+        skipped.push({ ...r, reason: 'No cost set' });
+      }
+      return;
+    }
+    if (r.suggested <= 0) return; // nothing to buy — silently ignore
+    const price = parseFloat(p.price);
+    const marginPerUnit = isFinite(price) ? Math.max(0, price - cost) : 0;
+    const dailyProfit = (r.dailyRate || 0) * marginPerUnit;
+    const roiScore = dailyProfit / cost;
+    candidates.push({
+      ...r,
+      cost,
+      price: isFinite(price) ? price : cost,
+      marginPerUnit,
+      dailyProfit,
+      roiScore
+    });
+  });
+
+  // Sort
+  if (strategy === 'roi') {
+    candidates.sort((a, b) => {
+      if (b.roiScore !== a.roiScore) return b.roiScore - a.roiScore;
+      const ur = urgencyRank(a.urgency) - urgencyRank(b.urgency);
+      if (ur !== 0) return ur;
+      return b.dailyRate - a.dailyRate;
+    });
+  } else {
+    // priority-first
+    candidates.sort((a, b) => {
+      const ur = urgencyRank(a.urgency) - urgencyRank(b.urgency);
+      if (ur !== 0) return ur;
+      if (b.dailyRate !== a.dailyRate) return b.dailyRate - a.dailyRate;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  }
+
+  // Walk-and-buy. Each item gets up to its suggested qty, capped by
+  // remaining budget. We don't skip an item just because we can't afford
+  // its full suggested qty — partial fills are useful.
+  const items = [];
+  let remaining = budget;
+  candidates.forEach(c => {
+    if (remaining < c.cost) return; // can't afford a single unit
+    const maxByBudget = Math.floor(remaining / c.cost);
+    const qty = Math.min(c.suggested, maxByBudget);
+    if (qty <= 0) return;
+    const lineTotal = qty * c.cost;
+    items.push({ ...c, qtyToBuy: qty, lineTotal });
+    remaining -= lineTotal;
+  });
+
+  return {
+    strategy,
+    budget,
+    items,
+    totalSpent: budget - remaining,
+    leftover: remaining,
+    skipped,
+    candidatesNotPicked: candidates.length - items.length
+  };
+}
+
+function onBudgetCalculate() {
+  const amount = parseFloat(document.getElementById('bp-amount').value) || 0;
+  const strategy = document.getElementById('bp-strategy').value || 'priority';
+  const out = document.getElementById('budget-planner-results');
+  if (!out) return;
+  if (amount <= 0) {
+    out.innerHTML = '<div class="bp-empty">Enter a budget above ₱0 to see a suggested shopping list.</div>';
+    budgetPlannerActive = false;
+    __lastBudgetPlan = null;
+    return;
+  }
+  budgetPlannerActive = true;
+  __lastBudgetPlan = computeBudgetPlan(amount, strategy);
+  renderBudgetPlan(__lastBudgetPlan);
+}
+
+function renderBudgetPlan(plan) {
+  const out = document.getElementById('budget-planner-results');
+  if (!out) return;
+  if (!plan.items.length) {
+    const reason = plan.skipped.length > 0
+      ? `${plan.skipped.length} candidate item${plan.skipped.length === 1 ? '' : 's'} skipped (mostly "No cost set"). Add a cost to each product in the editor to unlock the budget planner.`
+      : 'No items need reorder right now — your stock looks healthy.';
+    out.innerHTML = `<div class="bp-empty">${reason}</div>`;
+    return;
+  }
+  const urgLabel = {
+    oos: 'OOS', critical: 'Critical', watch: 'Watch',
+    healthy: 'Healthy', 'no-data': 'No velocity'
+  };
+  const rowsHtml = plan.items.map((it, i) => `
+    <tr>
+      <td class="rank">${i + 1}</td>
+      <td><button class="pt-pname" style="font-weight:500;" onclick="openProductView(${it.id})">${escText(it.name)}</button></td>
+      <td><span class="restock-badge ${it.urgency}">${urgLabel[it.urgency] || it.urgency}</span></td>
+      <td class="numeric">${it.qtyToBuy}<span class="row-muted" style="margin-left:4px;">/ ${it.suggested}</span></td>
+      <td class="numeric">₱${fmt(it.cost)}</td>
+      <td class="numeric">₱${fmt(it.lineTotal)}</td>
+    </tr>
+  `).join('');
+  const pct = plan.budget > 0 ? Math.round((plan.totalSpent / plan.budget) * 100) : 0;
+  const strategyLabel = plan.strategy === 'roi' ? 'ROI-weighted' : 'Priority-first';
+  const skippedToggle = plan.skipped.length > 0
+    ? `<div class="bp-skipped-section">
+         <button type="button" class="bp-skipped-toggle" onclick="toggleBudgetSkipped()">
+           ▸ ${plan.skipped.length} skipped item${plan.skipped.length === 1 ? '' : 's'} — show
+         </button>
+         <div class="bp-skipped-list" id="bp-skipped-list">
+           ${plan.skipped.map(s => `
+             <div class="bp-skipped-row">
+               <span>${escText(s.name)}</span>
+               <span class="bp-skipped-reason">${escText(s.reason)}</span>
+             </div>
+           `).join('')}
+         </div>
+       </div>`
+    : '';
+  out.innerHTML = `
+    <div class="bp-summary">
+      <strong class="bp-summary-amt">Spend ₱${fmt(plan.totalSpent)}</strong> of ₱${fmt(plan.budget)}
+      · ${pct}% used · ${plan.items.length} item${plan.items.length === 1 ? '' : 's'} to buy
+      · ₱${fmt(plan.leftover)} leftover
+      <span class="bp-summary-skipped">· strategy: ${strategyLabel}</span>
+    </div>
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th class="rank">#</th>
+            <th>Item</th>
+            <th>Urgency</th>
+            <th class="numeric">Buy</th>
+            <th class="numeric">Unit cost</th>
+            <th class="numeric">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    ${skippedToggle}
+  `;
+}
+
+function toggleBudgetSkipped() {
+  const list = document.getElementById('bp-skipped-list');
+  const btn  = document.querySelector('.bp-skipped-toggle');
+  if (!list || !btn) return;
+  const open = list.classList.toggle('open');
+  const n = (__lastBudgetPlan && __lastBudgetPlan.skipped) ? __lastBudgetPlan.skipped.length : 0;
+  btn.textContent = (open ? '▾ ' : '▸ ') + n + ' skipped item' + (n === 1 ? '' : 's') + ' — ' + (open ? 'hide' : 'show');
 }
 
 // Wrap the existing per-item ranking + drill-down so it can be driven by
