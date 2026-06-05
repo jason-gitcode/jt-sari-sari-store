@@ -226,7 +226,8 @@
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--surface);
-    font-size: 15px;
+    /* 16px (not 15) so iOS Safari doesn't auto-zoom the viewport on focus. */
+    font-size: 16px;
     font-family: inherit;
     color: var(--text);
     outline: none;
@@ -564,12 +565,12 @@ const getMyTenant  = functions.httpsCallable('getMyTenant');
       renderSuggestions(input.value);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // Enter picks the highlighted (or first) suggestion to FILL the field
+      // and arm the Go button. The user must press Go to actually navigate.
       if (activeIdx >= 0 && visible[activeIdx]) {
         pickStore(visible[activeIdx]);
-        navigateToStore();
       } else if (visible.length > 0) {
         pickStore(visible[0]);
-        navigateToStore();
       }
     } else if (e.key === 'Escape') {
       sugBox.classList.add('hidden');
@@ -579,13 +580,13 @@ const getMyTenant  = functions.httpsCallable('getMyTenant');
 
   sugBox.addEventListener('mousedown', (e) => {
     // mousedown (not click) so the input's blur doesn't hide the box before
-    // the click registers.
+    // the tap registers. Picking only fills the input + enables Go; the
+    // user explicitly clicks Go to navigate.
     const row = e.target.closest('.store-finder-suggestion');
     if (!row) return;
     const idx = parseInt(row.getAttribute('data-idx'), 10);
     if (visible[idx]) {
       pickStore(visible[idx]);
-      navigateToStore();
     }
   });
 
