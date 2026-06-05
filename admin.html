@@ -4628,6 +4628,16 @@ function renderSupplierFormBody(s) {
           </div>
         </div>
       </div>
+      <div class="supp-row">
+        <div class="supp-cell">
+          <label class="supp-label">Email address</label>
+          <input type="email" class="supp-input" data-field="email" value="${escAttr(s.email)}" placeholder="e.g. orders@abctrading.ph" autocomplete="off" />
+        </div>
+        <div class="supp-cell">
+          <label class="supp-label">Website</label>
+          <input type="url" class="supp-input" data-field="website" value="${escAttr(s.website)}" placeholder="e.g. abctrading.ph" autocomplete="off" />
+        </div>
+      </div>
       <div>
         <label class="supp-label">Address</label>
         <textarea class="supp-input" data-field="address" rows="2" placeholder="Supplier's address">${escText(s.address)}</textarea>
@@ -4660,11 +4670,27 @@ function renderSupplierViewBody(s) {
   }
   const row = (label, value, isEmpty) =>
     `<div class="supp-view-row"><div class="supp-view-label">${label}</div><div class="supp-view-value${isEmpty ? ' empty' : ''}">${isEmpty ? 'Not set' : value}</div></div>`;
+  // Email + website rendered as clickable links when present. Both fields
+  // are optional — show "Not set" when blank.
+  const emailHtml = s.email
+    ? `<a href="mailto:${escAttr(s.email)}" style="color:var(--accent);text-decoration:underline;">${escText(s.email)}</a>`
+    : '';
+  // Normalize website to include protocol so the link opens correctly even
+  // if the supplier typed just "abctrading.ph" without https://.
+  let websiteHref = '';
+  if (s.website) {
+    websiteHref = /^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website;
+  }
+  const websiteHtml = s.website
+    ? `<a href="${escAttr(websiteHref)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">${escText(s.website)}</a>`
+    : '';
   return `
     <div class="supp-view-grid">
       ${row('Business name', escText(s.businessName), !s.businessName)}
       ${row('Contact person', escText(s.contactPerson), !s.contactPerson)}
       ${row('Contact number', escText(s.contactNumber), !s.contactNumber)}
+      ${row('Email address', emailHtml, !s.email)}
+      ${row('Website', websiteHtml, !s.website)}
       ${row('Address', escText(s.address).replace(/\n/g, '<br>'), !s.address)}
       ${row('Next delivery / schedule', escText(schedDisplay), !schedDisplay)}
       <div class="supp-view-row">
@@ -4700,7 +4726,7 @@ function editFromView() {
 let currentEditSupplierId = null; // null when adding a new supplier
 function openSupplierAdd() {
   currentEditSupplierId = null;
-  const blank = { businessName: '', contactPerson: '', contactNumber: '', address: '', schedule: '', categories: [] };
+  const blank = { businessName: '', contactPerson: '', contactNumber: '', email: '', website: '', address: '', schedule: '', categories: [] };
   document.getElementById('edit-modal-title').textContent = 'Add Supplier';
   document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(blank);
   document.getElementById('edit-modal-delete-btn').style.display = 'none';
