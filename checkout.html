@@ -722,7 +722,7 @@ function init() {
           </iframe>
           <button type="button" class="map-edit-btn" onclick="openLocPicker()">Edit</button>
         </div>
-        <button type="button" class="locate-btn" onclick="locateMe()">📍 Use my location</button>
+        <button type="button" id="locate-btn" class="locate-btn" onclick="locateMe()">📍 Use my location</button>
         <span class="loc-status" id="loc-status">✓ Location attached — the store will get a map pin on your order</span>
       </div>
       <div class="field">
@@ -1118,6 +1118,17 @@ async function placeOrder() {
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (schedulesOn && hasSlots && !deliverySlot) {
       if (!hasError) showToast("Please select a delivery schedule.");
+      hasError = true;
+    }
+    // Require the customer to have captured coords. Without lat/lng the
+    // rider has no map pin and the typed address alone is rarely enough
+    // to find a Phase/Block/Lot in a subdivision.
+    if (!locPicked) {
+      if (!hasError) {
+        showToast("Please tap '📍 Use my location' so the rider can find you.");
+        const lbtn = document.getElementById('locate-btn');
+        if (lbtn) lbtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       hasError = true;
     }
   }
