@@ -735,6 +735,17 @@
     .order-addr { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
     .order-map-pin { font-size: 15px; line-height: 1; flex-shrink: 0; text-decoration: none; }
     .order-map-pin:hover { opacity: .75; }
+    /* Customer-pin link in the order card. Mirrors checkout's .pickup-pin-link
+       style so admin sees the same button shape + URL behaviour as customers
+       (Maps opens straight to Directions with Start / Add stops / Saved). */
+    .order-nav-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 6px; padding: 7px 11px;
+      background: #166534; color: #fff !important;
+      border-radius: 6px; font-size: 12px; font-weight: 600;
+      text-decoration: none; line-height: 1;
+    }
+    .order-nav-link:hover { background: #14532d; }
     .order-items-list { font-size: var(--fs-sm); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 10px; background: var(--surface-2); }
     .order-item-row { display: flex; justify-content: space-between; padding: 7px 11px; border-bottom: 1px solid var(--line); }
     .order-item-row:last-child { border-bottom: none; }
@@ -4958,7 +4969,7 @@ function renderOrders() {
     const addr     = isPickup
       ? '🏬 Pick-up at store'
       : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
-    const pinHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps/dir/?api=1&destination=${o.address.lat},${o.address.lng}" target="_blank" title="Open directions in Google Maps">📍</a>` : '';
+    const navHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-nav-link" href="https://www.google.com/maps/dir/?api=1&amp;destination=${o.address.lat},${o.address.lng}" target="_blank" rel="noopener" aria-label="Open directions to customer in Google Maps">📍 Click here to navigate to customer</a>` : '';
     const payLabel = o.payment === 'gcash' ? '📱 GCash'
                    : o.payment === 'cash'  ? '💵 Cash at Pickup'
                    : '🛵 Cash on Delivery';
@@ -5087,7 +5098,8 @@ function renderOrders() {
         </div>
         <div class="order-card-body">
           <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}${o.customer?.phone ? `<button class="copy-phone-btn" onclick="copyPhone(this,'${o.customer.phone}')">copy</button>` : ''}</div>
-          <div class="order-addr">${addr}${pinHtml}</div>
+          <div class="order-addr">${addr}</div>
+          ${navHtml}
           ${bodyHtml}
         </div>
         ${actionsHtml}

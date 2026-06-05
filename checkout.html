@@ -159,9 +159,51 @@
   .gcash-receipt-box { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
   .gcash-upload-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; background: #fff; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ink); font-weight: 500; }
   .gcash-upload-btn:hover { background: var(--soft); border-color: var(--accent); }
-  .gcash-receipt-thumb { position: relative; display: inline-block; max-width: 200px; margin-top: 4px; }
-  .gcash-receipt-thumb img { max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid var(--line); display: block; }
-  .gcash-receipt-remove { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #dc2626; color: white; border: 2px solid #fff; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+  .gcash-receipt-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .gcash-receipt-filename {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px;
+    font-size: 13px; font-family: inherit; cursor: pointer;
+    color: var(--accent); font-weight: 500;
+    max-width: 100%; overflow: hidden;
+  }
+  .gcash-receipt-filename:hover { background: var(--soft); border-color: var(--accent); }
+  .gcash-receipt-filename span {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-decoration: underline; text-decoration-color: rgba(0,0,0,0);
+    transition: text-decoration-color 0.15s;
+  }
+  .gcash-receipt-filename:hover span { text-decoration-color: currentColor; }
+  .gcash-receipt-remove-btn {
+    background: none; border: 0; color: #dc2626;
+    font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer;
+    font-family: inherit;
+  }
+  .gcash-receipt-remove-btn:hover { color: #991b1b; }
+  /* Lightbox modal — same pattern as admin's receipt preview. */
+  .gcash-receipt-modal {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px; cursor: pointer;
+  }
+  .gcash-receipt-modal.show { display: flex; }
+  .gcash-receipt-modal img {
+    max-width: 95vw; max-height: 90vh;
+    object-fit: contain; border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    cursor: default;
+  }
+  .gcash-receipt-modal-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.15); color: white;
+    border: 0; border-radius: 50%;
+    font-size: 24px; line-height: 1; padding: 0;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .gcash-receipt-modal-close:hover { background: rgba(255,255,255,0.3); }
 
   /* Delivery schedule */
   .schedule-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -987,15 +1029,40 @@ function renderGcashReceiptPreview() {
   const preview = document.getElementById('gcash-receipt-preview');
   if (!preview) return;
   if (gcashReceiptData) {
-    const safe = gcashReceiptData.replace(/"/g, '&quot;');
+    const safeName = (gcashReceiptName || 'gcash-receipt.jpg')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     preview.innerHTML = `
-      <div class="gcash-receipt-thumb">
-        <img src="${safe}" alt="Receipt preview" />
-        <button type="button" class="gcash-receipt-remove" onclick="removeGcashReceipt()" title="Remove">×</button>
+      <div class="gcash-receipt-row">
+        <button type="button" class="gcash-receipt-filename" onclick="openCheckoutReceiptModal()" title="Click to view receipt">
+          🖼️ <span>${safeName}</span>
+        </button>
+        <button type="button" class="gcash-receipt-remove-btn" onclick="removeGcashReceipt()" aria-label="Remove receipt" title="Remove receipt">×</button>
       </div>
     `;
   } else preview.innerHTML = '';
 }
+
+function openCheckoutReceiptModal() {
+  if (!gcashReceiptData) return;
+  const modal = document.getElementById('checkout-receipt-modal');
+  const img = document.getElementById('checkout-receipt-modal-img');
+  if (img) img.src = gcashReceiptData;
+  if (modal) modal.classList.add('show');
+}
+
+function closeCheckoutReceiptModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  const modal = document.getElementById('checkout-receipt-modal');
+  if (modal) modal.classList.remove('show');
+  const img = document.getElementById('checkout-receipt-modal-img');
+  if (img) img.src = '';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('checkout-receipt-modal');
+  if (modal && modal.classList.contains('show')) closeCheckoutReceiptModal();
+});
 function removeGcashReceipt() {
   gcashReceiptData = null;
   gcashReceiptName = null;
@@ -1490,5 +1557,11 @@ tcol('products').get().then(snapshot => {
     navigator.serviceWorker.register('/sw.js');
   }
 </script>
+
+<!-- GCash receipt lightbox (popup) — same modal pattern admin uses. -->
+<div class="gcash-receipt-modal" id="checkout-receipt-modal" onclick="closeCheckoutReceiptModal(event)">
+  <button type="button" class="gcash-receipt-modal-close" onclick="closeCheckoutReceiptModal()" aria-label="Close">×</button>
+  <img id="checkout-receipt-modal-img" src="" alt="GCash Receipt" onclick="event.stopPropagation()" />
+</div>
 </body>
 </html>
