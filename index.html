@@ -285,6 +285,22 @@
     text-overflow: ellipsis;
   }
   .card-unit { font-size: 12px; color: var(--muted); }
+  /* Description ALWAYS occupies the same 2-line vertical slot — even
+     when empty — so the price + add button row lines up across every card
+     in the row. Line-clamp truncates with the OS ellipsis on overflow. */
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.35;
+    margin: 4px 0;
+    min-height: calc(1.35em * 2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+  }
   .card-bottom {
     margin-top: auto;                         /* push to the bottom of the card so price + add-btn align across the row even when descriptions differ in length */
     padding-top: 8px;
@@ -1719,7 +1735,7 @@ function renderProducts() {
       <div class="card-body">
         <div class="card-name">${p.name}</div>
         <div class="card-unit">${p.unit}</div>
-        ${p.description ? `<div style="font-size:12px;color:var(--muted);margin:4px 0;">${p.description.substring(0, 50)}${p.description.length > 50 ? '...' : ''}</div>` : ''}
+        <div class="card-desc">${p.description || ''}</div>
         ${(displayStock === 0) ? `<div style="font-size:12px;color:#dc2626;">Out of Stock</div>` : ''}
         <div class="card-bottom">
           <div class="price${isRange ? ' is-range' : ''}">${priceStr}</div>
