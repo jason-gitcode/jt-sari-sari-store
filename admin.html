@@ -2360,6 +2360,10 @@
                     style="padding:8px 14px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
                     📍 Use my location
                   </button>
+                  <button type="button" id="si-remove-pin-btn" onclick="siRemovePin()"
+                    style="padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;">
+                    🗑️ Remove pin
+                  </button>
                   <span id="si-loc-status" style="font-size:12px;color:var(--muted);"></span>
                 </div>
                 <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">
@@ -3639,10 +3643,15 @@ function ensureDayCheckboxesPopulated() {
 // alongside the other Store Info fields. Module-level so Save can read them.
 let siPickupLat = null;
 let siPickupLng = null;
+// True when the owner explicitly tapped Remove pin this session. Lets Save
+// distinguish "pin untouched, keep whatever's in Firestore" from "delete
+// the pin from Firestore." Reset to false on load and on Use my location.
+let siPickupCleared = false;
 
 function siRenderPickupMapAndStatus() {
   const iframe = document.getElementById('si-pickup-map');
   const status = document.getElementById('si-loc-status');
+  const removeBtn = document.getElementById('si-remove-pin-btn');
   const hasPin = (typeof siPickupLat === 'number' && typeof siPickupLng === 'number');
   if (iframe) {
     const q = hasPin
@@ -3651,10 +3660,24 @@ function siRenderPickupMapAndStatus() {
     iframe.src = `https://maps.google.com/maps?q=${q}&output=embed`;
   }
   if (status) {
-    status.textContent = hasPin
-      ? `✓ Pinned at ${siPickupLat.toFixed(5)}, ${siPickupLng.toFixed(5)} — save Store Info to apply`
-      : 'No pin yet — tap Use my location to set one.';
-    status.style.color = hasPin ? '#16a34a' : 'var(--muted)';
+    if (hasPin) {
+      status.textContent = `✓ Pinned at ${siPickupLat.toFixed(5)}, ${siPickupLng.toFixed(5)} — save Store Info to apply`;
+      status.style.color = '#16a34a';
+    } else if (siPickupCleared) {
+      status.textContent = '🗑️ Pin will be removed — save Store Info to apply';
+      status.style.color = '#dc2626';
+    } else {
+      status.textContent = 'No pin yet — tap Use my location to set one.';
+      status.style.color = 'var(--muted)';
+    }
+  }
+  // Disable Remove pin when there's nothing to remove (no current pin AND
+  // no pending clear) — avoids a no-op confusing click.
+  if (removeBtn) {
+    const nothingToRemove = !hasPin && !siPickupCleared;
+    removeBtn.disabled = nothingToRemove;
+    removeBtn.style.opacity = nothingToRemove ? '0.45' : '1';
+    removeBtn.style.cursor = nothingToRemove ? 'not-allowed' : 'pointer';
   }
 }
 
@@ -3669,6 +3692,7 @@ function siUseMyLocation() {
     pos => {
       siPickupLat = pos.coords.latitude;
       siPickupLng = pos.coords.longitude;
+      siPickupCleared = false;
       siRenderPickupMapAndStatus();
     },
     err => {
@@ -3683,6 +3707,13 @@ function siUseMyLocation() {
   );
 }
 
+function siRemovePin() {
+  siPickupLat = null;
+  siPickupLng = null;
+  siPickupCleared = true;
+  siRenderPickupMapAndStatus();
+}
+
 function syncStoreInfoForm() {
   ensureHourSelectsPopulated();
   ensureDayCheckboxesPopulated();
@@ -3692,9 +3723,11 @@ function syncStoreInfoForm() {
   f('si-gcash-name', storeSettingsData.gcashAccountName);
   f('si-gcash-number', storeSettingsData.gcashNumber);
   // Pickup pin — load from settings if present, refresh map + status.
+  // Don't clobber in-progress edits (Use my location / Remove pin) by always
+  // resyncing — only refresh from server when the user hasn't touched it.
   const savedLat = storeSettingsData.pickupLat;
   const savedLng = storeSettingsData.pickupLng;
-  if (typeof savedLat === 'number' && typeof savedLng === 'number') {
+  if (!siPickupCleared && siPickupLat === null && typeof savedLat === 'number' && typeof savedLng === 'number') {
     siPickupLat = savedLat;
     siPickupLng = savedLng;
   }
@@ -3762,8 +3795,15 @@ async function saveStoreInfo() {
     if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
       payload.pickupLat = siPickupLat;
       payload.pickupLng = siPickupLng;
+    } else if (siPickupCleared) {
+      // Explicit removal — actually delete the fields, don't just write null.
+      payload.pickupLat = firebase.firestore.FieldValue.delete();
+      payload.pickupLng = firebase.firestore.FieldValue.delete();
     }
     await tdoc('settings', 'store').set(payload, { merge: true });
+    // After a successful save, reset the cleared flag so a later snapshot
+    // resync doesn't keep showing "Pin will be removed."
+    siPickupCleared = false;
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
   } catch (err) {
