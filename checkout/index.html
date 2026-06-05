@@ -565,13 +565,14 @@ function applyTenantStoreConfig() {
     const hasPin = Number.isFinite(latNum) && Number.isFinite(lngNum) && (latNum !== 0 || lngNum !== 0);
     let pinHtml = '';
     if (hasPin) {
-      // Use the q=lat,lng format (NOT dir/?api=1&destination=...). The latter
-      // opens Maps' Directions screen with no starting point and prompts the
-      // user to choose one; q=lat,lng drops the pin as a destination and shows
-      // the standard place sheet with Directions / Start / Save buttons,
-      // matching the behaviour of the admin's customer-pin link.
-      const href = `https://www.google.com/maps?q=${latNum},${lngNum}`;
-      pinHtml = `<a class="pickup-pin-link" href="${href}" target="_blank" rel="noopener" aria-label="Open ${storeName} in Google Maps">📍 Click here to navigate to the store</a>`;
+      // Use the dir/?api=1&destination= deep link so Google Maps opens
+      // straight into the Directions panel with origin = current location
+      // and Start / Add stops / Saved buttons ready. When location permission
+      // is granted (which it is by the time the customer reaches this link
+      // post-Use-my-location flow), this skips the "choose starting point"
+      // screen entirely.
+      const href = `https://www.google.com/maps/dir/?api=1&destination=${latNum},${lngNum}`;
+      pinHtml = `<a class="pickup-pin-link" href="${href}" target="_blank" rel="noopener" aria-label="Open directions to ${storeName} in Google Maps">📍 Click here to navigate to the store</a>`;
     }
     pickupBox.innerHTML = `<strong>Pick up at ${storeName}</strong>${pickup}${pinHtml ? '<br>' + pinHtml : ''}`;
   }

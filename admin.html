@@ -4958,7 +4958,7 @@ function renderOrders() {
     const addr     = isPickup
       ? '🏬 Pick-up at store'
       : (o.address ? [o.address.lotBlock, o.address.street, o.address.subdivision, o.address.floor ? `Floor ${o.address.floor}` : ''].filter(Boolean).join(', ') : '—');
-    const pinHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps?q=${o.address.lat},${o.address.lng}" target="_blank" title="Open in Google Maps">📍</a>` : '';
+    const pinHtml  = (!isPickup && o.address?.lat && o.address?.lng) ? `<a class="order-map-pin" href="https://www.google.com/maps/dir/?api=1&destination=${o.address.lat},${o.address.lng}" target="_blank" title="Open directions in Google Maps">📍</a>` : '';
     const payLabel = o.payment === 'gcash' ? '📱 GCash'
                    : o.payment === 'cash'  ? '💵 Cash at Pickup'
                    : '🛵 Cash on Delivery';
