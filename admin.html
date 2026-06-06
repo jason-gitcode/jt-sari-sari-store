@@ -475,7 +475,14 @@
     }
     .billing-history-table th, .billing-history-table td {
       padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line);
+      /* Keep each cell on one line — Date in particular was wrapping to 3
+         lines on narrow widths (e.g. "Jun" / "6," / "2026"). The whole
+         table sits inside overflow-x:auto so horizontal scroll handles
+         narrow viewports instead of cell-wrap. */
+      white-space: nowrap;
     }
+    /* Rejection reason row spans all columns and SHOULD wrap. */
+    .billing-history-table td[colspan] { white-space: normal; }
     .billing-history-table th {
       font-weight: 600; color: var(--muted); font-size: 11px;
       text-transform: uppercase; letter-spacing: 0.5px;
