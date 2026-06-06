@@ -3793,6 +3793,15 @@ function renderBillingTab() {
   }
 
   // ---- Payment history ----
+  // Hide the whole section for Free-tier tenants who've never paid —
+  // a permanently-empty "No payments yet" card is just visual noise.
+  // The section re-appears the instant they upgrade or have any history.
+  const historySection = document.getElementById('billing-history-section');
+  if (historySection) {
+    const tierIsFree = !subscriptionData || subscriptionData.tier === 'free';
+    const hasNoHistory = !paymentsHistory || paymentsHistory.length === 0;
+    historySection.style.display = (tierIsFree && hasNoHistory) ? 'none' : '';
+  }
   renderBillingHistory();
 
   // ---- Tier comparison ----
