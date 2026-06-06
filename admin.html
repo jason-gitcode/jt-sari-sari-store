@@ -3598,14 +3598,29 @@ tdoc('settings', 'store').onSnapshot(snap => {
 // trigger a noisy "Missing or insufficient permissions" warning.
 let subscriptionData = null;
 let __subscriptionUnsub = null;
+let paymentsHistory = [];
+let __paymentsUnsub = null;
 firebase.auth().onAuthStateChanged(user => {
   if (__subscriptionUnsub) { __subscriptionUnsub(); __subscriptionUnsub = null; }
-  if (!user) { subscriptionData = null; renderTierBadge(); return; }
+  if (__paymentsUnsub)     { __paymentsUnsub();     __paymentsUnsub = null; }
+  if (!user) {
+    subscriptionData = null;
+    paymentsHistory = [];
+    renderTierBadge();
+    return;
+  }
   __subscriptionUnsub = tdoc('subscription', 'current').onSnapshot(snap => {
     subscriptionData = snap.exists ? snap.data() : null;
     renderTierBadge();
   }, err => {
     console.warn('[subscription] listener:', err);
+  });
+  // Tenant's own payment history — drives the Billing → Payment history table.
+  __paymentsUnsub = tcol('payments').orderBy('submittedAt', 'desc').limit(50).onSnapshot(snap => {
+    paymentsHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderBillingTab();
+  }, err => {
+    console.warn('[payments] listener:', err);
   });
 });
 
@@ -3777,6 +3792,9 @@ function renderBillingTab() {
     `;
   }
 
+  // ---- Payment history ----
+  renderBillingHistory();
+
   // ---- Tier comparison ----
   const currentTier = (subscriptionData && subscriptionData.tier) || 'free';
   const tierOrder = ['free', 'growth', 'pro'];
@@ -3800,6 +3818,88 @@ function renderBillingTab() {
       </div>
     `;
   }).join('');
+}
+
+function renderBillingHistory() {
+  const body = document.getElementById('billing-history-body');
+  if (!body) return;
+  // Free + no payments → friendlier empty state
+  if (!paymentsHistory || paymentsHistory.length === 0) {
+    const onFree = !subscriptionData || subscriptionData.tier === 'free';
+    body.innerHTML = `<div class="billing-empty">${
+      onFree
+        ? 'No payments yet. Your subscription is on the Free plan.'
+        : 'No payments yet.'
+    }</div>`;
+    return;
+  }
+  const fmtDt = ts => {
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : (ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+  const tierLabel = t => ({ free: 'Free', growth: 'Growth', pro: 'Pro' }[t] || t || '—');
+  const statusLabel = s => ({
+    pending_verification: 'Pending',
+    confirmed: 'Confirmed',
+    rejected: 'Rejected',
+    refunded: 'Refunded'
+  }[s] || s);
+
+  const rowsHtml = paymentsHistory.map((p, idx) => {
+    const dateStr = fmtDt(p.submittedAt);
+    const tierStr = tierLabel(p.tier);
+    const amount = (typeof p.amount === 'number') ? `₱${p.amount.toFixed(2)}` : '—';
+    const status = p.status || 'pending_verification';
+    const statusPill = `<span class="billing-status-pill ${status}">${statusLabel(status)}</span>`;
+    const receiptCell = p.receiptDataUrl
+      ? `<button type="button" onclick="viewMyReceipt(${idx})" style="background:none;border:0;padding:2px 6px;font:inherit;font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;">🖼️ View</button>`
+      : '<span style="color:var(--muted);">—</span>';
+    const reasonRow = (status === 'rejected' && p.rejectedReason)
+      ? `<tr><td colspan="6" style="padding-top:0;color:#dc2626;font-size:11px;font-style:italic;">Reason: ${escText(p.rejectedReason)}</td></tr>`
+      : '';
+    return `
+      <tr>
+        <td>${dateStr}</td>
+        <td>${escText(p.period || '—')}</td>
+        <td>${tierStr}</td>
+        <td class="amount">${amount}</td>
+        <td>${statusPill}</td>
+        <td>${receiptCell}</td>
+      </tr>
+      ${reasonRow}
+    `;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="billing-history-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Period</th>
+            <th>Tier</th>
+            <th style="text-align:right;">Amount</th>
+            <th>Status</th>
+            <th>Receipt</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function viewMyReceipt(idx) {
+  const p = paymentsHistory[idx];
+  if (!p || !p.receiptDataUrl) return;
+  // Reuse the existing order-receipt lightbox.
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = p.receiptDataUrl;
+  document.getElementById('receipt-modal').classList.add('show');
 }
 
 function scrollToTierCompare() {
