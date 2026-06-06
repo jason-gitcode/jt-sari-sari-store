@@ -3674,21 +3674,86 @@ function renderBillingTab() {
       suspended: 'Suspended',
       cancelled: 'Cancelled'
     }[status] || status;
-    const nextBillLine = (tier === 'free')
-      ? `<div>Free plan — no recurring charge.</div>`
-      : `<div>Next bill: <strong>${fmtBillingDate(subscriptionData.currentPeriodEnd)}</strong> · ${fmtPHP(subscriptionData.amount || info.amount)}</div>`;
-    const trialLine = (status === 'trialing' && subscriptionData.trialEndsAt)
-      ? `<div>Trial ends: <strong>${fmtBillingDate(subscriptionData.trialEndsAt)}</strong></div>`
+
+    // Days remaining in the current period — drives Pay-Now visibility.
+    // For Free or missing end date, treat as unbounded ("never urgent").
+    let daysToEnd = Infinity;
+    const periodEnd = subscriptionData.currentPeriodEnd;
+    if (periodEnd && (periodEnd.toDate || periodEnd.seconds || typeof periodEnd === 'string')) {
+      const endDate = periodEnd.toDate
+        ? periodEnd.toDate()
+        : (periodEnd.seconds ? new Date(periodEnd.seconds * 1000) : new Date(periodEnd));
+      if (!isNaN(endDate.getTime())) {
+        daysToEnd = Math.ceil((endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+      }
+    }
+
+    // Status / period lines
+    let statusBlock = '';
+    if (tier === 'free') {
+      statusBlock = `<div>Free plan — no recurring charge.</div>`;
+    } else if (status === 'trialing') {
+      const daysLeft = subscriptionData.trialEndsAt
+        ? Math.max(0, Math.ceil(((subscriptionData.trialEndsAt.toDate ? subscriptionData.trialEndsAt.toDate() : new Date(subscriptionData.trialEndsAt)).getTime() - Date.now()) / (24*60*60*1000)))
+        : null;
+      statusBlock = `
+        <div>🎁 <strong>Free trial</strong>${daysLeft != null ? ` — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ''}</div>
+        <div>Trial ends: <strong>${fmtBillingDate(subscriptionData.trialEndsAt)}</strong></div>
+        <div>After trial: <strong>${fmtPHP(info.amount)}/mo</strong></div>
+      `;
+    } else if (status === 'active') {
+      statusBlock = `
+        <div style="color:#16a34a;font-weight:600;">✓ Paid through ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
+        <div style="margin-top:4px;">Next bill: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong> on ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
+      `;
+    } else if (status === 'past_due' || status === 'grace') {
+      statusBlock = `
+        <div style="color:#dc2626;font-weight:700;">⚠️ Payment overdue</div>
+        <div>Renew to keep your store open. Outstanding: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong></div>
+      `;
+    } else if (status === 'suspended') {
+      statusBlock = `
+        <div style="color:#dc2626;font-weight:700;">🚫 Store suspended</div>
+        <div>Your storefront is offline. Pay your subscription to reactivate.</div>
+      `;
+    } else if (status === 'cancelled') {
+      statusBlock = `
+        <div style="color:var(--muted);">Plan cancelled. Sign up for a new plan to reactivate.</div>
+      `;
+    }
+
+    // ---- Decide which action button (if any) to show ----
+    // Free: Upgrade
+    // Trialing: "Pay early" soft CTA — optional, ghost styling
+    // Active + >7 days till renewal: NO Pay button. Avoids "did the system
+    //   register my payment?" confusion right after a fresh confirmation.
+    // Active + ≤7 days: "Renew now" — gentle reminder
+    // Past_due / grace / suspended: "Pay now" — prominent
+    // Cancelled: "Reactivate" → opens Pay Now flow
+    let primaryActionHtml = '';
+    if (tier === 'free') {
+      primaryActionHtml = `<button class="billing-action-btn" onclick="scrollToTierCompare()">Upgrade</button>`;
+    } else if (status === 'trialing') {
+      primaryActionHtml = `<button class="billing-action-btn ghost" onclick="openPayNowModal()">Pay early (optional)</button>`;
+    } else if (status === 'active') {
+      if (daysToEnd <= 7) {
+        primaryActionHtml = `<button class="billing-action-btn" onclick="openPayNowModal()">Renew now</button>`;
+      }
+      // else: paid + plenty of time → NO Pay button.
+    } else if (status === 'past_due' || status === 'grace' || status === 'suspended') {
+      primaryActionHtml = `<button class="billing-action-btn" style="background:#dc2626;border-color:#dc2626;" onclick="openPayNowModal()">Pay now</button>`;
+    } else if (status === 'cancelled') {
+      primaryActionHtml = `<button class="billing-action-btn" onclick="openPayNowModal()">Reactivate plan</button>`;
+    }
+
+    // Cancel becomes a small text link at the bottom — destructive actions
+    // shouldn't share visual weight with the primary CTA.
+    const cancelLinkHtml = (tier !== 'free' && status !== 'cancelled')
+      ? `<div style="margin-top:14px;text-align:right;">
+           <button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>
+         </div>`
       : '';
-    const payNowBtn = (tier !== 'free')
-      ? `<button class="billing-action-btn" onclick="openPayNowModal()">Pay now</button>`
-      : '';
-    const upgradeBtn = (tier === 'free')
-      ? `<button class="billing-action-btn" onclick="scrollToTierCompare()">Upgrade</button>`
-      : '';
-    const cancelBtn = (tier !== 'free' && status !== 'cancelled')
-      ? `<button class="billing-action-btn danger" onclick="cancelSubscription()">Cancel plan</button>`
-      : '';
+
     planBody.innerHTML = `
       <div class="billing-current-row">
         <div class="billing-current-main">
@@ -3696,17 +3761,15 @@ function renderBillingTab() {
             <span class="tier-badge tier-${tier} status-${status}" style="font-size:11px;vertical-align:middle;">${statusLabel}</span>
           </div>
           <div class="billing-current-status">
-            ${trialLine}
-            ${nextBillLine}
+            ${statusBlock}
             <div style="margin-top:6px;">Product cap: <strong>${info.productCap.toLocaleString()}</strong></div>
           </div>
         </div>
         <div class="billing-current-actions">
-          ${upgradeBtn}
-          ${payNowBtn}
-          ${cancelBtn}
+          ${primaryActionHtml}
         </div>
       </div>
+      ${cancelLinkHtml}
     `;
   }
 
