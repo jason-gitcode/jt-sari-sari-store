@@ -1,4 +1,4 @@
-const CACHE = 'sari-sari-v154';
+const CACHE = 'sari-sari-v155';
 const PRECACHE = [
   '/logo.PNG',
   '/newlogo.jpeg',
