@@ -186,6 +186,116 @@
   .modal-status { font-size: 12px; color: var(--muted); margin-top: 12px; min-height: 16px; }
   .modal-status.success { color: var(--success); }
   .modal-status.error { color: var(--error); }
+
+  /* ---------- Platform-level admin sections ---------- */
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .section-card .desc { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  .form-grid label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .form-grid input {
+    width: 100%; padding: 8px 10px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 6px; color: var(--text); font-size: 14px;
+  }
+  .form-grid input:focus { outline: none; border-color: var(--accent); }
+  .form-status { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+  .form-status.success { color: var(--success); }
+  .form-status.error { color: var(--error); }
+
+  /* Pending payment cards */
+  .pending-payment-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .pending-payment-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .pending-payment-tenant { font-size: 14px; font-weight: 700; color: var(--text); }
+  .pending-payment-tenant .slug { color: var(--muted); font-weight: 500; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-left: 4px; }
+  .pending-payment-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pending-payment-tier-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+    background: #1e3a8a55; color: #93c5fd; border: 1px solid #3b82f655;
+  }
+  .pending-payment-tier-pill.tier-pro { background: #581c8755; color: #d8b4fe; border-color: #a855f755; }
+  .pending-payment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    font-size: 12px;
+    margin-bottom: 10px;
+    color: var(--text);
+  }
+  .pending-payment-grid .label { color: var(--muted); }
+  .pending-payment-grid .val { font-weight: 600; word-break: break-all; }
+  .pending-payment-note {
+    font-size: 12px; padding: 8px 10px; margin-bottom: 10px;
+    background: var(--surface-2); border-radius: 6px; border-left: 3px solid var(--accent);
+  }
+  .pending-payment-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pending-action-btn {
+    padding: 8px 14px; border-radius: 6px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    border: 1px solid transparent; font-family: inherit;
+  }
+  .pending-action-btn.view {
+    background: var(--surface-2); color: var(--text); border-color: var(--line);
+  }
+  .pending-action-btn.view:hover { background: #475569; }
+  .pending-action-btn.confirm {
+    background: var(--success); color: #fff;
+  }
+  .pending-action-btn.confirm:hover { filter: brightness(0.92); }
+  .pending-action-btn.reject {
+    background: transparent; color: var(--error); border-color: var(--error);
+  }
+  .pending-action-btn.reject:hover { background: rgba(239,68,68,0.10); }
+  .pending-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pending-empty {
+    padding: 24px; text-align: center; color: var(--muted);
+    font-size: 13px; background: var(--surface); border: 1px dashed var(--line); border-radius: 8px;
+  }
+
+  /* Receipt lightbox modal */
+  .receipt-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px; cursor: pointer;
+  }
+  .receipt-modal-overlay.show { display: flex; }
+  .receipt-modal-overlay img {
+    max-width: 95vw; max-height: 90vh;
+    object-fit: contain; border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    cursor: default;
+  }
+  .receipt-modal-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 40px; height: 40px;
+    background: rgba(255,255,255,0.15); color: white;
+    border: 0; border-radius: 50%;
+    font-size: 24px; line-height: 1; padding: 0;
+    cursor: pointer;
+  }
+  .receipt-modal-close:hover { background: rgba(255,255,255,0.30); }
 </style>
 </head>
 <body>
@@ -259,6 +369,65 @@
       </table>
     </div>
 
+    <!-- ===== PENDING SUBSCRIPTION PAYMENTS ===== -->
+    <div class="section-title" style="margin-top:32px;">
+      <span>📨 Pending subscription payments <span id="pending-count" style="background:#92400e;color:#fef3c7;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:6px;display:none;"></span></span>
+      <div class="actions">
+        <button class="btn btn-icon" onclick="loadPendingPayments()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="desc">Tenants who submitted manual GCash / Maya payments awaiting your verification. Cross-check each against your real wallet transaction log using the reference code.</div>
+      <div id="pending-payments-list">
+        <div class="pending-empty">Click Refresh to load pending payments.</div>
+      </div>
+    </div>
+
+    <!-- ===== SUBSCRIPTION PAYMENT ACCOUNTS ===== -->
+    <div class="section-title" style="margin-top:32px;">
+      <span>💰 Subscription payment accounts</span>
+    </div>
+    <div class="section-card">
+      <div class="desc">Receiving accounts shown to tenants in the Pay Now modal. GCash is the primary method; Maya Wallet is a backup for tenants who don't have GCash. Stored in <code>platform/billing</code>.</div>
+      <div class="form-grid">
+        <div>
+          <label for="pb-gcash-name">GCash account name</label>
+          <input type="text" id="pb-gcash-name" maxlength="100" placeholder="e.g. Jason T." />
+        </div>
+        <div>
+          <label for="pb-gcash-number">GCash number</label>
+          <input type="tel" id="pb-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" placeholder="09xxxxxxxxx" />
+        </div>
+        <div>
+          <label for="pb-maya-name">Maya Wallet account name</label>
+          <input type="text" id="pb-maya-name" maxlength="100" placeholder="e.g. Jason T." />
+        </div>
+        <div>
+          <label for="pb-maya-number">Maya Wallet number</label>
+          <input type="tel" id="pb-maya-number" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx" />
+        </div>
+        <div class="full">
+          <label for="pb-discord-webhook">Discord webhook (optional — fires when a payment is submitted)</label>
+          <input type="url" id="pb-discord-webhook" placeholder="https://discord.com/api/webhooks/..." />
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" id="pb-save-btn" onclick="savePlatformBilling()">Save</button>
+      </div>
+      <div class="form-status" id="pb-status"></div>
+    </div>
+
+    <!-- ===== SEED STARTER PACK ===== -->
+    <div class="section-title" style="margin-top:32px;">
+      <span>📦 Seed starter pack</span>
+    </div>
+    <div class="section-card">
+      <div class="desc">Pick <strong>1 product per category</strong> from the seed tenant (<code>jsminimart</code>, image-preferred) and write them to root <code>starter_pack/*</code>. <code>createTenant</code> copies these into every new tenant's catalog. Overwrites any existing pack.</div>
+      <button class="btn btn-primary" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed starter pack</button>
+      <div class="form-status" id="seed-pack-status"></div>
+    </div>
+
+    <!-- ===== INVITE CODES (existing) ===== -->
     <div class="section-title" style="margin-top:32px;">
       <span>Invite codes</span>
       <div class="actions">
@@ -301,6 +470,12 @@
   </div>
 </div>
 
+<!-- RECEIPT LIGHTBOX -->
+<div class="receipt-modal-overlay" id="receipt-modal" onclick="closeReceiptModal(event)">
+  <button type="button" class="receipt-modal-close" onclick="closeReceiptModal()" aria-label="Close">×</button>
+  <img id="receipt-modal-img" src="" alt="Payment receipt" onclick="event.stopPropagation()" />
+</div>
+
 <!-- DELETE MODAL -->
 <div class="modal-backdrop" id="delete-modal">
   <div class="modal">
@@ -333,10 +508,13 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const functions = firebase.app().functions('asia-southeast1');
-const deleteTenantFn       = functions.httpsCallable('deleteTenant');
-const generateInviteCodeFn = functions.httpsCallable('generateInviteCode');
-const listInviteCodesFn    = functions.httpsCallable('listInviteCodes');
-const revokeInviteCodeFn   = functions.httpsCallable('revokeInviteCode');
+const deleteTenantFn         = functions.httpsCallable('deleteTenant');
+const generateInviteCodeFn   = functions.httpsCallable('generateInviteCode');
+const listInviteCodesFn      = functions.httpsCallable('listInviteCodes');
+const revokeInviteCodeFn     = functions.httpsCallable('revokeInviteCode');
+const listPendingPaymentsFn  = functions.httpsCallable('listPendingPayments');
+const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
+const rejectManualPaymentFn  = functions.httpsCallable('rejectManualPayment');
 
 // Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
 const SUPERADMIN_EMAILS = new Set([
@@ -529,6 +707,8 @@ auth.onAuthStateChanged(user => {
   document.getElementById('dashboard-view').classList.remove('hidden');
   loadTenants();
   loadInviteCodes();
+  loadPendingPayments();
+  subscribePlatformBilling();
 });
 
 // ============================================================
@@ -622,6 +802,270 @@ async function revokeInviteCode(code) {
     loadInviteCodes();
   } catch (err) {
     alert('Could not revoke: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// ============================================================
+// PENDING SUBSCRIPTION PAYMENTS
+// ============================================================
+let __lastPendingPayments = [];
+
+function escText(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadPendingPayments() {
+  const listEl = document.getElementById('pending-payments-list');
+  const countEl = document.getElementById('pending-count');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="pending-empty">Loading pending payments…</div>';
+  try {
+    const result = await listPendingPaymentsFn();
+    __lastPendingPayments = (result.data && result.data.payments) || [];
+    renderPendingPayments();
+    if (countEl) {
+      if (__lastPendingPayments.length > 0) {
+        countEl.textContent = __lastPendingPayments.length;
+        countEl.style.display = '';
+      } else {
+        countEl.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('listPendingPayments failed:', err);
+    listEl.innerHTML = `<div class="pending-empty" style="color:#fca5a5;">❌ ${escText(err.message || err)}</div>`;
+  }
+}
+
+function renderPendingPayments() {
+  const listEl = document.getElementById('pending-payments-list');
+  if (!listEl) return;
+  if (__lastPendingPayments.length === 0) {
+    listEl.innerHTML = '<div class="pending-empty">✅ No pending payments. You\'re all caught up.</div>';
+    return;
+  }
+  const fmtDt = ms => ms ? new Date(ms).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  listEl.innerHTML = __lastPendingPayments.map((p, idx) => {
+    const tierLabel = { growth: 'Growth', pro: 'Pro' }[p.tier] || p.tier;
+    const tierClass = p.tier === 'pro' ? ' tier-pro' : '';
+    const noteHtml = p.senderNote
+      ? `<div class="pending-payment-note">📝 ${escText(p.senderNote)}</div>` : '';
+    return `
+      <div class="pending-payment-card">
+        <div class="pending-payment-head">
+          <div>
+            <div class="pending-payment-tenant">${escText(p.tenantName)}<span class="slug">/${escText(p.tid)}/</span></div>
+            <div class="pending-payment-meta">From: ${escText(p.submittedBy || '—')} · Submitted ${fmtDt(p.submittedAt)}</div>
+          </div>
+          <span class="pending-payment-tier-pill${tierClass}">${tierLabel} · ₱${p.amount}</span>
+        </div>
+        <div class="pending-payment-grid">
+          <span class="label">Reference</span>
+          <span class="val">${escText(p.referenceCode)}</span>
+          <span class="label">Period</span>
+          <span class="val">${escText(p.period)}</span>
+        </div>
+        ${noteHtml}
+        <div class="pending-payment-actions">
+          <button class="pending-action-btn view" onclick="viewPendingReceipt(${idx})">🖼️ View receipt</button>
+          <button class="pending-action-btn confirm" onclick="confirmPendingPayment(${idx})">✓ Confirm payment</button>
+          <button class="pending-action-btn reject" onclick="rejectPendingPayment(${idx})">✗ Reject</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function viewPendingReceipt(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p || !p.receiptDataUrl) { alert('No receipt attached.'); return; }
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = p.receiptDataUrl;
+  document.getElementById('receipt-modal').classList.add('show');
+}
+
+function closeReceiptModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('receipt-modal').classList.remove('show');
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = '';
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('receipt-modal');
+  if (modal && modal.classList.contains('show')) closeReceiptModal();
+});
+
+async function confirmPendingPayment(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p) return;
+  const tierLabel = { growth: 'Growth', pro: 'Pro' }[p.tier] || p.tier;
+  if (!confirm(`Confirm ${p.tenantName} (/${p.tid}/) paid ₱${p.amount} for PabiliMart ${tierLabel}?\n\nThis extends their subscription by 30 days.`)) return;
+  try {
+    await confirmManualPaymentFn({ tid: p.tid, paymentId: p.paymentId });
+    loadPendingPayments();
+  } catch (err) {
+    console.error('confirmManualPayment failed:', err);
+    alert('❌ ' + (err.message || err));
+  }
+}
+
+async function rejectPendingPayment(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p) return;
+  const reason = prompt(`Reject payment from ${p.tenantName} (/${p.tid}/)?\n\nReason (required, shown to the tenant):`);
+  if (!reason || !reason.trim()) return;
+  try {
+    await rejectManualPaymentFn({ tid: p.tid, paymentId: p.paymentId, reason: reason.trim() });
+    loadPendingPayments();
+  } catch (err) {
+    console.error('rejectManualPayment failed:', err);
+    alert('❌ ' + (err.message || err));
+  }
+}
+
+// ============================================================
+// SUBSCRIPTION PAYMENT ACCOUNTS (platform/billing)
+// ============================================================
+let __platformBillingUnsub = null;
+
+function subscribePlatformBilling() {
+  if (__platformBillingUnsub) __platformBillingUnsub();
+  __platformBillingUnsub = db.collection('platform').doc('billing').onSnapshot(snap => {
+    const data = snap.exists ? snap.data() : {};
+    const f = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && document.activeElement !== el) el.value = val || '';
+    };
+    f('pb-gcash-name', data.gcashAccountName);
+    f('pb-gcash-number', data.gcashNumber);
+    f('pb-maya-name', data.mayaAccountName);
+    f('pb-maya-number', data.mayaNumber);
+    f('pb-discord-webhook', data.subscriptionDiscordWebhook);
+  }, err => console.warn('[platform/billing] listener:', err));
+}
+
+async function savePlatformBilling() {
+  const status = document.getElementById('pb-status');
+  const btn = document.getElementById('pb-save-btn');
+  const gcashAccountName = document.getElementById('pb-gcash-name').value.trim();
+  const gcashNumber = document.getElementById('pb-gcash-number').value.trim();
+  const mayaAccountName = document.getElementById('pb-maya-name').value.trim();
+  const mayaNumber = document.getElementById('pb-maya-number').value.trim();
+  const subscriptionDiscordWebhook = document.getElementById('pb-discord-webhook').value.trim();
+
+  if (gcashAccountName.length < 2) { status.textContent = 'GCash account name is required.'; status.className = 'form-status error'; return; }
+  if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.className = 'form-status error'; return; }
+  if (subscriptionDiscordWebhook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(subscriptionDiscordWebhook)) {
+    status.textContent = 'Discord webhook URL must start with https://discord.com/api/webhooks/'; status.className = 'form-status error'; return;
+  }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  status.textContent = 'Saving…'; status.className = 'form-status';
+  try {
+    await db.collection('platform').doc('billing').set({
+      gcashAccountName,
+      gcashNumber,
+      mayaAccountName: mayaAccountName || null,
+      mayaNumber: mayaNumber || null,
+      mayaBankName: firebase.firestore.FieldValue.delete(),
+      subscriptionDiscordWebhook: subscriptionDiscordWebhook || null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: auth.currentUser?.email || null
+    }, { merge: true });
+    status.className = 'form-status success';
+    status.textContent = '✅ Saved. Tenants will see these accounts immediately.';
+  } catch (err) {
+    console.error(err);
+    status.className = 'form-status error';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+// ============================================================
+// SEED STARTER PACK — pulls from jsminimart's products collection and
+// writes one per category (image-preferred) to root /starter_pack/*.
+// createTenant copies these into every new tenant's catalog.
+// ============================================================
+async function runSeedStarterPack() {
+  const SEED_TENANT = 'jsminimart';
+  const btn = document.getElementById('seed-pack-btn');
+  const status = document.getElementById('seed-pack-status');
+  if (!confirm(`Pick 1 product per category from /${SEED_TENANT}/ and write them to /starter_pack/*?\n\nNew tenants will receive these as their starting catalog (image preferred). Overwrites any existing starter pack.`)) return;
+  btn.disabled = true; btn.textContent = 'Seeding…';
+  status.className = 'form-status'; status.textContent = 'Reading products…';
+  try {
+    const srcSnap = await db.collection('tenants').doc(SEED_TENANT).collection('products').get();
+    const candidates = srcSnap.docs
+      .map(d => ({ id: d.id, data: d.data() }))
+      .filter(p => p.data.available !== false && p.data.hidden !== true);
+    if (candidates.length === 0) throw new Error(`No available products to sample from /${SEED_TENANT}/.`);
+
+    const shuffle = arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    };
+    const byCategory = new Map();
+    candidates.forEach(p => {
+      const cat = p.data.category || 'Uncategorized';
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat).push(p);
+    });
+    const picked = [];
+    for (const [, items] of byCategory) {
+      const withImg = items.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0);
+      const pool = withImg.length > 0 ? withImg : items;
+      shuffle(pool);
+      picked.push(pool[0]);
+    }
+    const pickedWithImages = picked.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0).length;
+    status.textContent = `Picked ${picked.length} product${picked.length === 1 ? '' : 's'} across ${byCategory.size} categor${byCategory.size === 1 ? 'y' : 'ies'} (${pickedWithImages} with photos). Clearing old pack…`;
+
+    // Wipe existing
+    const existingSnap = await db.collection('starter_pack').get();
+    {
+      let batch = db.batch(); let ops = 0;
+      for (const d of existingSnap.docs) {
+        batch.delete(d.ref); ops++;
+        if (ops >= 20) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+      if (ops > 0) await batch.commit();
+    }
+    status.textContent = `Cleared ${existingSnap.size} old entries. Writing new pack…`;
+
+    // Write new pack — clean state
+    {
+      let batch = db.batch(); let ops = 0;
+      for (const p of picked) {
+        const clean = { ...p.data };
+        clean.stock = null;
+        clean.available = true;
+        clean.hidden = false;
+        if (Array.isArray(clean.variants)) {
+          clean.variants = clean.variants.map(v => ({ ...v, stock: null }));
+        }
+        batch.set(db.collection('starter_pack').doc(p.id), clean);
+        ops++;
+        if (ops >= 20) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+      if (ops > 0) await batch.commit();
+    }
+
+    status.className = 'form-status success';
+    status.textContent = `✅ Seeded ${picked.length} products to /starter_pack/* — ${pickedWithImages} with photos, ${picked.length - pickedWithImages} emoji-only.`;
+    btn.textContent = 'Re-seed pack';
+    btn.disabled = false;
+  } catch (err) {
+    console.error(err);
+    status.className = 'form-status error';
+    status.textContent = '❌ ' + (err && err.message ? err.message : String(err));
+    btn.disabled = false;
+    btn.textContent = 'Retry seed';
   }
 }
 </script>
