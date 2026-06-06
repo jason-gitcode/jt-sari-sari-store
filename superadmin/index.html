@@ -216,6 +216,29 @@
   td.created { color: var(--muted); font-size: 12px; }
   td.actions { white-space: nowrap; }
   td.actions a, td.actions button { margin-left: 4px; }
+  /* Clickable Name / Code cell — looks like a link, opens a detail modal.
+     Replaces the icon-row Actions cell on narrow phones. */
+  .row-open-btn {
+    background: none; border: 0; padding: 0;
+    color: var(--accent); cursor: pointer;
+    font: inherit; font-weight: 500;
+    text-decoration: underline; text-decoration-color: transparent;
+    transition: text-decoration-color 0.15s;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    text-align: left;
+  }
+  .row-open-btn:hover { text-decoration-color: currentColor; }
+  .row-open-btn.code-style {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+  /* Mobile column hider — applied to th/td that should disappear under
+     640px so phone tables only show the essential 2–3 columns. Use !important
+     to beat the th's table-header rules. */
+  @media (max-width: 640px) {
+    .mobile-hide { display: none !important; }
+  }
   .empty {
     padding: 32px;
     text-align: center;
@@ -296,14 +319,17 @@
     text-transform: uppercase; letter-spacing: 0.4px;
     line-height: 1.3;
   }
-  .form-grid input {
-    width: 100%; padding: 5px 8px;
+  /* Compact form input. !important + class specificity overrides the
+     global iOS 16px auto-zoom rule at the bottom of the stylesheet.
+     Trade-off: iOS may briefly zoom the viewport when one of these
+     inputs gets focus. Accepted because this form is touched once
+     during platform setup and the visual size matters more here than
+     the brief focus-zoom UX. */
+  .section-card .form-grid input {
+    width: 100%; padding: 5px 8px !important;
     background: var(--surface-2); border: 1px solid var(--line);
     border-radius: 6px; color: var(--text);
-    /* Desktop: 11px for a very tight, compact look. Mobile still bumps
-       to 16px via the iOS auto-zoom prevention rule at the bottom of
-       the stylesheet — non-negotiable to avoid viewport zoom on focus. */
-    font-size: 11px;
+    font-size: 11px !important;
     font-family: inherit;
   }
   .form-grid input:focus { outline: none; border-color: var(--accent); }
@@ -495,14 +521,14 @@
       <table id="tenants-table">
         <thead>
           <tr>
-            <th>Slug</th>
+            <th class="mobile-hide">Slug</th>
             <th>Name</th>
             <th>Plan</th>
-            <th>Owner</th>
-            <th>Created</th>
+            <th class="mobile-hide">Owner</th>
+            <th class="mobile-hide">Created</th>
             <th class="numeric">Products</th>
-            <th class="numeric">Orders</th>
-            <th>Actions</th>
+            <th class="numeric mobile-hide">Orders</th>
+            <th class="mobile-hide">Actions</th>
           </tr>
         </thead>
         <tbody id="tenants-tbody">
@@ -597,10 +623,10 @@
           <tr>
             <th>Code</th>
             <th>Status</th>
-            <th>Bound email</th>
-            <th>Note</th>
-            <th>Created</th>
-            <th>Redeemed by</th>
+            <th class="mobile-hide">Bound email</th>
+            <th class="mobile-hide">Note</th>
+            <th class="mobile-hide">Created</th>
+            <th class="mobile-hide">Redeemed by</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -616,6 +642,24 @@
 <div class="receipt-modal-overlay" id="receipt-modal" onclick="closeReceiptModal(event)">
   <button type="button" class="receipt-modal-close" onclick="closeReceiptModal()" aria-label="Close">×</button>
   <img id="receipt-modal-img" src="" alt="Payment receipt" onclick="event.stopPropagation()" />
+</div>
+
+<!-- TENANT DETAIL MODAL -->
+<div class="modal-backdrop" id="tenant-modal" onclick="closeTenantModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="tm-title">Tenant details</h3>
+    <div id="tm-body" style="display:grid; grid-template-columns: max-content 1fr; gap: 8px 14px; font-size: 13px; margin-bottom: 14px;"></div>
+    <div class="modal-actions" id="tm-actions" style="flex-wrap:wrap; gap:8px;"></div>
+  </div>
+</div>
+
+<!-- INVITE CODE DETAIL MODAL -->
+<div class="modal-backdrop" id="invite-modal" onclick="closeInviteModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Invite code details</h3>
+    <div id="im-body" style="display:grid; grid-template-columns: max-content 1fr; gap: 8px 14px; font-size: 13px; margin-bottom: 14px;"></div>
+    <div class="modal-actions" id="im-actions" style="flex-wrap:wrap; gap:8px;"></div>
+  </div>
 </div>
 
 <!-- DELETE MODAL -->
@@ -798,14 +842,14 @@ function renderTable(tenants, counts) {
     const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
     return `
       <tr>
-        <td class="slug">${t.id}</td>
-        <td class="name" title="${escText(t.name || '—')}">${escText(t.name || '—')}</td>
+        <td class="slug mobile-hide">${t.id}</td>
+        <td class="name"><button class="row-open-btn" onclick="openTenantModal(${i})" title="${escText(t.name || t.id)}">${escText(t.name || '—')}</button></td>
         <td class="plan"><span class="pill ${pillClass}">${pillLabel}</span></td>
-        <td class="owner" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
-        <td class="created">${formatDate(t.createdAt)}</td>
+        <td class="owner mobile-hide" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
+        <td class="created mobile-hide">${formatDate(t.createdAt)}</td>
         <td class="numeric">${c.products == null ? '—' : c.products}</td>
-        <td class="numeric">${c.orders == null ? '—' : c.orders}</td>
-        <td class="actions">
+        <td class="numeric mobile-hide">${c.orders == null ? '—' : c.orders}</td>
+        <td class="actions mobile-hide">
           <a class="btn btn-icon" href="/${t.id}/" target="_blank" title="Open storefront">🌐</a>
           <a class="btn btn-icon" href="/${t.id}/admin/" target="_blank" title="Open admin">⚙️</a>
           <button class="btn btn-icon btn-danger" onclick="openDeleteModal('${t.id}')" title="Delete tenant">🗑️</button>
@@ -816,6 +860,86 @@ function renderTable(tenants, counts) {
 }
 
 function refresh() { loadTenants(); }
+
+// ----- Tenant detail modal (opened by clicking Name in the table) -----
+function openTenantModal(idx) {
+  const t = CACHED_TENANTS && CACHED_TENANTS[idx];
+  if (!t) return;
+  const fmtT = ts => ts ? formatDate(ts) : '—';
+  const owners = Array.isArray(t.ownerEmails) ? t.ownerEmails : [];
+  const ownerHtml = owners.length === 0
+    ? '—'
+    : owners.map(e => escText(e)).join('<br>');
+  document.getElementById('tm-title').textContent = t.name || t.id;
+  document.getElementById('tm-body').innerHTML = `
+    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Store name</span>
+    <span style="font-weight:600;word-break:break-word;">${escText(t.name || '—')}</span>
+    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Slug</span>
+    <span style="font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;">/${escText(t.id)}/</span>
+    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Owner${owners.length > 1 ? 's' : ''}</span>
+    <span style="font-weight:600;word-break:break-word;">${ownerHtml}</span>
+    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Created</span>
+    <span style="font-weight:600;">${fmtT(t.createdAt)}</span>
+  `;
+  document.getElementById('tm-actions').innerHTML = `
+    <a class="btn" href="/${t.id}/" target="_blank" rel="noopener" style="text-decoration:none;">🌐 Storefront</a>
+    <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener" style="text-decoration:none;">⚙️ Admin</a>
+    <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete tenant</button>
+    <button type="button" class="btn" onclick="closeTenantModal()">Close</button>
+  `;
+  document.getElementById('tenant-modal').classList.add('show');
+}
+function closeTenantModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('tenant-modal').classList.remove('show');
+}
+
+// ----- Invite code detail modal (opened by clicking Code in the table) -----
+function openInviteModal(idx) {
+  const c = CACHED_INVITE_CODES && CACHED_INVITE_CODES[idx];
+  if (!c) return;
+  const statusLabel = c.redeemedAt ? 'Redeemed' : (c.revoked ? 'Revoked' : 'Pending');
+  const statusColor = c.redeemedAt ? '#16a34a' : (c.revoked ? '#991b1b' : '#0369a1');
+  const shareUrl = `https://pabilimart.com/signup/?code=${c.code}`;
+  const k = label => `<span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">${label}</span>`;
+  const v = html => `<span style="font-weight:600;word-break:break-word;">${html}</span>`;
+  const lines = [
+    k('Code') + v(`<span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0.08em;">${escText(c.code)}</span>`),
+    k('Status') + v(`<span style="color:${statusColor};">${statusLabel}</span>`),
+    k('Bound email') + v(escText(c.email || '—')),
+    k('Note') + v(escText(c.note || '—')),
+    k('Created') + v(c.createdAt ? formatDate(new Date(c.createdAt)) : '—')
+  ];
+  if (c.redeemedAt) {
+    lines.push(k('Redeemed by') + v(`${escText(c.redeemedBy || '—')}<br><span style="color:var(--muted);font-size:11px;font-weight:500;">→ /${escText(c.redeemedSlug || '?')}/</span>`));
+    lines.push(k('Redeemed at') + v(formatDate(new Date(c.redeemedAt))));
+  }
+  document.getElementById('im-body').innerHTML = lines.join('');
+
+  const isPending = !c.redeemedAt && !c.revoked;
+  const actions = [];
+  if (isPending) {
+    actions.push(`<button type="button" class="btn btn-primary" onclick="copyToClipboard('${escText(shareUrl)}', this)">📋 Copy share link</button>`);
+    actions.push(`<button type="button" class="btn btn-danger" onclick="closeInviteModal(); revokeInviteCode('${escText(c.code)}');">Revoke</button>`);
+  }
+  actions.push(`<button type="button" class="btn" onclick="closeInviteModal()">Close</button>`);
+  document.getElementById('im-actions').innerHTML = actions.join('');
+
+  document.getElementById('invite-modal').classList.add('show');
+}
+function closeInviteModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('invite-modal').classList.remove('show');
+}
+
+// Close any modal on Escape.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  ['tenant-modal', 'invite-modal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('show')) el.classList.remove('show');
+  });
+});
 
 // ---------- DELETE FLOW ----------
 let pendingDeleteSlug = null;
@@ -936,17 +1060,19 @@ function copyToClipboard(text, btn) {
   });
 }
 
+let CACHED_INVITE_CODES = [];
 async function loadInviteCodes() {
   const tbody = document.getElementById('invite-tbody');
   tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading invite codes…</td></tr>';
   try {
     const { data } = await listInviteCodesFn({});
     const codes = (data && Array.isArray(data.codes)) ? data.codes : [];
+    CACHED_INVITE_CODES = codes;
     if (codes.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" class="loading">No invite codes yet. Generate one above to invite a new tenant.</td></tr>';
       return;
     }
-    tbody.innerHTML = codes.map(c => {
+    tbody.innerHTML = codes.map((c, i) => {
       let statusCell;
       if (c.redeemedAt) {
         statusCell = `<span style="color:#16a34a;font-weight:600;">Redeemed</span>`;
@@ -963,12 +1089,12 @@ async function loadInviteCodes() {
         ? `<button class="btn btn-icon" onclick="copyToClipboard('${escTextSA(shareUrl)}', this)">Copy link</button> <button class="btn btn-icon" onclick="revokeInviteCode('${escTextSA(c.code)}')" style="color:#991b1b;">Revoke</button>`
         : '—';
       return `<tr>
-        <td><code style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0.08em;">${escTextSA(c.code)}</code></td>
+        <td><button class="row-open-btn code-style" onclick="openInviteModal(${i})">${escTextSA(c.code)}</button></td>
         <td>${statusCell}</td>
-        <td>${escTextSA(c.email || '—')}</td>
-        <td>${escTextSA(c.note || '—')}</td>
-        <td>${c.createdAt ? formatDate(new Date(c.createdAt)) : '—'}</td>
-        <td>${redeemed}</td>
+        <td class="mobile-hide">${escTextSA(c.email || '—')}</td>
+        <td class="mobile-hide">${escTextSA(c.note || '—')}</td>
+        <td class="mobile-hide">${c.createdAt ? formatDate(new Date(c.createdAt)) : '—'}</td>
+        <td class="mobile-hide">${redeemed}</td>
         <td>${actions}</td>
       </tr>`;
     }).join('');
