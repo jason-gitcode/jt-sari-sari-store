@@ -146,6 +146,16 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // PLATFORM CONFIG — owner-readable (so Pay-Now modals can show the
+    // GCash account + reference info), superadmin-writable only.
+    // Holds subscription payment receiving accounts (GCash, Maya instaPay).
+    // ============================================================
+    match /platform/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isSuperadmin();
+    }
+
+    // ============================================================
     // INVITE CODES — fully closed to clients. All access (mint, list,
     // revoke, redeem) goes through Cloud Functions running with admin
     // privileges, so codes can never be enumerated or tampered with from
