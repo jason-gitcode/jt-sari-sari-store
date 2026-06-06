@@ -3746,11 +3746,18 @@ function renderBillingTab() {
       primaryActionHtml = `<button class="billing-action-btn" onclick="openPayNowModal()">Reactivate plan</button>`;
     }
 
-    // Cancel becomes a small text link at the bottom — destructive actions
-    // shouldn't share visual weight with the primary CTA.
-    const cancelLinkHtml = (tier !== 'free' && status !== 'cancelled')
-      ? `<div style="margin-top:14px;text-align:right;">
-           <button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>
+    // Cancel sits in the bottom-right as a small secondary text link.
+    // Primary action sits in the bottom-LEFT (per UX iteration: action +
+    // cancel share a single bottom row, left/right balanced).
+    const cancelLinkInline = (tier !== 'free' && status !== 'cancelled')
+      ? `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>`
+      : '';
+
+    const hasBottomRow = primaryActionHtml || cancelLinkInline;
+    const bottomRowHtml = hasBottomRow
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;">
+           <div>${primaryActionHtml || ''}</div>
+           <div>${cancelLinkInline}</div>
          </div>`
       : '';
 
@@ -3765,11 +3772,8 @@ function renderBillingTab() {
             <div style="margin-top:6px;">Product cap: <strong>${info.productCap.toLocaleString()}</strong></div>
           </div>
         </div>
-        <div class="billing-current-actions">
-          ${primaryActionHtml}
-        </div>
       </div>
-      ${cancelLinkHtml}
+      ${bottomRowHtml}
     `;
   }
 
