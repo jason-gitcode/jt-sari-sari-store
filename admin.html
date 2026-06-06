@@ -562,6 +562,7 @@
     #settings-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #reports-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    #billing-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     /* Supplier table — mirrors the Home Inventory ranking table (.dash-table)
        in font scale, padding, sticky header, and box treatment. Wrapper
        scrolls horizontally when the table is wider than the viewport so
@@ -3219,16 +3220,12 @@
                     <input type="tel" id="pb-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" placeholder="09xxxxxxxxx" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
                   </div>
                   <div>
-                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya / instaPay account name</label>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya Wallet account name</label>
                     <input type="text" id="pb-maya-name" maxlength="100" placeholder="e.g. Jason T." style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
                   </div>
                   <div>
-                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya number</label>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya Wallet number</label>
                     <input type="tel" id="pb-maya-number" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
-                  </div>
-                  <div style="grid-column:1 / -1;">
-                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya bank label (shown to tenants)</label>
-                    <input type="text" id="pb-maya-bank" maxlength="60" placeholder="e.g. Maya Savings" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
                   </div>
                   <div style="grid-column:1 / -1;">
                     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Discord webhook (optional — fires when a payment is submitted)</label>
@@ -3735,12 +3732,11 @@ function showPayNowModal() {
   document.getElementById('paynow-ref-code').textContent = refCode;
   document.getElementById('paynow-gcash-name').textContent = platformBillingData.gcashAccountName || '—';
   document.getElementById('paynow-gcash-number').textContent = platformBillingData.gcashNumber || '—';
-  // Maya / instaPay alt is optional.
+  // Maya Wallet alt is optional.
   const mayaWrap = document.getElementById('paynow-maya-wrap');
   if (platformBillingData.mayaNumber) {
     document.getElementById('paynow-maya-name').textContent = platformBillingData.mayaAccountName || '—';
     document.getElementById('paynow-maya-number').textContent = platformBillingData.mayaNumber || '—';
-    document.getElementById('paynow-maya-bank').textContent = platformBillingData.mayaBankName || 'Maya Savings';
     mayaWrap.style.display = '';
   } else {
     mayaWrap.style.display = 'none';
@@ -3748,7 +3744,8 @@ function showPayNowModal() {
   // Reset receipt preview + status
   renderPayNowReceipt();
   document.getElementById('paynow-status').textContent = '';
-  document.getElementById('paynow-submit-btn').disabled = false;
+  // Start disabled — receipt upload is required before submission can fire.
+  document.getElementById('paynow-submit-btn').disabled = true;
   document.getElementById('paynow-submit-btn').textContent = 'Submit payment';
   document.getElementById('paynow-modal').classList.add('show');
 }
@@ -3805,18 +3802,26 @@ function handlePayNowReceiptUpload(event) {
 
 function renderPayNowReceipt() {
   const wrap = document.getElementById('paynow-receipt-preview');
+  const submitBtn = document.getElementById('paynow-submit-btn');
   if (!payNowReceiptData) {
-    wrap.innerHTML = '';
+    if (wrap) wrap.innerHTML = '';
+    // No receipt → Submit must stay disabled.
+    if (submitBtn) submitBtn.disabled = true;
     return;
   }
   const safeName = (payNowReceiptName || 'receipt.jpg')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  wrap.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
-      <span style="font-size:13px;color:var(--ink);">🖼️ ${safeName}</span>
-      <button type="button" onclick="removePayNowReceipt()" style="background:none;border:0;color:#dc2626;font-size:18px;cursor:pointer;">×</button>
-    </div>
-  `;
+  if (wrap) {
+    wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:var(--ink);">🖼️ ${safeName}</span>
+        <button type="button" onclick="removePayNowReceipt()" style="background:none;border:0;color:#dc2626;font-size:18px;cursor:pointer;">×</button>
+      </div>
+    `;
+  }
+  // Receipt attached → allow Submit (only if the button hasn't already
+  // been swapped to a "Submitted" success state).
+  if (submitBtn && submitBtn.textContent === 'Submit payment') submitBtn.disabled = false;
 }
 
 function removePayNowReceipt() {
@@ -5147,7 +5152,6 @@ function syncPlatformBillingForm() {
   f('pb-gcash-number', data.gcashNumber);
   f('pb-maya-name', data.mayaAccountName);
   f('pb-maya-number', data.mayaNumber);
-  f('pb-maya-bank', data.mayaBankName);
   f('pb-discord-webhook', data.subscriptionDiscordWebhook);
 }
 
@@ -5158,7 +5162,6 @@ async function savePlatformBilling() {
   const gcashNumber = document.getElementById('pb-gcash-number').value.trim();
   const mayaAccountName = document.getElementById('pb-maya-name').value.trim();
   const mayaNumber = document.getElementById('pb-maya-number').value.trim();
-  const mayaBankName = document.getElementById('pb-maya-bank').value.trim();
   const subscriptionDiscordWebhook = document.getElementById('pb-discord-webhook').value.trim();
 
   if (gcashAccountName.length < 2) {
@@ -5186,7 +5189,8 @@ async function savePlatformBilling() {
       gcashNumber,
       mayaAccountName: mayaAccountName || null,
       mayaNumber: mayaNumber || null,
-      mayaBankName: mayaBankName || null,
+      // mayaBankName field retired — Maya Wallet rebrand drops the bank label.
+      mayaBankName: firebase.firestore.FieldValue.delete(),
       subscriptionDiscordWebhook: subscriptionDiscordWebhook || null,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: firebase.auth().currentUser?.email || null
@@ -9019,12 +9023,7 @@ function playNewOrderSound() {
         </div>
       </div>
       <div class="paynow-account-block" id="paynow-maya-wrap" style="display:none;">
-        <h4>🏦 instaPay backup</h4>
-        <div class="paynow-account-row">
-          <span class="label">Bank</span>
-          <span class="val" id="paynow-maya-bank">—</span>
-          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-bank', this)">Copy</button>
-        </div>
+        <h4>💜 Maya Wallet</h4>
         <div class="paynow-account-row">
           <span class="label">Account name</span>
           <span class="val" id="paynow-maya-name">—</span>
@@ -9039,18 +9038,20 @@ function playNewOrderSound() {
     </div>
 
     <div class="paynow-instructions">
-      ⚠️ <strong>Important:</strong> include the reference code (above) in the
-      GCash message field exactly as shown — it lets us match your payment
-      to your store. Don't add extra characters.
+      ⚠️ <strong>Important:</strong> when sending the payment via GCash or Maya,
+      paste the reference code (above) into the <strong>Message / Note</strong>
+      field exactly as shown — it's how we match your payment to your store.
+      Don't add extra characters.
     </div>
 
     <div class="paynow-receipt-section">
-      <label>Upload payment receipt screenshot</label>
+      <label>Upload payment receipt screenshot <span style="color:#dc2626;">*</span></label>
       <input type="file" id="paynow-receipt-input"
              accept="image/png,image/jpeg,image/jpg,image/heic,image/heif,image/webp"
              style="display:none;" onchange="handlePayNowReceiptUpload(event)" />
       <label for="paynow-receipt-input" class="paynow-upload-btn">📎 Click here</label>
       <div id="paynow-receipt-preview"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Required — Submit is disabled until a receipt is attached.</div>
     </div>
 
     <div class="paynow-note-section">
