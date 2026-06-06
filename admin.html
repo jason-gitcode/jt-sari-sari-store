@@ -2027,6 +2027,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- Functions SDK — needed for the Billing Pay-Now flow (Phase B) and
+       superadmin one-shots like backfillSubscriptions. -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -3207,14 +3210,22 @@ tdoc('settings', 'store').onSnapshot(snap => {
 
 // Subscription doc listener — drives the tier badge in the header. The doc
 // is seeded on tenant creation (PabiliMart Free); existing tenants get one
-// via the rebuildPublicDirectory-style backfillSubscriptions function.
+// via the backfillSubscriptions function.
+//
+// Wire the listener INSIDE auth state changed so it doesn't fire pre-auth
+// — the subscription rule requires isOwnerOrSuper, so pre-auth fires
+// trigger a noisy "Missing or insufficient permissions" warning.
 let subscriptionData = null;
-tdoc('subscription', 'current').onSnapshot(snap => {
-  subscriptionData = snap.exists ? snap.data() : null;
-  renderTierBadge();
-}, err => {
-  // Permission errors are expected during impersonation testing — fail open.
-  console.warn('[subscription] listener:', err);
+let __subscriptionUnsub = null;
+firebase.auth().onAuthStateChanged(user => {
+  if (__subscriptionUnsub) { __subscriptionUnsub(); __subscriptionUnsub = null; }
+  if (!user) { subscriptionData = null; renderTierBadge(); return; }
+  __subscriptionUnsub = tdoc('subscription', 'current').onSnapshot(snap => {
+    subscriptionData = snap.exists ? snap.data() : null;
+    renderTierBadge();
+  }, err => {
+    console.warn('[subscription] listener:', err);
+  });
 });
 
 function renderTierBadge() {
