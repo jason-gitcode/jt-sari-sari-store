@@ -103,6 +103,27 @@ service cloud.firestore {
       match /suppliers/{sid} {
         allow read, write: if isOwnerOrSuper(tid);
       }
+
+      // ---------- subscription: read by owner/super; writes only via Cloud
+      //            Functions (admin SDK bypasses rules). Disallow client write
+      //            so tenants can't extend their own subscription by editing
+      //            the doc directly.
+      match /subscription/{sid} {
+        allow read: if isOwnerOrSuper(tid);
+        allow write: if false;
+      }
+
+      // ---------- payments: per-payment record. Owner can create a
+      //            pending_verification submission (with receipt upload) but
+      //            cannot self-confirm. Superadmin confirms via Cloud Function.
+      match /payments/{pid} {
+        allow read: if isOwnerOrSuper(tid);
+        allow create: if isOwnerOrSuper(tid)
+                       && request.resource.data.status == 'pending_verification'
+                       && request.resource.data.amount is number
+                       && request.resource.data.amount > 0;
+        allow update, delete: if false; // only Cloud Functions modify after create
+      }
     }
 
     // ============================================================

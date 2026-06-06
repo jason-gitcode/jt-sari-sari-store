@@ -133,6 +133,59 @@ async function upsertDirectoryEntry(slug, name) {
   }, { merge: true });
 }
 
+// ============================================================
+// Subscription tiers — single source of truth used by createTenant
+// (seeding new tenants) and the lifecycle / billing flows.
+// Phase-A scope: schema only. Phase-D will enforce caps server-side.
+// ============================================================
+const SUBSCRIPTION_TIERS = {
+  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 10 },
+  growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500 },
+  pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000 }
+};
+
+// First month free across all paid tiers + the Free tier is permanently free.
+// Trial duration in days. Apply only to PAID tiers via getInitialSubscription.
+const FREE_TRIAL_DAYS = 30;
+
+function getInitialSubscription({ tier = 'free' } = {}) {
+  const tierConfig = SUBSCRIPTION_TIERS[tier] || SUBSCRIPTION_TIERS.free;
+  const now = new Date();
+  if (tier === 'free') {
+    // Free tier doesn't trial — it's permanently free.
+    return {
+      tier: 'free',
+      status: 'active',
+      amount: 0,
+      currentPeriodStart: FieldValue.serverTimestamp(),
+      currentPeriodEnd: null, // no renewal needed
+      trialEndsAt: null,
+      pastDueSince: null,
+      suspendedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      paymentMethod: null,
+      createdAt: FieldValue.serverTimestamp()
+    };
+  }
+  // Paid tier: 30-day trial.
+  const trialEnd = new Date(now.getTime() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  return {
+    tier,
+    status: 'trialing',
+    amount: tierConfig.amount,
+    currentPeriodStart: FieldValue.serverTimestamp(),
+    currentPeriodEnd: trialEnd, // trial ends here unless first payment lands
+    trialEndsAt: trialEnd,
+    pastDueSince: null,
+    suspendedAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
+    paymentMethod: 'manual_gcash', // MVP default
+    createdAt: FieldValue.serverTimestamp()
+  };
+}
+
 async function removeDirectoryEntry(slug) {
   // arrayRemove needs the exact object; we don't store the name authoritatively
   // here, so re-read and filter instead.
@@ -297,6 +350,11 @@ exports.createTenant = onCall(async (request) => {
     deliveryAreas: []
   });
 
+  // ---------- SEED SUBSCRIPTION DOC ----------
+  // New tenants land on PabiliMart Free by default. They can upgrade
+  // from the Billing tab. Free has no trial because it's permanently free.
+  await ref.collection('subscription').doc('current').set(getInitialSubscription({ tier: 'free' }));
+
   // ---------- COPY STARTER PACK PRODUCTS ----------
   // The root /starter_pack collection is curated by superadmin via the
   // "Seed Starter Pack" button in admin. If it's empty (i.e. no pack
@@ -410,6 +468,30 @@ exports.rebuildPublicDirectory = onCall(async (request) => {
     rebuiltBy: token.email
   });
   return { count: stores.length, stores };
+});
+
+// ============================================================
+// backfillSubscriptions — superadmin-only. One-shot migration that gives
+// every existing tenant a subscription/current doc (PabiliMart Free,
+// active) if they don't already have one. Idempotent — safe to re-run.
+// Run once after Phase A ships, then ignore.
+// ============================================================
+exports.backfillSubscriptions = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const snap = await db.collection('tenants').get();
+  let seeded = 0, skipped = 0;
+  for (const doc of snap.docs) {
+    const subRef = doc.ref.collection('subscription').doc('current');
+    const subSnap = await subRef.get();
+    if (subSnap.exists) { skipped++; continue; }
+    await subRef.set(getInitialSubscription({ tier: 'free' }));
+    seeded++;
+  }
+  return { seeded, skipped, total: snap.size };
 });
 
 // ============================================================
