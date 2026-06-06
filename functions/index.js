@@ -595,6 +595,168 @@ exports.submitManualPayment = onCall(async (request) => {
 });
 
 // ============================================================
+// listPendingPayments — superadmin-only. Returns all pending_verification
+// payments across every tenant so the superadmin can review the queue.
+// Bypasses firestore.rules `list` restriction by running with admin SDK.
+// ============================================================
+exports.listPendingPayments = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  // Collection group query across every tenants/*/payments/* doc.
+  const snap = await db.collectionGroup('payments')
+    .where('status', '==', 'pending_verification')
+    .orderBy('submittedAt', 'asc')
+    .limit(200)
+    .get();
+
+  // Hydrate each payment with its tenant's storefront name so the
+  // superadmin can see which store it's from.
+  const tenantNameCache = {};
+  async function getTenantName(tid) {
+    if (tid in tenantNameCache) return tenantNameCache[tid];
+    const t = await db.collection('tenants').doc(tid).get();
+    const name = t.exists ? (t.data().name || tid) : tid;
+    tenantNameCache[tid] = name;
+    return name;
+  }
+
+  const payments = [];
+  for (const doc of snap.docs) {
+    // Path: tenants/{tid}/payments/{pid}
+    const parts = doc.ref.path.split('/');
+    const tid = parts[1];
+    const v = doc.data() || {};
+    const tenantName = await getTenantName(tid);
+    payments.push({
+      tid,
+      tenantName,
+      paymentId: doc.id,
+      referenceCode: v.referenceCode || doc.id,
+      tier: v.tier,
+      amount: v.amount,
+      period: v.period,
+      submittedAt: v.submittedAt ? v.submittedAt.toMillis() : null,
+      submittedBy: v.submittedBy || null,
+      senderNote: v.senderNote || null,
+      receiptDataUrl: v.receiptDataUrl || null,
+      receiptName: v.receiptName || null
+    });
+  }
+  return { payments };
+});
+
+// ============================================================
+// confirmManualPayment — superadmin-only. Marks a payment confirmed +
+// extends the tenant's subscription by 30 days, switches tier if needed,
+// clears any past_due / grace / suspended state.
+// ============================================================
+exports.confirmManualPayment = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const paymentId = String(data.paymentId || '').trim();
+  if (!tid || !paymentId) throw new HttpsError('invalid-argument', 'tid and paymentId are required');
+
+  const tref = db.collection('tenants').doc(tid);
+  const pref = tref.collection('payments').doc(paymentId);
+  const sref = tref.collection('subscription').doc('current');
+
+  await db.runTransaction(async (tx) => {
+    const psnap = await tx.get(pref);
+    if (!psnap.exists) throw new HttpsError('not-found', 'Payment not found.');
+    const p = psnap.data() || {};
+    if (p.status !== 'pending_verification') {
+      throw new HttpsError('failed-precondition', `Payment is not pending (status: ${p.status}).`);
+    }
+    const tier = p.tier;
+    if (!SUBSCRIPTION_TIERS[tier] || tier === 'free') {
+      throw new HttpsError('failed-precondition', 'Payment is for an unknown or non-paid tier.');
+    }
+
+    // Extend subscription. currentPeriodEnd = max(today, current end) + 30 days
+    // so paying early doesn't lose time, paying late doesn't double up.
+    const now = new Date();
+    const ssnap = await tx.get(sref);
+    const sub = ssnap.exists ? ssnap.data() : null;
+    let baseDate = now;
+    if (sub && sub.currentPeriodEnd) {
+      const currentEnd = sub.currentPeriodEnd.toDate
+        ? sub.currentPeriodEnd.toDate()
+        : new Date(sub.currentPeriodEnd);
+      if (currentEnd.getTime() > now.getTime()) baseDate = currentEnd;
+    }
+    const newEnd = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    tx.set(sref, {
+      tier,
+      status: 'active',
+      amount: SUBSCRIPTION_TIERS[tier].amount,
+      currentPeriodStart: ssnap.exists && sub.currentPeriodEnd ? sub.currentPeriodEnd : FieldValue.serverTimestamp(),
+      currentPeriodEnd: newEnd,
+      trialEndsAt: null,
+      pastDueSince: null,
+      suspendedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      paymentMethod: 'manual_gcash',
+      lastConfirmedPaymentRef: pref.path,
+      lastConfirmedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    tx.update(pref, {
+      status: 'confirmed',
+      confirmedAt: FieldValue.serverTimestamp(),
+      confirmedBy: token.email,
+      newPeriodEnd: newEnd
+    });
+  });
+
+  return { paymentId, tid, status: 'confirmed' };
+});
+
+// ============================================================
+// rejectManualPayment — superadmin-only. Marks a payment rejected with
+// a reason. Does NOT modify the subscription doc.
+// ============================================================
+exports.rejectManualPayment = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const paymentId = String(data.paymentId || '').trim();
+  const reason = String(data.reason || '').trim().slice(0, 500);
+  if (!tid || !paymentId) throw new HttpsError('invalid-argument', 'tid and paymentId are required');
+  if (!reason) throw new HttpsError('invalid-argument', 'Please provide a reason for rejection.');
+
+  const pref = db.collection('tenants').doc(tid).collection('payments').doc(paymentId);
+  const psnap = await pref.get();
+  if (!psnap.exists) throw new HttpsError('not-found', 'Payment not found.');
+  const p = psnap.data() || {};
+  if (p.status !== 'pending_verification') {
+    throw new HttpsError('failed-precondition', `Payment is not pending (status: ${p.status}).`);
+  }
+
+  await pref.update({
+    status: 'rejected',
+    rejectedAt: FieldValue.serverTimestamp(),
+    rejectedBy: token.email,
+    rejectedReason: reason
+  });
+
+  return { paymentId, tid, status: 'rejected' };
+});
+
+// ============================================================
 // getMyTenant — returns the list of tenants this signed-in account owns.
 // Used by the signup page to swap the create-store form for a "you already
 // have a store" landing card when the per-email cap is hit. Bypasses the

@@ -200,6 +200,62 @@
     .brand-title.scale-md { font-size: 14px; }
     .brand-title.scale-sm { font-size: 12px; }
     .brand-title.scale-xs { font-size: 11px; }
+    /* ---------- Pending Payments queue ---------- */
+    .pending-payment-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .pending-payment-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .pending-payment-tenant { font-size: 14px; font-weight: 700; }
+    .pending-payment-tenant .slug { color: var(--muted); font-weight: 500; font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .pending-payment-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pending-payment-tier-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+      background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd;
+    }
+    .pending-payment-tier-pill.tier-pro { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .pending-payment-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .pending-payment-grid .label { color: var(--muted); }
+    .pending-payment-grid .val { font-weight: 600; word-break: break-all; }
+    .pending-payment-note {
+      font-size: 12px; padding: 8px 10px; margin-bottom: 10px;
+      background: var(--surface-2); border-radius: 6px; border-left: 3px solid var(--accent);
+    }
+    .pending-payment-actions {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .pending-action-btn {
+      padding: 8px 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      border: 1px solid transparent; font-family: inherit;
+    }
+    .pending-action-btn.view {
+      background: var(--surface-2); color: var(--ink); border-color: var(--line);
+    }
+    .pending-action-btn.view:hover { background: var(--surface-3); }
+    .pending-action-btn.confirm {
+      background: #16a34a; color: #fff;
+    }
+    .pending-action-btn.confirm:hover { background: #15803d; }
+    .pending-action-btn.reject {
+      background: var(--surface); color: #b91c1c; border-color: #fecaca;
+    }
+    .pending-action-btn.reject:hover { background: #fef2f2; }
+    .pending-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
     /* ---------- Pay Now modal ---------- */
     .paynow-overlay {
       position: fixed; inset: 0;
@@ -3206,6 +3262,18 @@
                 <button class="btn-logout-settings" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed Starter Pack</button>
               </div>
             </div>
+            <div class="setting-row" id="pending-payments-row" style="display:none;flex-direction:column;align-items:stretch;">
+              <div class="setting-info" style="width:100%;">
+                <div class="setting-title">📨 Pending Subscription Payments <span style="font-size:11px;font-weight:400;color:var(--muted);">superadmin only</span> <span id="pending-payments-count" style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:4px;display:none;"></span></div>
+                <div class="setting-desc">Tenants who submitted manual GCash / Maya payments awaiting your verification. Cross-check each against your real GCash transaction log using the reference code.</div>
+                <div style="margin-top:10px;">
+                  <button class="btn-logout-settings" id="pending-refresh-btn" onclick="loadPendingPayments()">Refresh queue</button>
+                </div>
+                <div id="pending-payments-list" style="margin-top:14px;">
+                  <div class="billing-empty">Click "Refresh queue" to load pending payments.</div>
+                </div>
+              </div>
+            </div>
             <div class="setting-row" id="platform-billing-row" style="display:none;flex-direction:column;align-items:stretch;">
               <div class="setting-info" style="width:100%;">
                 <div class="setting-title">💰 Subscription Payment Accounts <span style="font-size:11px;font-weight:400;color:var(--muted);">superadmin only</span></div>
@@ -5206,6 +5274,124 @@ async function savePlatformBilling() {
   }
 }
 
+// ----- Pending Payments queue (superadmin) -----
+// Loads all pending_verification payments across every tenant via the
+// listPendingPayments Cloud Function (collection group query). Owner can
+// view receipt + confirm or reject each.
+let __lastPendingPayments = [];
+
+async function loadPendingPayments() {
+  const listEl = document.getElementById('pending-payments-list');
+  const countEl = document.getElementById('pending-payments-count');
+  const btn = document.getElementById('pending-refresh-btn');
+  if (!listEl || !btn) return;
+  btn.disabled = true; btn.textContent = 'Loading…';
+  listEl.innerHTML = '<div class="billing-empty">Loading pending payments…</div>';
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('listPendingPayments');
+    const result = await fn();
+    __lastPendingPayments = result.data.payments || [];
+    renderPendingPayments();
+    if (countEl) {
+      if (__lastPendingPayments.length > 0) {
+        countEl.textContent = __lastPendingPayments.length;
+        countEl.style.display = '';
+      } else {
+        countEl.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('listPendingPayments failed:', err);
+    listEl.innerHTML = `<div class="billing-empty" style="color:#dc2626;">❌ ${err.message || err}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Refresh queue';
+  }
+}
+
+function renderPendingPayments() {
+  const listEl = document.getElementById('pending-payments-list');
+  if (!listEl) return;
+  if (__lastPendingPayments.length === 0) {
+    listEl.innerHTML = '<div class="billing-empty">✅ No pending payments. You\'re all caught up.</div>';
+    return;
+  }
+  const escAttrLocal = s => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fmtDt = ms => ms ? new Date(ms).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  listEl.innerHTML = __lastPendingPayments.map((p, idx) => {
+    const tierLabel = { growth: 'Growth', pro: 'Pro' }[p.tier] || p.tier;
+    const tierClass = p.tier === 'pro' ? ' tier-pro' : '';
+    const noteHtml = p.senderNote
+      ? `<div class="pending-payment-note">📝 ${escText(p.senderNote)}</div>` : '';
+    return `
+      <div class="pending-payment-card">
+        <div class="pending-payment-head">
+          <div>
+            <div class="pending-payment-tenant">${escText(p.tenantName)} <span class="slug">/${escText(p.tid)}/</span></div>
+            <div class="pending-payment-meta">From: ${escText(p.submittedBy || '—')} · Submitted ${fmtDt(p.submittedAt)}</div>
+          </div>
+          <span class="pending-payment-tier-pill${tierClass}">${tierLabel} · ₱${p.amount}</span>
+        </div>
+        <div class="pending-payment-grid">
+          <span class="label">Reference</span>
+          <span class="val">${escText(p.referenceCode)}</span>
+          <span class="label">Period</span>
+          <span class="val">${escText(p.period)}</span>
+        </div>
+        ${noteHtml}
+        <div class="pending-payment-actions">
+          <button class="pending-action-btn view" onclick="viewPendingReceipt(${idx})">🖼️ View receipt</button>
+          <button class="pending-action-btn confirm" onclick="confirmPendingPayment(${idx})">✓ Confirm payment</button>
+          <button class="pending-action-btn reject" onclick="rejectPendingPayment(${idx})">✗ Reject</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function viewPendingReceipt(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p || !p.receiptDataUrl) {
+    alert('No receipt attached.');
+    return;
+  }
+  // Reuse the order-receipt lightbox modal already in the DOM.
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = p.receiptDataUrl;
+  document.getElementById('receipt-modal').classList.add('show');
+}
+
+async function confirmPendingPayment(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p) return;
+  const tierLabel = { growth: 'Growth', pro: 'Pro' }[p.tier] || p.tier;
+  if (!confirm(`Confirm ${p.tenantName} (/${p.tid}/) paid ₱${p.amount} for PabiliMart ${tierLabel}?\n\nThis extends their subscription by 30 days.`)) return;
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('confirmManualPayment');
+    await fn({ tid: p.tid, paymentId: p.paymentId });
+    showToast('Payment confirmed — subscription extended', 'success');
+    loadPendingPayments();
+  } catch (err) {
+    console.error('confirmManualPayment failed:', err);
+    alert('❌ ' + (err.message || err));
+  }
+}
+
+async function rejectPendingPayment(idx) {
+  const p = __lastPendingPayments[idx];
+  if (!p) return;
+  const reason = prompt(`Reject payment from ${p.tenantName} (/${p.tid}/)?\n\nReason (required, shown to the tenant):`);
+  if (!reason || !reason.trim()) return;
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('rejectManualPayment');
+    await fn({ tid: p.tid, paymentId: p.paymentId, reason: reason.trim() });
+    showToast('Payment rejected', 'success');
+    loadPendingPayments();
+  } catch (err) {
+    console.error('rejectManualPayment failed:', err);
+    alert('❌ ' + (err.message || err));
+  }
+}
+
 function showLogin() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('admin-area').style.display = 'none';
@@ -7124,10 +7310,12 @@ auth.onAuthStateChanged(async user => {
     // against the original single-tenant data; they have no meaning on other
     // tenants, and superadmins who visit a non-seed tenant shouldn't see them.
     if (auth_result.reason === 'superadmin' && TENANT_ID === 'jsminimart') {
-      ['seed-pack-row', 'allowed-emails-row', 'migrate-row', 'platform-billing-row'].forEach(id => {
+      ['seed-pack-row', 'allowed-emails-row', 'migrate-row', 'platform-billing-row', 'pending-payments-row'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = '';
       });
+      // Auto-load the queue on first reveal so the count badge appears.
+      if (typeof loadPendingPayments === 'function') loadPendingPayments();
     }
   } else {
     const msg = ({
