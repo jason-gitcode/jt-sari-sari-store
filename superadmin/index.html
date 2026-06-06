@@ -8,6 +8,13 @@
   if (location.hostname === 'jsminimart.com' || location.hostname === 'www.jsminimart.com') {
     location.replace('https://pabilimart.com' + location.pathname + location.search + location.hash);
   }
+  // Apply persisted theme before first paint to avoid a flash.
+  (function () {
+    try {
+      const saved = localStorage.getItem('pabilimart-superadmin-theme');
+      if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) {}
+  })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Superadmin — Pabili Mart SaaS</title>
@@ -17,6 +24,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
+    /* Dark (default) */
     --bg: #0f172a;
     --surface: #1e293b;
     --surface-2: #334155;
@@ -29,6 +37,19 @@
     --error: #ef4444;
     --warn: #f59e0b;
   }
+  [data-theme="light"] {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --text: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --success: #16a34a;
+    --error: #dc2626;
+    --warn: #f59e0b;
+  }
   html, body { height: 100%; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -38,6 +59,9 @@
   }
   .hidden { display: none !important; }
   .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+  @media (max-width: 640px) {
+    .container { padding: 14px 12px; }
+  }
 
   /* Sign-in screen */
   .signin-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
@@ -88,11 +112,26 @@
     align-items: center;
     gap: 12px;
   }
-  .header-title { display: flex; align-items: center; gap: 12px; }
+  .header-inner { flex-wrap: wrap; }
+  .header-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
   .header-title img { width: 32px; height: 32px; border-radius: 8px; }
   .header-title h1 { font-size: 16px; font-weight: 600; }
   .header-title .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .header-user { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+  .header-user { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; flex-shrink: 0; }
+  .header-user #signed-email { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-toggle-btn {
+    background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text); padding: 5px 9px; border-radius: 6px;
+    font-size: 14px; cursor: pointer; line-height: 1;
+  }
+  .theme-toggle-btn:hover { filter: brightness(0.92); }
+  @media (max-width: 640px) {
+    .header-inner { gap: 8px; padding: 10px 12px; }
+    .header-title h1 { font-size: 14px; }
+    .header-title .badge { display: none; }
+    .header-user { width: 100%; justify-content: space-between; font-size: 12px; }
+    .header-user #signed-email { max-width: none; flex: 1; }
+  }
 
   /* Stats */
   .stats {
@@ -120,7 +159,10 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 12px;
-    overflow: hidden;
+    /* Horizontal scroll handles narrow viewports instead of wrapping
+       cells. -webkit-overflow-scrolling for momentum on iOS. */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
   table { width: 100%; border-collapse: collapse; }
   th, td {
@@ -129,16 +171,35 @@
     font-size: 13px;
     border-bottom: 1px solid var(--line);
     vertical-align: middle;
+    /* Keep every cell on a single line; the wrapper scrolls horizontally
+       on narrow viewports. Was wrapping names + emails before. */
+    white-space: nowrap;
   }
   tr:last-child td { border-bottom: none; }
-  th { background: rgba(15,23,42,0.4); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+  th { background: var(--surface-2); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
   td.slug { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--accent); }
-  td.name { font-weight: 500; }
-  td.owner { color: var(--muted); font-size: 12px; }
-  td.plan .pill { background: var(--surface-2); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
-  td.plan .pill.starter { background: #1e3a8a33; color: #93c5fd; }
-  td.plan .pill.growth { background: #14532d33; color: #86efac; }
-  td.plan .pill.pro { background: #581c8733; color: #d8b4fe; }
+  td.name { font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+  td.owner {
+    color: var(--muted); font-size: 12px;
+    max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* Subscription tier pills — Free / Growth / Pro / Trialing. The legacy
+     'starter' value was leaking from the old tenant.plan field that
+     createTenant still sets but no longer reflects the real tier; we now
+     read subscription/current.tier in loadTenants. */
+  td.plan .pill { background: var(--surface-2); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+  td.plan .pill.free   { background: #33415555; color: #cbd5e1; }
+  td.plan .pill.growth { background: #14532d55; color: #86efac; }
+  td.plan .pill.pro    { background: #92400e55; color: #fcd34d; }
+  td.plan .pill.trialing { background: #1e3a8a55; color: #93c5fd; }
+  td.plan .pill.past_due, td.plan .pill.grace, td.plan .pill.suspended {
+    background: #7f1d1d55; color: #fca5a5;
+  }
+  td.plan .pill.unknown { background: var(--surface-2); color: var(--muted); }
+  [data-theme="light"] td.plan .pill.free   { background: #e2e8f0; color: #475569; }
+  [data-theme="light"] td.plan .pill.growth { background: #dcfce7; color: #166534; }
+  [data-theme="light"] td.plan .pill.pro    { background: #fef3c7; color: #92400e; }
+  [data-theme="light"] td.plan .pill.trialing { background: #dbeafe; color: #1d4ed8; }
   td.numeric { font-variant-numeric: tabular-nums; }
   td.created { color: var(--muted); font-size: 12px; }
   td.actions { white-space: nowrap; }
@@ -330,7 +391,8 @@
       </div>
       <div class="header-user">
         <span id="signed-email">—</span>
-        <button class="btn btn-icon" onclick="signOut()">Sign out</button>
+        <button type="button" class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark" aria-label="Toggle theme">🌙</button>
+        <button class="btn btn-icon" onclick="signOut()" style="white-space:nowrap;">Sign out</button>
       </div>
     </div>
   </div>
@@ -547,6 +609,26 @@ function signOut() {
   auth.signOut();
 }
 
+// ----- Theme toggle (light / dark) -----
+function applyThemeIcon() {
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  btn.textContent = isLight ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('pabilimart-superadmin-theme', 'dark'); } catch (e) {}
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem('pabilimart-superadmin-theme', 'light'); } catch (e) {}
+  }
+  applyThemeIcon();
+}
+applyThemeIcon();
+
 function formatDate(ts) {
   if (!ts) return '—';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -567,15 +649,20 @@ async function loadTenants() {
     const tenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     CACHED_TENANTS = tenants;
 
-    // Fetch product/order counts in parallel using count() aggregation
+    // Fetch product/order counts + subscription tier in parallel per tenant.
+    // The legacy tenant.plan field still says 'starter' (createTenant sets
+    // it but doesn't update on tier changes) — the actual current tier lives
+    // in subscription/current, which we read here.
     const counts = await Promise.all(tenants.map(async (t) => {
       try {
-        const [pCount, oCount] = await Promise.all([
+        const [pCount, oCount, subSnap] = await Promise.all([
           db.collection('tenants').doc(t.id).collection('products').count().get().then(r => r.data().count).catch(() => null),
-          db.collection('tenants').doc(t.id).collection('orders').count().get().then(r => r.data().count).catch(() => null)
+          db.collection('tenants').doc(t.id).collection('orders').count().get().then(r => r.data().count).catch(() => null),
+          db.collection('tenants').doc(t.id).collection('subscription').doc('current').get().catch(() => null)
         ]);
-        return { products: pCount, orders: oCount };
-      } catch { return { products: null, orders: null }; }
+        const sub = (subSnap && subSnap.exists) ? subSnap.data() : null;
+        return { products: pCount, orders: oCount, sub };
+      } catch { return { products: null, orders: null, sub: null }; }
     }));
 
     renderStats(tenants, counts);
@@ -610,15 +697,28 @@ function renderTable(tenants, counts) {
   }
   tbody.innerHTML = tenants.map((t, i) => {
     const c = counts[i] || {};
-    const plan = (t.plan || 'starter').toLowerCase();
+    // Read the real subscription tier/status (Free / Growth / Pro /
+    // Trialing / Past Due / ...). Falls back to "unknown" if no sub doc
+    // exists yet (pre-backfill tenants), with a hint to run the backfill.
+    let pillClass = 'unknown';
+    let pillLabel = 'unknown';
+    if (c.sub) {
+      const tier = (c.sub.tier || 'free').toLowerCase();
+      const status = (c.sub.status || 'active').toLowerCase();
+      if (status === 'trialing') { pillClass = 'trialing'; pillLabel = 'Trialing'; }
+      else if (status === 'past_due' || status === 'grace' || status === 'suspended') {
+        pillClass = status; pillLabel = status.replace('_', ' ');
+      }
+      else { pillClass = tier; pillLabel = tier; }
+    }
     const owner = Array.isArray(t.ownerEmails) && t.ownerEmails.length > 0 ? t.ownerEmails[0] : (t.createdByEmail || '—');
     const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
     return `
       <tr>
         <td class="slug">${t.id}</td>
-        <td class="name">${t.name || '—'}</td>
-        <td class="plan"><span class="pill ${plan}">${plan}</span></td>
-        <td class="owner">${shortEmail(owner)}${ownerSuffix}</td>
+        <td class="name" title="${escText(t.name || '—')}">${escText(t.name || '—')}</td>
+        <td class="plan"><span class="pill ${pillClass}">${pillLabel}</span></td>
+        <td class="owner" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
         <td class="created">${formatDate(t.createdAt)}</td>
         <td class="numeric">${c.products == null ? '—' : c.products}</td>
         <td class="numeric">${c.orders == null ? '—' : c.orders}</td>
