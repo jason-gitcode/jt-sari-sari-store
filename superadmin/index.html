@@ -309,7 +309,20 @@
     width: 100%;
     max-width: 440px;
   }
-  .modal h3 { font-size: 16px; margin-bottom: 8px; }
+  .modal h3 { font-size: 16px; margin-bottom: 8px; padding-right: 36px; }
+  .modal { position: relative; }
+  .modal-x-close {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 28px; height: 28px;
+    border: 0; border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 20px; line-height: 1;
+    cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .modal-x-close:hover { background: var(--surface-2); color: var(--text); }
   .modal p { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
   .modal input {
     width: 100%;
@@ -691,6 +704,7 @@
 <!-- TENANT DETAIL MODAL -->
 <div class="modal-backdrop" id="tenant-modal" onclick="closeTenantModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
+    <button type="button" class="modal-x-close" onclick="closeTenantModal()" aria-label="Close">×</button>
     <h3 id="tm-title">Tenant details</h3>
     <div id="tm-body" class="modal-detail-list"></div>
     <div class="modal-actions" id="tm-actions" style="flex-wrap:wrap; gap:8px; justify-content:flex-end;"></div>
@@ -932,7 +946,6 @@ function openTenantModal(idx) {
     <a class="btn" href="/${t.id}/" target="_blank" rel="noopener" style="text-decoration:none;">🌐 Storefront</a>
     <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener" style="text-decoration:none;">⚙️ Admin</a>
     <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete</button>
-    <button type="button" class="btn" onclick="closeTenantModal()">Close</button>
   `;
   document.getElementById('tenant-modal').classList.add('show');
 }
