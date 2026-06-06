@@ -495,6 +495,106 @@ exports.backfillSubscriptions = onCall(async (request) => {
 });
 
 // ============================================================
+// submitManualPayment — tenant owner submits a manual GCash payment for
+// a tier upgrade or renewal. Creates a pending_verification payment doc
+// + fires a Discord webhook so the superadmin can confirm in real time.
+//
+// Validation: requested tier exists, amount matches tier price, receipt
+// is a reasonable size (compressed client-side), tenant owns the tid.
+//
+// Idempotency: the reference code (`PM-{slug}-{YYYYMM}`) is the doc ID,
+// so resubmitting the same month overwrites the previous pending doc
+// for that period — prevents duplicate submissions clogging the queue.
+// ============================================================
+exports.submitManualPayment = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const requestedTier = String(data.tier || '').trim();
+  const receiptDataUrl = String(data.receiptDataUrl || '');
+  const receiptName = String(data.receiptName || 'receipt.jpg').slice(0, 200);
+  const senderNote = String(data.senderNote || '').slice(0, 300); // optional
+
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  if (!SUBSCRIPTION_TIERS[requestedTier] || requestedTier === 'free') {
+    throw new HttpsError('invalid-argument', 'Choose a paid tier (Growth or Pro).');
+  }
+  if (!receiptDataUrl.startsWith('data:image/')) {
+    throw new HttpsError('invalid-argument', 'Receipt is missing or not an image.');
+  }
+  if (receiptDataUrl.length > 1_500_000) {
+    throw new HttpsError('invalid-argument', 'Receipt image too large. Compress under 1.5 MB.');
+  }
+
+  // ---- Ownership check ----
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can submit a payment.');
+  }
+
+  // ---- Compute reference code (YYYYMM in Manila time) ----
+  const manila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const period = manila.getFullYear() + String(manila.getMonth() + 1).padStart(2, '0');
+  const referenceCode = `PM-${tid}-${period}`;
+
+  // ---- Write payment doc (idempotent on referenceCode) ----
+  const paymentRef = tref.collection('payments').doc(referenceCode);
+  await paymentRef.set({
+    amount: SUBSCRIPTION_TIERS[requestedTier].amount,
+    tier: requestedTier,
+    period,
+    referenceCode,
+    status: 'pending_verification',
+    submittedAt: FieldValue.serverTimestamp(),
+    submittedBy: email,
+    senderNote: senderNote || null,
+    receiptDataUrl, // base64; small enough at 900px JPEG q=0.7
+    receiptName,
+    confirmedAt: null,
+    confirmedBy: null,
+    rejectedAt: null,
+    rejectedReason: null
+  });
+
+  // ---- Discord notification (best-effort, non-blocking) ----
+  try {
+    const billingSnap = await db.collection('platform').doc('billing').get();
+    const webhook = billingSnap.exists ? (billingSnap.data() || {}).subscriptionDiscordWebhook : null;
+    if (webhook) {
+      const tierConfig = SUBSCRIPTION_TIERS[requestedTier];
+      const lines = [
+        `💰 **Subscription payment submitted**`,
+        `Tenant: \`${tid}\` (${tenant.name || tid})`,
+        `Tier: ${tierConfig.name} — ₱${tierConfig.amount}`,
+        `Reference: \`${referenceCode}\``,
+        `From: ${email}`,
+        senderNote ? `Note: ${senderNote}` : null,
+        ``,
+        `→ Review in superadmin → Pending Payments`
+      ].filter(Boolean).join('\n');
+      await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: lines })
+      });
+    }
+  } catch (err) {
+    console.error('discord notification failed:', err);
+  }
+
+  return { referenceCode, status: 'pending_verification' };
+});
+
+// ============================================================
 // getMyTenant — returns the list of tenants this signed-in account owns.
 // Used by the signup page to swap the create-store form for a "you already
 // have a store" landing card when the per-email cap is hit. Bypasses the

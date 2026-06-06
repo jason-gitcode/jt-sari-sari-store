@@ -200,6 +200,132 @@
     .brand-title.scale-md { font-size: 14px; }
     .brand-title.scale-sm { font-size: 12px; }
     .brand-title.scale-xs { font-size: 11px; }
+    /* ---------- Pay Now modal ---------- */
+    .paynow-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none; align-items: flex-start; justify-content: center;
+      z-index: 9999;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .paynow-overlay.show { display: flex; }
+    .paynow-modal {
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: var(--radius);
+      width: 100%; max-width: 520px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      padding: 22px 24px;
+      margin: 20px auto;
+    }
+    .paynow-modal h2 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+    .paynow-modal .paynow-subtitle {
+      color: var(--muted); font-size: 13px; margin: 0 0 16px; line-height: 1.4;
+    }
+    .paynow-summary {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 12px;
+      font-size: 13px;
+      align-items: center;
+    }
+    .paynow-summary .label { color: var(--muted); }
+    .paynow-summary .val { color: var(--ink); font-weight: 600; }
+    .paynow-accounts {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .paynow-account-block {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .paynow-account-block:last-child { border-bottom: 0; }
+    .paynow-account-block h4 {
+      font-size: 13px; font-weight: 700; margin: 0 0 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .paynow-account-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 4px 0; font-size: 13px;
+    }
+    .paynow-account-row .label { color: var(--muted); flex-shrink: 0; }
+    .paynow-account-row .val {
+      font-weight: 600; flex: 1; min-width: 0;
+      text-align: right; word-break: break-all;
+    }
+    .paynow-copy-btn {
+      background: var(--accent); color: #fff; border: 0;
+      border-radius: 4px; padding: 3px 10px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      flex-shrink: 0;
+    }
+    .paynow-copy-btn:hover { filter: brightness(0.92); }
+    .paynow-instructions {
+      font-size: 12px; color: var(--muted);
+      background: #fef3c7; color: #92400e;
+      border-radius: 6px; padding: 8px 10px;
+      margin-bottom: 14px; line-height: 1.5;
+    }
+    [data-theme="dark"] .paynow-instructions {
+      background: rgba(245,158,11,0.16); color: #fcd34d;
+    }
+    .paynow-receipt-section { margin-bottom: 14px; }
+    .paynow-receipt-section label {
+      display: block; font-size: 13px; font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .paynow-upload-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: var(--surface-2);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px; color: var(--ink); font-weight: 500;
+    }
+    .paynow-upload-btn:hover { background: var(--surface); border-color: var(--accent); }
+    .paynow-note-section { margin-bottom: 14px; }
+    .paynow-note-section label {
+      display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;
+    }
+    .paynow-note-section textarea {
+      width: 100%; padding: 8px 10px;
+      border: 1px solid var(--line); border-radius: 6px;
+      font: inherit; font-size: 13px;
+      background: var(--surface); color: var(--ink);
+      resize: vertical; min-height: 50px;
+    }
+    .paynow-status {
+      font-size: 13px; min-height: 18px; margin: 8px 0;
+    }
+    .paynow-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 14px;
+    }
+    .paynow-actions .btn-cancel {
+      padding: 9px 18px; border-radius: 6px;
+      border: 1px solid var(--line); background: var(--surface);
+      color: var(--ink); font: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
+    .paynow-actions .btn-cancel:hover { background: var(--surface-2); }
+    .paynow-actions .btn-submit {
+      padding: 9px 22px; border-radius: 6px;
+      border: 0; background: var(--accent); color: #fff;
+      font: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer;
+    }
+    .paynow-actions .btn-submit:hover { filter: brightness(0.92); }
+    .paynow-actions .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
     /* ---------- Billing tab ---------- */
     .billing-section {
       background: var(--surface);
@@ -3079,6 +3205,42 @@
                 <button class="btn-logout-settings" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed Starter Pack</button>
               </div>
             </div>
+            <div class="setting-row" id="platform-billing-row" style="display:none;flex-direction:column;align-items:stretch;">
+              <div class="setting-info" style="width:100%;">
+                <div class="setting-title">💰 Subscription Payment Accounts <span style="font-size:11px;font-weight:400;color:var(--muted);">superadmin only</span></div>
+                <div class="setting-desc">Receiving accounts shown to tenants in the Pay Now modal. GCash is the primary method; Maya (instaPay) is a backup for tenants who don't have GCash. Stored in <code>platform/billing</code>.</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+                  <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">GCash account name</label>
+                    <input type="text" id="pb-gcash-name" maxlength="100" placeholder="e.g. Jason T." style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">GCash number</label>
+                    <input type="tel" id="pb-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" placeholder="09xxxxxxxxx" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya / instaPay account name</label>
+                    <input type="text" id="pb-maya-name" maxlength="100" placeholder="e.g. Jason T." style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya number</label>
+                    <input type="tel" id="pb-maya-number" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                  <div style="grid-column:1 / -1;">
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Maya bank label (shown to tenants)</label>
+                    <input type="text" id="pb-maya-bank" maxlength="60" placeholder="e.g. Maya Savings" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                  <div style="grid-column:1 / -1;">
+                    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Discord webhook (optional — fires when a payment is submitted)</label>
+                    <input type="url" id="pb-discord-webhook" placeholder="https://discord.com/api/webhooks/..." style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;background:var(--surface);color:var(--ink);" />
+                  </div>
+                </div>
+                <div class="setting-desc" id="pb-status" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+              </div>
+              <div class="setting-control" style="margin-top:10px;align-self:flex-end;">
+                <button class="btn-logout-settings" id="pb-save-btn" onclick="savePlatformBilling()">Save</button>
+              </div>
+            </div>
           </section>
 
         </div>
@@ -3513,15 +3675,193 @@ function scrollToTierCompare() {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// Phase B2/B3 will wire these — for now show a friendly placeholder.
+// ----- Pay Now flow -----
+// Reads platform/billing for the GCash + Maya account details, generates
+// a reference code (PM-{slug}-{YYYYMM}), and walks the owner through:
+// (1) sending payment via GCash, (2) uploading a receipt screenshot,
+// (3) submitting → status flips to pending_verification in Firestore.
+let platformBillingData = null;
+let __platformBillingUnsub = null;
+firebase.auth().onAuthStateChanged(user => {
+  if (__platformBillingUnsub) { __platformBillingUnsub(); __platformBillingUnsub = null; }
+  if (!user) { platformBillingData = null; return; }
+  __platformBillingUnsub = db.collection('platform').doc('billing').onSnapshot(snap => {
+    platformBillingData = snap.exists ? snap.data() : null;
+    if (typeof syncPlatformBillingForm === 'function') syncPlatformBillingForm();
+  }, err => console.warn('[platform/billing] listener:', err));
+});
+
+let payNowTargetTier = null;
+let payNowReceiptData = null;
+let payNowReceiptName = null;
+
+function manilaPeriodCode() {
+  const manila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  return manila.getFullYear() + String(manila.getMonth() + 1).padStart(2, '0');
+}
+
 function openPayNowModal() {
-  alert('Pay Now flow coming in the next update.');
+  // Default to upgrading to Growth if currently Free; otherwise pay for
+  // the current paid tier's renewal.
+  const currentTier = (subscriptionData && subscriptionData.tier) || 'free';
+  payNowTargetTier = (currentTier === 'free') ? 'growth' : currentTier;
+  showPayNowModal();
 }
+
 function requestTierChange(tier) {
-  alert('Tier change to ' + tier + ' coming in the next update — manual GCash workflow.');
+  if (tier === 'free') {
+    alert('To downgrade to Free, cancel your current plan first. (Coming in the next update.)');
+    return;
+  }
+  payNowTargetTier = tier;
+  showPayNowModal();
 }
+
 function cancelSubscription() {
-  alert('Plan cancellation coming in the next update.');
+  alert('Plan cancellation flow coming in the next update.');
+}
+
+function showPayNowModal() {
+  if (!platformBillingData || !platformBillingData.gcashNumber) {
+    alert('Subscription payments are not yet configured by the platform admin. Please check back shortly.');
+    return;
+  }
+  payNowReceiptData = null;
+  payNowReceiptName = null;
+  const tier = TIER_INFO[payNowTargetTier];
+  const refCode = `PM-${TENANT_ID}-${manilaPeriodCode()}`;
+  document.getElementById('paynow-tier-name').textContent = tier.name;
+  document.getElementById('paynow-amount').textContent = fmtPHP(tier.amount);
+  document.getElementById('paynow-ref-code').textContent = refCode;
+  document.getElementById('paynow-gcash-name').textContent = platformBillingData.gcashAccountName || '—';
+  document.getElementById('paynow-gcash-number').textContent = platformBillingData.gcashNumber || '—';
+  // Maya / instaPay alt is optional.
+  const mayaWrap = document.getElementById('paynow-maya-wrap');
+  if (platformBillingData.mayaNumber) {
+    document.getElementById('paynow-maya-name').textContent = platformBillingData.mayaAccountName || '—';
+    document.getElementById('paynow-maya-number').textContent = platformBillingData.mayaNumber || '—';
+    document.getElementById('paynow-maya-bank').textContent = platformBillingData.mayaBankName || 'Maya Savings';
+    mayaWrap.style.display = '';
+  } else {
+    mayaWrap.style.display = 'none';
+  }
+  // Reset receipt preview + status
+  renderPayNowReceipt();
+  document.getElementById('paynow-status').textContent = '';
+  document.getElementById('paynow-submit-btn').disabled = false;
+  document.getElementById('paynow-submit-btn').textContent = 'Submit payment';
+  document.getElementById('paynow-modal').classList.add('show');
+}
+
+function closePayNowModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('paynow-modal').classList.remove('show');
+}
+
+function paynowCopy(elId, btnEl) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const text = (el.textContent || '').trim();
+  if (!text) return;
+  navigator.clipboard?.writeText(text).then(() => {
+    const orig = btnEl.textContent;
+    btnEl.textContent = 'Copied!';
+    setTimeout(() => { btnEl.textContent = orig; }, 1200);
+  });
+}
+
+function handlePayNowReceiptUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    document.getElementById('paynow-status').textContent = 'Please pick an image file.';
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    document.getElementById('paynow-status').textContent = 'Image too large. Max 10 MB.';
+    return;
+  }
+  payNowReceiptName = file.name || 'receipt.jpg';
+  // Compress: max 900px on the long edge, JPEG q=0.7. Same pattern as the
+  // checkout GCash receipt upload.
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 900;
+      let w = img.width, h = img.height;
+      if (w > h && w > max) { h = h * (max / w); w = max; }
+      else if (h > max) { w = w * (max / h); h = max; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      payNowReceiptData = canvas.toDataURL('image/jpeg', 0.7);
+      renderPayNowReceipt();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderPayNowReceipt() {
+  const wrap = document.getElementById('paynow-receipt-preview');
+  if (!payNowReceiptData) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const safeName = (payNowReceiptName || 'receipt.jpg')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">
+      <span style="font-size:13px;color:var(--ink);">🖼️ ${safeName}</span>
+      <button type="button" onclick="removePayNowReceipt()" style="background:none;border:0;color:#dc2626;font-size:18px;cursor:pointer;">×</button>
+    </div>
+  `;
+}
+
+function removePayNowReceipt() {
+  payNowReceiptData = null;
+  payNowReceiptName = null;
+  const input = document.getElementById('paynow-receipt-input');
+  if (input) input.value = '';
+  renderPayNowReceipt();
+}
+
+async function submitPayNow() {
+  const status = document.getElementById('paynow-status');
+  const btn = document.getElementById('paynow-submit-btn');
+  if (!payNowReceiptData) {
+    status.textContent = 'Please upload a screenshot of your GCash payment receipt.';
+    status.style.color = '#dc2626';
+    return;
+  }
+  const note = document.getElementById('paynow-sender-note').value.trim();
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  status.textContent = '';
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('submitManualPayment');
+    const result = await fn({
+      tid: TENANT_ID,
+      tier: payNowTargetTier,
+      receiptDataUrl: payNowReceiptData,
+      receiptName: payNowReceiptName,
+      senderNote: note
+    });
+    status.style.color = '#16a34a';
+    status.textContent = `✅ Submitted! Reference: ${result.data.referenceCode}. We'll confirm within 24 hours.`;
+    btn.textContent = 'Submitted';
+    // Auto-close after 4s so the owner can see the message.
+    setTimeout(() => closePayNowModal(), 4000);
+    // Refresh the Billing tab to pull the new pending payment.
+    renderBillingTab();
+  } catch (err) {
+    console.error('submitManualPayment failed:', err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : 'Submission failed.');
+    btn.disabled = false;
+    btn.textContent = 'Submit payment';
+  }
 }
 
 function syncStorefrontLayoutPicker() {
@@ -4791,6 +5131,74 @@ async function runSeedStarterPack() {
     status.textContent = '❌ ' + (err && err.message ? err.message : String(err));
     btn.disabled = false;
     btn.textContent = 'Retry Seed';
+  }
+}
+
+// ----- Platform billing config (superadmin → Settings → Account) -----
+// Stored at platform/billing in Firestore. Read by every tenant's Pay Now
+// modal so they know which GCash / Maya account to send to.
+function syncPlatformBillingForm() {
+  const data = platformBillingData || {};
+  const f = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = val || '';
+  };
+  f('pb-gcash-name', data.gcashAccountName);
+  f('pb-gcash-number', data.gcashNumber);
+  f('pb-maya-name', data.mayaAccountName);
+  f('pb-maya-number', data.mayaNumber);
+  f('pb-maya-bank', data.mayaBankName);
+  f('pb-discord-webhook', data.subscriptionDiscordWebhook);
+}
+
+async function savePlatformBilling() {
+  const status = document.getElementById('pb-status');
+  const btn = document.getElementById('pb-save-btn');
+  const gcashAccountName = document.getElementById('pb-gcash-name').value.trim();
+  const gcashNumber = document.getElementById('pb-gcash-number').value.trim();
+  const mayaAccountName = document.getElementById('pb-maya-name').value.trim();
+  const mayaNumber = document.getElementById('pb-maya-number').value.trim();
+  const mayaBankName = document.getElementById('pb-maya-bank').value.trim();
+  const subscriptionDiscordWebhook = document.getElementById('pb-discord-webhook').value.trim();
+
+  if (gcashAccountName.length < 2) {
+    status.textContent = 'GCash account name is required.';
+    status.style.color = '#dc2626';
+    return;
+  }
+  if (!/^09\d{9}$/.test(gcashNumber)) {
+    status.textContent = 'GCash number must be 11 digits and start with 09.';
+    status.style.color = '#dc2626';
+    return;
+  }
+  if (subscriptionDiscordWebhook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(subscriptionDiscordWebhook)) {
+    status.textContent = 'Discord webhook URL must start with https://discord.com/api/webhooks/';
+    status.style.color = '#dc2626';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  status.textContent = 'Saving…';
+  status.style.color = 'var(--muted)';
+  try {
+    await db.collection('platform').doc('billing').set({
+      gcashAccountName,
+      gcashNumber,
+      mayaAccountName: mayaAccountName || null,
+      mayaNumber: mayaNumber || null,
+      mayaBankName: mayaBankName || null,
+      subscriptionDiscordWebhook: subscriptionDiscordWebhook || null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: firebase.auth().currentUser?.email || null
+    }, { merge: true });
+    status.style.color = '#16a34a';
+    status.textContent = '✅ Saved. Tenants will see these accounts immediately.';
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#dc2626';
+    status.textContent = '❌ ' + (err && err.message ? err.message : err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
   }
 }
 
@@ -6712,7 +7120,7 @@ auth.onAuthStateChanged(async user => {
     // against the original single-tenant data; they have no meaning on other
     // tenants, and superadmins who visit a non-seed tenant shouldn't see them.
     if (auth_result.reason === 'superadmin' && TENANT_ID === 'jsminimart') {
-      ['seed-pack-row', 'allowed-emails-row', 'migrate-row'].forEach(id => {
+      ['seed-pack-row', 'allowed-emails-row', 'migrate-row', 'platform-billing-row'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = '';
       });
@@ -8572,6 +8980,93 @@ function playNewOrderSound() {
      the owner still has to click "Save changes" in Store Info to
      persist them to Firestore (same pattern as Use my location).
 =================================================================== -->
+<!-- ===================================================================
+     Pay Now modal — tenant owner submits a manual GCash payment for a
+     subscription upgrade or renewal. Reads platform/billing for the
+     receiving account details. submitManualPayment Cloud Function fires
+     the Discord webhook so superadmin gets notified in real time.
+=================================================================== -->
+<div class="paynow-overlay" id="paynow-modal" onclick="closePayNowModal(event)">
+  <div class="paynow-modal" onclick="event.stopPropagation()">
+    <h2>💳 Pay your subscription</h2>
+    <p class="paynow-subtitle">
+      Send the amount via GCash, include the reference code in the message,
+      then upload your receipt screenshot. We'll confirm within 24 hours.
+    </p>
+
+    <div class="paynow-summary">
+      <span class="label">Tier</span>      <span class="val" id="paynow-tier-name">—</span>
+      <span class="label">Amount</span>    <span class="val" id="paynow-amount">—</span>
+      <span class="label">Reference</span>
+      <span class="val" style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+        <span id="paynow-ref-code">—</span>
+        <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-ref-code', this)">Copy</button>
+      </span>
+    </div>
+
+    <div class="paynow-accounts">
+      <div class="paynow-account-block">
+        <h4>📱 GCash (primary)</h4>
+        <div class="paynow-account-row">
+          <span class="label">Account name</span>
+          <span class="val" id="paynow-gcash-name">—</span>
+          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-gcash-name', this)">Copy</button>
+        </div>
+        <div class="paynow-account-row">
+          <span class="label">Number</span>
+          <span class="val" id="paynow-gcash-number">—</span>
+          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-gcash-number', this)">Copy</button>
+        </div>
+      </div>
+      <div class="paynow-account-block" id="paynow-maya-wrap" style="display:none;">
+        <h4>🏦 instaPay backup</h4>
+        <div class="paynow-account-row">
+          <span class="label">Bank</span>
+          <span class="val" id="paynow-maya-bank">—</span>
+          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-bank', this)">Copy</button>
+        </div>
+        <div class="paynow-account-row">
+          <span class="label">Account name</span>
+          <span class="val" id="paynow-maya-name">—</span>
+          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-name', this)">Copy</button>
+        </div>
+        <div class="paynow-account-row">
+          <span class="label">Number</span>
+          <span class="val" id="paynow-maya-number">—</span>
+          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-number', this)">Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="paynow-instructions">
+      ⚠️ <strong>Important:</strong> include the reference code (above) in the
+      GCash message field exactly as shown — it lets us match your payment
+      to your store. Don't add extra characters.
+    </div>
+
+    <div class="paynow-receipt-section">
+      <label>Upload payment receipt screenshot</label>
+      <input type="file" id="paynow-receipt-input"
+             accept="image/png,image/jpeg,image/jpg,image/heic,image/heif,image/webp"
+             style="display:none;" onchange="handlePayNowReceiptUpload(event)" />
+      <label for="paynow-receipt-input" class="paynow-upload-btn">📎 Click here</label>
+      <div id="paynow-receipt-preview"></div>
+    </div>
+
+    <div class="paynow-note-section">
+      <label for="paynow-sender-note">Notes (optional)</label>
+      <textarea id="paynow-sender-note" placeholder="Anything we should know? e.g. paid via a friend's GCash"></textarea>
+    </div>
+
+    <div class="paynow-status" id="paynow-status"></div>
+
+    <div class="paynow-actions">
+      <button type="button" class="btn-cancel" onclick="closePayNowModal()">Cancel</button>
+      <button type="button" class="btn-submit" id="paynow-submit-btn" onclick="submitPayNow()">Submit payment</button>
+    </div>
+  </div>
+</div>
+
 <div class="si-loc-overlay" id="si-loc-overlay">
   <div class="si-loc-modal">
     <div class="si-loc-header">
