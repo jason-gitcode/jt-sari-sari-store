@@ -239,6 +239,50 @@
   @media (max-width: 640px) {
     .mobile-hide { display: none !important; }
   }
+
+  /* Detail-modal vertical row stack. Each row is its own label-above-value
+     block separated by a thin divider so readability holds at modal width
+     regardless of value length. Replaces the cramped 2-column grid that
+     looked messy on long emails / slugs. */
+  .modal-detail-list { margin-bottom: 14px; }
+  .modal-detail-row {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0;
+  }
+  .modal-detail-row:first-child { padding-top: 0; }
+  .modal-detail-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .modal-detail-row .k {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .modal-detail-row .v {
+    font-size: 13px;
+    font-weight: 600;
+    word-break: break-word;
+    line-height: 1.4;
+    color: var(--text);
+  }
+  .modal-detail-row .v.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    word-break: break-all;
+  }
+  .modal-detail-row .v.sub {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 2px;
+  }
   .empty {
     padding: 32px;
     text-align: center;
@@ -526,7 +570,7 @@
             <th>Plan</th>
             <th class="mobile-hide">Owner</th>
             <th class="mobile-hide">Created</th>
-            <th class="numeric">Products</th>
+            <th class="numeric mobile-hide">Products</th>
             <th class="numeric mobile-hide">Orders</th>
             <th class="mobile-hide">Actions</th>
           </tr>
@@ -648,8 +692,8 @@
 <div class="modal-backdrop" id="tenant-modal" onclick="closeTenantModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
     <h3 id="tm-title">Tenant details</h3>
-    <div id="tm-body" style="display:grid; grid-template-columns: max-content 1fr; gap: 8px 14px; font-size: 13px; margin-bottom: 14px;"></div>
-    <div class="modal-actions" id="tm-actions" style="flex-wrap:wrap; gap:8px;"></div>
+    <div id="tm-body" class="modal-detail-list"></div>
+    <div class="modal-actions" id="tm-actions" style="flex-wrap:wrap; gap:8px; justify-content:flex-end;"></div>
   </div>
 </div>
 
@@ -657,8 +701,8 @@
 <div class="modal-backdrop" id="invite-modal" onclick="closeInviteModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
     <h3>Invite code details</h3>
-    <div id="im-body" style="display:grid; grid-template-columns: max-content 1fr; gap: 8px 14px; font-size: 13px; margin-bottom: 14px;"></div>
-    <div class="modal-actions" id="im-actions" style="flex-wrap:wrap; gap:8px;"></div>
+    <div id="im-body" class="modal-detail-list"></div>
+    <div class="modal-actions" id="im-actions" style="flex-wrap:wrap; gap:8px; justify-content:flex-end;"></div>
   </div>
 </div>
 
@@ -847,7 +891,7 @@ function renderTable(tenants, counts) {
         <td class="plan"><span class="pill ${pillClass}">${pillLabel}</span></td>
         <td class="owner mobile-hide" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
         <td class="created mobile-hide">${formatDate(t.createdAt)}</td>
-        <td class="numeric">${c.products == null ? '—' : c.products}</td>
+        <td class="numeric mobile-hide">${c.products == null ? '—' : c.products}</td>
         <td class="numeric mobile-hide">${c.orders == null ? '—' : c.orders}</td>
         <td class="actions mobile-hide">
           <a class="btn btn-icon" href="/${t.id}/" target="_blank" title="Open storefront">🌐</a>
@@ -862,29 +906,32 @@ function renderTable(tenants, counts) {
 function refresh() { loadTenants(); }
 
 // ----- Tenant detail modal (opened by clicking Name in the table) -----
+function modalRow(label, valueHtml) {
+  return `<div class="modal-detail-row"><div class="k">${label}</div><div class="v">${valueHtml || '—'}</div></div>`;
+}
+function modalRowMono(label, valueText, sub) {
+  const subHtml = sub ? `<span class="v sub">${sub}</span>` : '';
+  return `<div class="modal-detail-row"><div class="k">${label}</div><div class="v mono">${valueText}</div>${subHtml}</div>`;
+}
+
 function openTenantModal(idx) {
   const t = CACHED_TENANTS && CACHED_TENANTS[idx];
   if (!t) return;
-  const fmtT = ts => ts ? formatDate(ts) : '—';
   const owners = Array.isArray(t.ownerEmails) ? t.ownerEmails : [];
-  const ownerHtml = owners.length === 0
-    ? '—'
-    : owners.map(e => escText(e)).join('<br>');
+  const ownerHtml = owners.length === 0 ? '—' : owners.map(e => escText(e)).join('<br>');
+
   document.getElementById('tm-title').textContent = t.name || t.id;
-  document.getElementById('tm-body').innerHTML = `
-    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Store name</span>
-    <span style="font-weight:600;word-break:break-word;">${escText(t.name || '—')}</span>
-    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Slug</span>
-    <span style="font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;">/${escText(t.id)}/</span>
-    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Owner${owners.length > 1 ? 's' : ''}</span>
-    <span style="font-weight:600;word-break:break-word;">${ownerHtml}</span>
-    <span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">Created</span>
-    <span style="font-weight:600;">${fmtT(t.createdAt)}</span>
-  `;
+  document.getElementById('tm-body').innerHTML = [
+    modalRow('Store name', escText(t.name || '—')),
+    modalRowMono('Slug', '/' + escText(t.id) + '/'),
+    modalRow('Owner' + (owners.length > 1 ? 's' : ''), ownerHtml),
+    modalRow('Created', t.createdAt ? formatDate(t.createdAt) : '—')
+  ].join('');
+
   document.getElementById('tm-actions').innerHTML = `
     <a class="btn" href="/${t.id}/" target="_blank" rel="noopener" style="text-decoration:none;">🌐 Storefront</a>
     <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener" style="text-decoration:none;">⚙️ Admin</a>
-    <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete tenant</button>
+    <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete</button>
     <button type="button" class="btn" onclick="closeTenantModal()">Close</button>
   `;
   document.getElementById('tenant-modal').classList.add('show');
@@ -901,26 +948,25 @@ function openInviteModal(idx) {
   const statusLabel = c.redeemedAt ? 'Redeemed' : (c.revoked ? 'Revoked' : 'Pending');
   const statusColor = c.redeemedAt ? '#16a34a' : (c.revoked ? '#991b1b' : '#0369a1');
   const shareUrl = `https://pabilimart.com/signup/?code=${c.code}`;
-  const k = label => `<span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.4px;">${label}</span>`;
-  const v = html => `<span style="font-weight:600;word-break:break-word;">${html}</span>`;
-  const lines = [
-    k('Code') + v(`<span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0.08em;">${escText(c.code)}</span>`),
-    k('Status') + v(`<span style="color:${statusColor};">${statusLabel}</span>`),
-    k('Bound email') + v(escText(c.email || '—')),
-    k('Note') + v(escText(c.note || '—')),
-    k('Created') + v(c.createdAt ? formatDate(new Date(c.createdAt)) : '—')
+
+  const rows = [
+    modalRowMono('Code', escText(c.code)),
+    modalRow('Status', `<span style="color:${statusColor};">${statusLabel}</span>`),
+    modalRow('Bound email', escText(c.email || '—')),
+    modalRow('Note', escText(c.note || '—')),
+    modalRow('Created', c.createdAt ? formatDate(new Date(c.createdAt)) : '—')
   ];
   if (c.redeemedAt) {
-    lines.push(k('Redeemed by') + v(`${escText(c.redeemedBy || '—')}<br><span style="color:var(--muted);font-size:11px;font-weight:500;">→ /${escText(c.redeemedSlug || '?')}/</span>`));
-    lines.push(k('Redeemed at') + v(formatDate(new Date(c.redeemedAt))));
+    rows.push(modalRow('Redeemed by', escText(c.redeemedBy || '—') + `<span class="v sub">→ /${escText(c.redeemedSlug || '?')}/</span>`));
+    rows.push(modalRow('Redeemed at', formatDate(new Date(c.redeemedAt))));
   }
-  document.getElementById('im-body').innerHTML = lines.join('');
+  document.getElementById('im-body').innerHTML = rows.join('');
 
   const isPending = !c.redeemedAt && !c.revoked;
   const actions = [];
   if (isPending) {
     actions.push(`<button type="button" class="btn btn-primary" onclick="copyToClipboard('${escText(shareUrl)}', this)">📋 Copy share link</button>`);
-    actions.push(`<button type="button" class="btn btn-danger" onclick="closeInviteModal(); revokeInviteCode('${escText(c.code)}');">Revoke</button>`);
+    actions.push(`<button type="button" class="btn btn-danger" onclick="revokeInviteCode('${escText(c.code)}')">Revoke</button>`);
   }
   actions.push(`<button type="button" class="btn" onclick="closeInviteModal()">Close</button>`);
   document.getElementById('im-actions').innerHTML = actions.join('');
@@ -1108,7 +1154,12 @@ async function revokeInviteCode(code) {
   if (!confirm(`Revoke invite code ${code}?\n\nThe code will no longer be usable for signup.`)) return;
   try {
     await revokeInviteCodeFn({ code });
-    loadInviteCodes();
+    // Close the invite detail modal if it's open (the user just revoked
+    // from inside it). Then reload the table — list will reflect the
+    // updated `revoked: true` field on the just-revoked code.
+    const im = document.getElementById('invite-modal');
+    if (im && im.classList.contains('show')) im.classList.remove('show');
+    await loadInviteCodes();
   } catch (err) {
     alert('Could not revoke: ' + (err && err.message ? err.message : err));
   }
