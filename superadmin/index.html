@@ -297,14 +297,13 @@
     line-height: 1.3;
   }
   .form-grid input {
-    width: 100%; padding: 6px 9px;
+    width: 100%; padding: 5px 8px;
     background: var(--surface-2); border: 1px solid var(--line);
     border-radius: 6px; color: var(--text);
-    /* Desktop: 12px for a tight, compact look. Mobile bumps to 16px via
-       the iOS auto-zoom prevention rule at the bottom of the stylesheet
-       — that's a non-negotiable to avoid viewport zoom on focus, so
-       mobile inputs stay slightly larger by necessity. */
-    font-size: 12px;
+    /* Desktop: 11px for a very tight, compact look. Mobile still bumps
+       to 16px via the iOS auto-zoom prevention rule at the bottom of
+       the stylesheet — non-negotiable to avoid viewport zoom on focus. */
+    font-size: 11px;
     font-family: inherit;
   }
   .form-grid input:focus { outline: none; border-color: var(--accent); }
@@ -357,20 +356,14 @@
     letter-spacing: 0.5px;
   }
   .pending-payment-table .v {
+    /* Single uniform style for every value cell: 13px sans-serif weight
+       600. No monospace overrides, no code-pill backgrounds — Plan tier
+       pill and Receipt View button keep their own styling because they
+       are interactive/badge elements, not text. */
     font-size: 13px;
     font-weight: 600;
     word-break: break-word;
     line-height: 1.35;
-  }
-  .pending-payment-table .v.mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-weight: 500;
-    font-size: 12px;
-    word-break: break-all;
-  }
-  .pending-payment-table .v code {
-    background: var(--surface-2); padding: 1px 6px;
-    border-radius: 4px; font-size: 12px;
   }
   .pending-payment-actions {
     display: flex; gap: 8px; flex-wrap: wrap;
@@ -1046,11 +1039,11 @@ function renderPendingPayments() {
         <div class="pending-payment-table">
           <div class="cell"><span class="k">Plan</span><span class="v"><span class="pending-payment-tier-pill${tierClass}">${tierLabel} · ₱${p.amount}</span></span></div>
           <div class="cell"><span class="k">Store name</span><span class="v">${escText(p.tenantName)}</span></div>
-          <div class="cell"><span class="k">Slug</span><span class="v"><code>/${escText(p.tid)}/</code></span></div>
+          <div class="cell"><span class="k">Slug</span><span class="v">/${escText(p.tid)}/</span></div>
           <div class="cell"><span class="k">From</span><span class="v">${escText(p.submittedBy || '—')}</span></div>
           <div class="cell"><span class="k">Submitted</span><span class="v">${fmtDt(p.submittedAt)}</span></div>
-          <div class="cell"><span class="k">Reference</span><span class="v mono">${escText(p.referenceCode)}</span></div>
-          <div class="cell"><span class="k">Period</span><span class="v mono">${escText(p.period)}</span></div>
+          <div class="cell"><span class="k">Reference</span><span class="v">${escText(p.referenceCode)}</span></div>
+          <div class="cell"><span class="k">Period</span><span class="v">${escText(p.period)}</span></div>
           <div class="cell"><span class="k">Receipt</span><span class="v"><button type="button" class="pending-action-btn receipt-inline" onclick="viewPendingReceipt(${idx})">🖼️ View</button></span></div>
           ${noteCell}
         </div>
