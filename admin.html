@@ -816,6 +816,21 @@
       transition: opacity .15s;
     }
     .btn-add-product:hover { opacity: 0.9; }
+    .btn-add-product:disabled, .btn-add-product.disabled {
+      opacity: 0.4; cursor: not-allowed; filter: grayscale(0.6);
+    }
+    .product-cap-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 600;
+      background: var(--surface-2); color: var(--muted);
+      border: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .product-cap-pill.healthy { color: #16a34a; border-color: rgba(22,163,74,0.30); background: rgba(22,163,74,0.08); }
+    .product-cap-pill.approaching { color: #92400e; border-color: rgba(245,158,11,0.30); background: rgba(245,158,11,0.10); }
+    .product-cap-pill.at-cap { color: #b91c1c; border-color: rgba(220,38,38,0.30); background: rgba(220,38,38,0.10); }
+    .product-cap-pill.unlimited { color: var(--muted); }
     .delete-sel-btn {
       height: 38px; padding: 0 14px;
       border-radius: var(--radius-sm);
@@ -2454,11 +2469,24 @@
           <div class="page-title">Products</div>
           <div class="page-subtitle">Inventory, pricing, and availability.</div>
         </div>
-        <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="product-cap-pill" id="product-cap-pill" title=""></span>
           <button class="delete-sel-btn" id="delete-sel-btn" onclick="deleteSelected()" disabled>
             <span id="delete-sel-label">Delete</span>
           </button>
-          <button class="btn-add-product" onclick="openAddModal()">+ Add Product</button>
+          <button class="btn-add-product" id="add-product-btn" onclick="openAddModal()">+ Add Product</button>
+        </div>
+      </div>
+      <!-- Upgrade nudge banner — visible only when products approach/hit
+           the tier's cap. Hidden by default; renderProductCapStatus
+           toggles it based on count vs cap. -->
+      <div id="product-cap-upgrade-banner" style="display:none; margin: 12px 0; padding: 12px 16px; border-radius: 10px; background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(245,158,11,0.10)); border: 1px solid var(--accent); color: var(--ink);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px; flex-wrap:wrap;">
+          <div style="font-size: 13px; line-height: 1.45;">
+            <strong id="product-cap-banner-title">You've reached your plan's product limit</strong>
+            <div id="product-cap-banner-msg" style="color: var(--muted); margin-top: 2px;"></div>
+          </div>
+          <button type="button" class="btn-add-product" onclick="switchTab('billing')" style="background: var(--accent); color: #fff; flex-shrink: 0;">Upgrade plan →</button>
         </div>
       </div>
       <div class="products-toolbar">
@@ -3555,6 +3583,8 @@ firebase.auth().onAuthStateChanged(user => {
   __subscriptionUnsub = tdoc('subscription', 'current').onSnapshot(snap => {
     subscriptionData = snap.exists ? snap.data() : null;
     renderTierBadge();
+    // Phase D: tier change → re-evaluate the product cap pill + banner.
+    if (typeof renderProductCapStatus === 'function') renderProductCapStatus();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
@@ -3589,8 +3619,8 @@ function renderTierBadge() {
 // Mirror of SUBSCRIPTION_TIERS in functions/index.js — single source of
 // truth for tier copy. If you edit one, edit the other.
 const TIER_INFO = {
-  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 10,
-            features: ['10 products', 'Storefront on pabilimart.com/{your-slug}/',
+  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,
+            features: ['5 products', 'Storefront on pabilimart.com/{your-slug}/',
                        'Pabili Mart branding', 'No custom domain'] },
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,
             features: ['500 products', 'Analytics + marketing nudges',
@@ -5206,10 +5236,77 @@ function subscribeToProducts() {
     // Keep the Settings → Appearance category-order editor live as new
     // product categories appear (or last products of a category are deleted).
     if (typeof renderCategoryOrderEditor === 'function') renderCategoryOrderEditor();
+    // Phase D: refresh product-cap pill + Add Product disabled state +
+    // upgrade banner. Counts change with every snapshot.
+    renderProductCapStatus();
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
   });
+}
+
+// ----- Phase D: Product cap enforcement -----
+// Free 5 / Growth 500 / Pro 10K — capped client-side. Cloud Function
+// enforcement is intentionally deferred until abuse appears (pilot
+// scale doesn't warrant it; firestore rules already restrict writes
+// to owner-or-super so tenants can only over-fill their own catalog).
+function renderProductCapStatus() {
+  const pill = document.getElementById('product-cap-pill');
+  const addBtn = document.getElementById('add-product-btn');
+  const banner = document.getElementById('product-cap-upgrade-banner');
+  const bannerTitle = document.getElementById('product-cap-banner-title');
+  const bannerMsg = document.getElementById('product-cap-banner-msg');
+  if (!pill || !addBtn) return;
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const info = TIER_INFO[tier] || TIER_INFO.free;
+  const cap = info.productCap;
+  const count = (products || []).length;
+
+  // The Pro tier's 10K is effectively unlimited for any sari-sari shop;
+  // skip the cap warnings and Add disabled state at this scale.
+  if (cap >= 10000) {
+    pill.textContent = `${count.toLocaleString()} products`;
+    pill.className = 'product-cap-pill unlimited';
+    pill.title = `${info.name} — effectively unlimited`;
+    addBtn.disabled = false;
+    addBtn.classList.remove('disabled');
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  const pct = (count / cap);
+  pill.textContent = `${count} / ${cap} products`;
+  pill.title = `${info.name} plan limit`;
+  if (count >= cap) {
+    pill.classList.remove('healthy', 'approaching', 'unlimited');
+    pill.classList.add('at-cap', 'product-cap-pill');
+    addBtn.disabled = true;
+    addBtn.classList.add('disabled');
+    addBtn.title = `You've reached the ${info.name} limit of ${cap} products. Upgrade to add more.`;
+    if (banner) {
+      banner.style.display = '';
+      bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} products)`;
+      bannerMsg.textContent = `Upgrade to PabiliMart Growth (₱149/mo) for 500 products, or Pro (₱399/mo) for 10,000.`;
+    }
+  } else if (pct >= 0.8) {
+    pill.classList.remove('healthy', 'at-cap', 'unlimited');
+    pill.classList.add('approaching', 'product-cap-pill');
+    addBtn.disabled = false;
+    addBtn.classList.remove('disabled');
+    addBtn.title = '';
+    if (banner) {
+      banner.style.display = '';
+      bannerTitle.textContent = `Approaching your ${info.name} plan limit`;
+      bannerMsg.textContent = `${count} of ${cap} products used. Upgrade ahead of time to avoid hitting the cap mid-restock.`;
+    }
+  } else {
+    pill.classList.remove('approaching', 'at-cap', 'unlimited');
+    pill.classList.add('healthy', 'product-cap-pill');
+    addBtn.disabled = false;
+    addBtn.classList.remove('disabled');
+    addBtn.title = '';
+    if (banner) banner.style.display = 'none';
+  }
 }
 
 // ---------- ORDERS ----------
@@ -6780,6 +6877,25 @@ async function saveProduct(e) {
 }
 
 function openAddModal() {
+  // Phase D: client-side product cap gate. Block at-cap and offer
+  // the upgrade path. Bypassed by the at-cap state already disabling
+  // the button, but defense-in-depth in case someone triggers via
+  // keyboard / programmatic call.
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const info = TIER_INFO[tier] || TIER_INFO.free;
+  const cap = info.productCap;
+  const count = (products || []).length;
+  if (cap < 10000 && count >= cap) {
+    if (confirm(
+      `You've reached your ${info.name} plan limit of ${cap} products.\n\n` +
+      `Upgrade to PabiliMart Growth (₱149/mo) for 500 products,\n` +
+      `or Pro (₱399/mo) for 10,000.\n\n` +
+      `Open the Billing tab now to upgrade?`
+    )) {
+      switchTab('billing');
+    }
+    return;
+  }
   resetForm();
   showProductFormModal();
 }

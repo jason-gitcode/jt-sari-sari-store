@@ -139,7 +139,7 @@ async function upsertDirectoryEntry(slug, name) {
 // Phase-A scope: schema only. Phase-D will enforce caps server-side.
 // ============================================================
 const SUBSCRIPTION_TIERS = {
-  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 10 },
+  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5 },
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500 },
   pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000 }
 };
@@ -347,7 +347,12 @@ exports.createTenant = onCall(async (request) => {
     freeDeliveryEnabled: true,
     freeDeliveryThreshold: 400,
     deliveryAreasEnabled: true,
-    deliveryAreas: []
+    deliveryAreas: [],
+    // Subscription tier mirror — public-readable copy of subscription.tier
+    // so the customer-facing storefront can gate the "Powered by Pabili
+    // Mart" footer on Free tier without relaxing the (private) subscription
+    // doc rules. Kept in sync by confirmManualPayment + backfillSubscriptions.
+    tier: 'free'
   });
 
   // ---------- SEED SUBSCRIPTION DOC ----------
@@ -471,10 +476,13 @@ exports.rebuildPublicDirectory = onCall(async (request) => {
 });
 
 // ============================================================
-// backfillSubscriptions — superadmin-only. One-shot migration that gives
-// every existing tenant a subscription/current doc (PabiliMart Free,
-// active) if they don't already have one. Idempotent — safe to re-run.
-// Run once after Phase A ships, then ignore.
+// backfillSubscriptions — superadmin-only. Idempotent migration that
+// ensures every tenant has BOTH a subscription/current doc AND a tier
+// field on their settings/store doc.
+//   - If no subscription doc exists, seeds PabiliMart Free Active.
+//   - If subscription exists, mirrors its tier into settings/store so the
+//     storefront's "Powered by Pabili Mart" footer gate is in sync.
+// Safe to re-run.
 // ============================================================
 exports.backfillSubscriptions = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -483,15 +491,24 @@ exports.backfillSubscriptions = onCall(async (request) => {
   if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
 
   const snap = await db.collection('tenants').get();
-  let seeded = 0, skipped = 0;
+  let seeded = 0, skipped = 0, tierSynced = 0;
   for (const doc of snap.docs) {
     const subRef = doc.ref.collection('subscription').doc('current');
+    const settingsRef = doc.ref.collection('settings').doc('store');
     const subSnap = await subRef.get();
-    if (subSnap.exists) { skipped++; continue; }
-    await subRef.set(getInitialSubscription({ tier: 'free' }));
-    seeded++;
+    let tier = 'free';
+    if (!subSnap.exists) {
+      await subRef.set(getInitialSubscription({ tier: 'free' }));
+      seeded++;
+    } else {
+      skipped++;
+      tier = (subSnap.data() || {}).tier || 'free';
+    }
+    // Always sync tier mirror to settings/store (idempotent on merge).
+    await settingsRef.set({ tier }, { merge: true });
+    tierSynced++;
   }
-  return { seeded, skipped, total: snap.size };
+  return { seeded, skipped, tierSynced, total: snap.size };
 });
 
 // ============================================================
@@ -716,6 +733,12 @@ exports.confirmManualPayment = onCall(async (request) => {
       confirmedBy: token.email,
       newPeriodEnd: newEnd
     });
+
+    // Mirror tier into settings/store so the customer-facing storefront
+    // can gate the "Powered by Pabili Mart" footer without needing
+    // subscription doc read access. Public-read on settings/* already.
+    const settingsRef = tref.collection('settings').doc('store');
+    tx.set(settingsRef, { tier }, { merge: true });
   });
 
   return { paymentId, tid, status: 'confirmed' };

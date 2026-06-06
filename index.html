@@ -761,6 +761,31 @@
       font-size: 16px !important;
     }
   }
+
+  /* Phase D: Free-tier "Powered by Pabili Mart" footer. Shown only when
+     the tenant's settings/store.tier is 'free' or missing. Paid plans
+     remove this branding. */
+  .powered-by-footer {
+    display: none;
+    margin: 32px auto 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted, #94a3b8);
+    line-height: 1.5;
+    padding: 0 12px;
+  }
+  .powered-by-footer.shown { display: block; }
+  .powered-by-footer a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .powered-by-footer a:hover {
+    color: var(--accent, #2563eb);
+    border-bottom-color: var(--accent, #2563eb);
+  }
+  .powered-by-footer strong { font-weight: 600; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -1209,6 +1234,16 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   }
 }
 
+// Phase D: Free-tier branding footer toggle. Shown when settings/store.tier
+// is 'free' or missing; hidden on paid tiers (Growth, Pro). Tier is mirrored
+// into settings/store by createTenant + confirmManualPayment.
+function applyPoweredByFooter() {
+  const el = document.getElementById('powered-by-footer');
+  if (!el) return;
+  const tier = (storeSettingsData && storeSettingsData.tier) || 'free';
+  el.classList.toggle('shown', tier === 'free');
+}
+
 function applyRainMode(active) {
   const header   = document.querySelector('header');
   const infoBar  = document.getElementById('info-bar');
@@ -1269,6 +1304,9 @@ tdoc('settings', 'store').onSnapshot(snap => {
   lastRainMode      = rainMode;
   applyRainMode(rainMode);
   buildTicker(rainMode, storeClosedMode, maintenanceMode);
+  // Phase D: Free-tier branding footer. Show "Powered by Pabili Mart" on
+  // any tenant whose tier field is missing or 'free'. Paid tiers hide it.
+  applyPoweredByFooter();
   // Storefront layout — 'list' for restaurants/carinderias, 'grid'
   // (default) for sari-sari stores. Switches via a data attribute on the
   // root so CSS picks up the right layout without re-mounting.
@@ -2051,5 +2089,11 @@ tcol('products').onSnapshot(snapshot => {
     navigator.serviceWorker.register('/sw.js');
   }
 </script>
+
+<!-- Phase D: Free-tier branding footer. JS toggles .shown class based on
+     storeSettingsData.tier read from the settings/store snapshot. -->
+<footer class="powered-by-footer" id="powered-by-footer">
+  Powered by <a href="https://pabilimart.com/signup/" target="_blank" rel="noopener"><strong>Pabili Mart</strong></a> · Sell online with your own sari-sari storefront
+</footer>
 </body>
 </html>
