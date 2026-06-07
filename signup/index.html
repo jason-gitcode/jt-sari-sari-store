@@ -14,7 +14,8 @@
 <base href="/">
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
-<link rel="apple-touch-icon" href="/newlogo.jpeg" />
+<!-- No favicon — the signup page is platform-scoped, not tied to a tenant.
+     Avoids leaking the seed tenant's logo into browser tab switchers. -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {

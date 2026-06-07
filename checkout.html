@@ -18,7 +18,24 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
-<link rel="apple-touch-icon" href="/newlogo.jpeg" />
+<!-- Tab favicon added dynamically below — only the seed tenant gets
+     /newlogo.jpeg up front. Non-jsminimart tenants either get their
+     uploaded custom logo (after settings snapshot) or no icon at all. -->
+<script>
+  (function () {
+    var parts = window.location.pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'jsminimart') return;
+    var l1 = document.createElement('link');
+    l1.rel = 'apple-touch-icon';
+    l1.href = '/newlogo.jpeg';
+    document.head.appendChild(l1);
+    var l2 = document.createElement('link');
+    l2.rel = 'icon';
+    l2.type = 'image/jpeg';
+    l2.href = '/newlogo.jpeg';
+    document.head.appendChild(l2);
+  })();
+</script>
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
@@ -621,8 +638,33 @@ function applyPoweredByFooter() {
   el.classList.toggle('shown', tier === 'free');
 }
 
+function setStorefrontFavicon(href) {
+  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"], link[rel="shortcut icon"]')
+    .forEach(l => l.remove());
+  if (!href) return;
+  const mime = href.startsWith('data:image/png') ? 'image/png'
+    : href.startsWith('data:image/') ? 'image/jpeg'
+    : (href.endsWith('.png') || href.endsWith('.PNG')) ? 'image/png'
+    : 'image/jpeg';
+  const apple = document.createElement('link');
+  apple.rel = 'apple-touch-icon';
+  apple.href = href;
+  document.head.appendChild(apple);
+  const icon = document.createElement('link');
+  icon.rel = 'icon';
+  icon.type = mime;
+  icon.href = href;
+  document.head.appendChild(icon);
+}
+
 function applyTenantStoreConfig() {
   applyPoweredByFooter();
+  // Tab favicon — same rules as the storefront index.html.
+  const hasCustomLogo = (storeSettingsData.logoEnabled === true) && !!storeSettingsData.logoDataUrl;
+  setStorefrontFavicon(
+    hasCustomLogo ? storeSettingsData.logoDataUrl
+      : (TENANT_ID === 'jsminimart' ? '/newlogo.jpeg' : null)
+  );
   const storeName = storeSettingsData.storeName || STORE.name || '';
   const pickup = storeSettingsData.pickupAddress || '';
   const pickupBox = document.getElementById('pickup-info');
