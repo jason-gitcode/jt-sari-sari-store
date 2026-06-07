@@ -1413,6 +1413,17 @@ document.addEventListener('keydown', (e) => {
   if (modal && modal.classList.contains('show')) closeReceiptModal();
 });
 
+// Helper: refresh every dashboard that shows subscription state after a
+// payment is confirmed or rejected. Without this, the All tenants table
+// keeps showing the pre-confirmation Plan (e.g. "Free" when subscription
+// just flipped to "Growth") until the superadmin manually hits ↻ Refresh
+// on each table.
+function refreshAllAfterPaymentAction() {
+  loadPendingPayments();
+  if (typeof loadTenants === 'function') loadTenants();
+  if (typeof loadTransactionHistory === 'function') loadTransactionHistory();
+}
+
 async function confirmPendingPayment(idx) {
   const p = __lastPendingPayments[idx];
   if (!p) return;
@@ -1420,7 +1431,7 @@ async function confirmPendingPayment(idx) {
   if (!confirm(`Confirm ${p.tenantName} (/${p.tid}/) paid ₱${p.amount} for PabiliMart ${tierLabel}?\n\nThis extends their subscription by 30 days.`)) return;
   try {
     await confirmManualPaymentFn({ tid: p.tid, paymentId: p.paymentId });
-    loadPendingPayments();
+    refreshAllAfterPaymentAction();
   } catch (err) {
     console.error('confirmManualPayment failed:', err);
     alert('❌ ' + (err.message || err));
@@ -1434,7 +1445,7 @@ async function rejectPendingPayment(idx) {
   if (!reason || !reason.trim()) return;
   try {
     await rejectManualPaymentFn({ tid: p.tid, paymentId: p.paymentId, reason: reason.trim() });
-    loadPendingPayments();
+    refreshAllAfterPaymentAction();
   } catch (err) {
     console.error('rejectManualPayment failed:', err);
     alert('❌ ' + (err.message || err));
