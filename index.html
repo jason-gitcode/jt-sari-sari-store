@@ -1174,6 +1174,29 @@ function getEffectiveStoreClosed() {
 }
 
 function buildTicker(rainMode, storeClosed, maintenance) {
+  // Per-tenant kill switch (admin → Settings → Appearance). When false,
+  // hide the entire info-bar — including rain / closed / maintenance
+  // banners. Default true preserves existing tenants' behaviour.
+  const tickerOn = storeSettingsData.tickerEnabled !== false;
+  const bar = document.getElementById('info-bar');
+  if (bar) bar.style.display = tickerOn ? '' : 'none';
+  if (!tickerOn) {
+    // Even when hidden, keep the footer "Delivery Times" + hours in sync
+    // since those live OUTSIDE the info-bar (FOOTER block).
+    const schedulesOn  = storeSettingsData.schedulesEnabled !== false;
+    const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
+    const footDel = document.getElementById('footer-delivery-times');
+    if (footDel) {
+      footDel.textContent = (schedulesOn && schedules.length > 0)
+        ? schedules.map(s => fmtTime12Long(s.start)).join(' · ')
+        : '—';
+    }
+    const footHours = document.getElementById('footer-hours');
+    if (footHours) footHours.textContent = `${fmtHour12Long(getOpenHour())} – ${fmtHour12Long(getCloseHour())}`;
+    const footDays = document.getElementById('footer-days');
+    if (footDays) footDays.textContent = fmtOpenDaysFooter(getOpenDays());
+    return;
+  }
   const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
   const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
   const feeOn        = storeSettingsData.deliveryFeeEnabled !== false;
@@ -1382,6 +1405,16 @@ tdoc('settings', 'store').onSnapshot(snap => {
   // prevent the JS Mini Mart flash for non-jsminimart tenants).
   if (nameEl) nameEl.style.visibility = 'visible';
   if (tagEl)  tagEl.style.visibility  = 'visible';
+
+  // Custom logo: when enabled + uploaded, the logo image replaces the
+  // store-name text. The brand image slot already shows on both desktop
+  // and mobile, so swapping its src is enough — we just hide the h1.
+  const customLogoOn = (storeSettingsData.logoEnabled === true) && !!storeSettingsData.logoDataUrl;
+  const brandLogoImg = document.querySelector('#brand-logo img');
+  if (brandLogoImg) {
+    brandLogoImg.src = customLogoOn ? storeSettingsData.logoDataUrl : '/newlogo.jpeg';
+  }
+  if (nameEl) nameEl.style.display = customLogoOn ? 'none' : '';
 });
 
 // Re-evaluate every minute so the ticker flips automatically at 6am / 4pm

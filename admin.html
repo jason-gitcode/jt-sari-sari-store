@@ -2906,6 +2906,44 @@
               </div>
             </div>
             <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">🖼️ Use a custom logo <span class="mode-badge off" id="set-logo-badge">OFF</span></div>
+                <div class="setting-desc">Upload your store logo to replace the store name at the top of the storefront. When off, the storefront shows your store name as text.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-logo-enabled" onclick="toggleServiceOption('logoEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
+              </div>
+            </div>
+            <div class="setting-row" id="logo-editor-row" style="display:none;">
+              <div class="setting-info" style="flex:1;">
+                <div class="setting-desc">Custom logo</div>
+                <div style="display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap;">
+                  <div style="width:80px;height:80px;border:1px solid var(--line);border-radius:50%;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;">
+                    <img id="logo-preview-img" alt="Custom store logo" style="width:100%;height:100%;object-fit:contain;display:none;" />
+                    <div id="logo-preview-placeholder" style="font-size:22px;color:var(--muted);">🖼️</div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                    <label id="logo-upload-label" for="logo-upload-input"
+                      style="padding:8px 14px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
+                      Upload logo
+                    </label>
+                    <input type="file" id="logo-upload-input" accept="image/jpeg,image/png,image/webp"
+                      onchange="handleLogoUpload(this)" style="display:none;" />
+                    <button type="button" id="logo-remove-btn" onclick="removeLogo()"
+                      style="display:none;padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;">
+                      Remove logo
+                    </button>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4;">
+                  Square images work best (the storefront crops to a circle). PNG with transparent background keeps the cleanest look. Max upload 5MB — we resize it automatically.
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Pickup address</div>
                 <div class="setting-desc">Shown to customers who choose pickup at checkout.</div>
@@ -3197,6 +3235,19 @@
                   <button data-layout="grid" onclick="setStorefrontLayout('grid')">🧱 Grid</button>
                   <button data-layout="list" onclick="setStorefrontLayout('list')">📋 List</button>
                 </div>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-title">Show storefront info ticker</div>
+                <div class="setting-desc">The scrolling bar at the top of your storefront that shows your operating hours, delivery areas, free-delivery threshold, schedules, and mode badges (Rain Mode, Closed, Maintenance). Turn off to hide it entirely — useful if you want a cleaner storefront or your customers already know the info.</div>
+              </div>
+              <div class="setting-control">
+                <label class="toggle-sw">
+                  <input type="checkbox" id="set-ticker-enabled" onclick="toggleServiceOption('tickerEnabled', this.checked)" />
+                  <span class="toggle-sl"></span>
+                </label>
               </div>
             </div>
 
@@ -4249,6 +4300,102 @@ function applyTenantBranding() {
 }
 
 // Service & Payment toggle handlers
+// ============================================================
+// CUSTOM LOGO UPLOAD
+// ============================================================
+// Tenant uploads a square-ish image; we resize to 240px max and store
+// as a base64 data URL on settings/store.logoDataUrl. The storefront
+// swaps the brand image and hides the store-name text when enabled.
+
+function compressImageToDataUrl(file, maxDim, quality, mime) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL(mime, quality));
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.onerror = () => reject(new Error('Could not read the image — please try a different file.'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleLogoUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    alert('That image is larger than 5MB. Please choose a smaller file.');
+    input.value = '';
+    return;
+  }
+  try {
+    // Preserve PNG (and WebP via PNG output) for transparency; JPEG for everything else.
+    const useMime = (file.type === 'image/png' || file.type === 'image/webp') ? 'image/png' : 'image/jpeg';
+    const quality = useMime === 'image/jpeg' ? 0.88 : 1;
+    const dataUrl = await compressImageToDataUrl(file, 240, quality, useMime);
+    if (dataUrl.length > 220000) {
+      alert('That image is too detailed even after resizing. Please try a simpler logo or a JPEG.');
+      input.value = '';
+      return;
+    }
+    await tdoc('settings', 'store').set({ logoDataUrl: dataUrl }, { merge: true });
+    showToast('Logo updated.', 'success');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to upload logo: ' + (err && err.message ? err.message : err));
+  }
+  input.value = '';
+}
+
+async function removeLogo() {
+  if (!confirm('Remove your custom logo? The storefront will go back to showing your store name as text.')) return;
+  try {
+    await tdoc('settings', 'store').set({
+      logoDataUrl: firebase.firestore.FieldValue.delete()
+    }, { merge: true });
+    showToast('Logo removed.', 'success');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to remove logo: ' + (err && err.message ? err.message : err));
+  }
+}
+
+function refreshLogoSubEditor() {
+  const enabled = storeSettingsData.logoEnabled === true;
+  if (!enabled) return;
+  const preview = document.getElementById('logo-preview-img');
+  const placeholder = document.getElementById('logo-preview-placeholder');
+  const removeBtn = document.getElementById('logo-remove-btn');
+  const uploadLbl = document.getElementById('logo-upload-label');
+  const hasLogo = !!storeSettingsData.logoDataUrl;
+  if (preview) {
+    if (hasLogo) {
+      preview.src = storeSettingsData.logoDataUrl;
+      preview.style.display = '';
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+  if (placeholder) placeholder.style.display = hasLogo ? 'none' : '';
+  if (removeBtn) removeBtn.style.display = hasLogo ? '' : 'none';
+  if (uploadLbl) uploadLbl.textContent = hasLogo ? 'Replace logo' : 'Upload logo';
+}
+
 async function toggleServiceOption(field, value) {
   // Guard: don't let admin disable ALL payment methods
   if (field.startsWith('pay') && value === false) {
@@ -4293,7 +4440,9 @@ function syncServiceToggles() {
     'set-schedules-enabled': storeSettingsData.schedulesEnabled !== false,
     'set-del-fee-enabled':   storeSettingsData.deliveryFeeEnabled !== false,
     'set-free-del-enabled':  storeSettingsData.freeDeliveryEnabled !== false,
-    'set-areas-enabled':     storeSettingsData.deliveryAreasEnabled !== false
+    'set-areas-enabled':     storeSettingsData.deliveryAreasEnabled !== false,
+    'set-ticker-enabled':    storeSettingsData.tickerEnabled !== false,
+    'set-logo-enabled':      storeSettingsData.logoEnabled === true
   };
   for (const id in fields) {
     const el = document.getElementById(id);
@@ -4328,7 +4477,8 @@ function syncServiceToggles() {
     'set-schedules-badge':  fields['set-schedules-enabled'],
     'set-del-fee-badge':    fields['set-del-fee-enabled'],
     'set-free-del-badge':   fields['set-free-del-enabled'],
-    'set-areas-badge':      fields['set-areas-enabled']
+    'set-areas-badge':      fields['set-areas-enabled'],
+    'set-logo-badge':       fields['set-logo-enabled']
   };
   // Sub-editors visible whenever their toggle is on — no delivery dependency.
   // COD limit editor: only visible when COD itself is effectively on (toggle ON + delivery ON).
@@ -4342,11 +4492,14 @@ function syncServiceToggles() {
   if (freeRow)    freeRow.style.display    = fields['set-free-del-enabled']  ? '' : 'none';
   const areasRow = document.getElementById('areas-editor-row');
   if (areasRow)   areasRow.style.display   = fields['set-areas-enabled']     ? '' : 'none';
+  const logoRow = document.getElementById('logo-editor-row');
+  if (logoRow)    logoRow.style.display    = fields['set-logo-enabled']      ? '' : 'none';
   renderSchedulesEditor();
   syncCodLimitEditor();
   syncDeliveryFeeEditor();
   syncFreeDeliveryEditor();
   renderAreasEditor();
+  refreshLogoSubEditor();
   for (const id in badges) {
     const el = document.getElementById(id);
     if (!el) continue;
