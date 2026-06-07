@@ -831,6 +831,35 @@
     .product-cap-pill.approaching { color: #92400e; border-color: rgba(245,158,11,0.30); background: rgba(245,158,11,0.10); }
     .product-cap-pill.at-cap { color: #b91c1c; border-color: rgba(220,38,38,0.30); background: rgba(220,38,38,0.10); }
     .product-cap-pill.unlimited { color: var(--muted); }
+
+    /* Cap upgrade nudge — full title + sub on desktop, single short line on phones. */
+    .cap-banner {
+      margin: 12px 0; padding: 12px 16px;
+      border-radius: 10px; border: 1px solid var(--accent);
+      background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(245,158,11,0.10));
+      color: var(--ink);
+    }
+    .cap-banner-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .cap-banner-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; }
+    .cap-banner-full { display: block; }
+    .cap-banner-compact { display: none; font-size: 13px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cap-banner-upgrade {
+      flex-shrink: 0; background: var(--accent); color: #fff; border: 0;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+    }
+    .cap-banner-dismiss {
+      flex-shrink: 0; background: transparent; border: 0; color: var(--muted);
+      font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 6px;
+    }
+    @media (max-width: 600px) {
+      .cap-banner { margin: 10px 0; padding: 8px 12px; border-radius: 8px; }
+      .cap-banner-row { flex-wrap: nowrap; gap: 8px; }
+      .cap-banner-full { display: none; }
+      .cap-banner-compact { display: block; }
+      .cap-banner-upgrade { padding: 6px 10px; font-size: 12px; }
+    }
+
     .delete-sel-btn {
       height: 38px; padding: 0 14px;
       border-radius: var(--radius-sm);
@@ -2476,15 +2505,21 @@
           <button class="btn-add-product" id="add-product-btn" onclick="openAddModal()">+ Add Product</button>
         </div>
       </div>
-      <!-- Upgrade nudge banner — one-row compact pill with × dismiss.
-           renderProductCapStatus toggles visibility and copy; dismiss is
+      <!-- Upgrade nudge banner. Desktop shows the full title + sub-message;
+           mobile collapses to a single short line to save vertical space.
+           renderProductCapStatus toggles visibility and copy. × dismiss is
            session-scoped so it returns next time the tab is opened. -->
-      <div id="product-cap-upgrade-banner" style="display:none; margin: 10px 0; padding: 8px 12px; border-radius: 8px; background: linear-gradient(90deg, rgba(37,99,235,0.10), rgba(245,158,11,0.10)); border: 1px solid var(--accent); color: var(--ink);">
-        <div style="display:flex; align-items:center; gap: 8px; flex-wrap:nowrap;">
-          <span id="product-cap-banner-msg" style="font-size: 13px; line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-          <button type="button" onclick="switchTab('billing')" style="flex-shrink: 0; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">Upgrade →</button>
-          <button type="button" id="product-cap-banner-dismiss" onclick="dismissProductCapBanner()" aria-label="Dismiss"
-            style="flex-shrink: 0; background: transparent; border: 0; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 6px;">×</button>
+      <div id="product-cap-upgrade-banner" class="cap-banner" style="display:none;">
+        <div class="cap-banner-row">
+          <div class="cap-banner-text">
+            <div class="cap-banner-full">
+              <strong id="product-cap-banner-title"></strong>
+              <div id="product-cap-banner-msg" style="color: var(--muted); margin-top: 2px;"></div>
+            </div>
+            <div class="cap-banner-compact" id="product-cap-banner-msg-compact"></div>
+          </div>
+          <button type="button" class="cap-banner-upgrade" onclick="switchTab('billing')">Upgrade →</button>
+          <button type="button" id="product-cap-banner-dismiss" onclick="dismissProductCapBanner()" aria-label="Dismiss" class="cap-banner-dismiss">×</button>
         </div>
       </div>
       <div class="products-toolbar">
@@ -5406,7 +5441,9 @@ function renderProductCapStatus() {
   const pill = document.getElementById('product-cap-pill');
   const addBtn = document.getElementById('add-product-btn');
   const banner = document.getElementById('product-cap-upgrade-banner');
+  const bannerTitle = document.getElementById('product-cap-banner-title');
   const bannerMsg = document.getElementById('product-cap-banner-msg');
+  const bannerCompact = document.getElementById('product-cap-banner-msg-compact');
   if (!pill || !addBtn) return;
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const info = TIER_INFO[tier] || TIER_INFO.free;
@@ -5439,7 +5476,9 @@ function renderProductCapStatus() {
     addBtn.title = `You've reached the ${info.name} limit of ${cap} products. Upgrade to add more.`;
     if (banner) {
       banner.style.display = dismissed ? 'none' : '';
-      if (bannerMsg) bannerMsg.innerHTML = `<strong>${cap}/${cap} used</strong> — ${info.name} limit reached`;
+      if (bannerTitle) bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} products)`;
+      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for 500 products, or Pro (₱399/mo) for 10,000.';
+      if (bannerCompact) bannerCompact.textContent = 'Limit reached.';
     }
   } else if (pct >= 0.8) {
     pill.classList.remove('healthy', 'at-cap', 'unlimited');
@@ -5449,7 +5488,9 @@ function renderProductCapStatus() {
     addBtn.title = '';
     if (banner) {
       banner.style.display = dismissed ? 'none' : '';
-      if (bannerMsg) bannerMsg.innerHTML = `<strong>${count}/${cap} used</strong> — approaching ${info.name} limit`;
+      if (bannerTitle) bannerTitle.textContent = `Approaching your ${info.name} plan limit`;
+      if (bannerMsg) bannerMsg.textContent = `${count} of ${cap} products used. Upgrade ahead of time to avoid hitting the cap mid-restock.`;
+      if (bannerCompact) bannerCompact.textContent = 'Approaching limit.';
     }
   } else {
     pill.classList.remove('approaching', 'at-cap', 'unlimited');
