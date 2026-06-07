@@ -1424,11 +1424,16 @@ tdoc('settings', 'store').onSnapshot(snap => {
     if (brandLogoImg) brandLogoImg.src = storeSettingsData.logoDataUrl;
     if (nameEl) nameEl.style.display = 'none';
   } else {
-    if (brandLogoImg) brandLogoImg.src = '/newlogo.jpeg';
     if (nameEl) nameEl.style.display = '';
-    // Leave the no-default-logo class + boot-set inline display:none
-    // alone for non-jsminimart tenants — they keep the text-only header
-    // as before.
+    if (TENANT_ID && TENANT_ID !== 'jsminimart') {
+      // Re-apply the same guards the customLogoOn branch clears so
+      // toggling the custom logo off doesn't briefly expose the seed
+      // tenant's /newlogo.jpeg before the next page load.
+      document.documentElement.classList.add('no-default-logo');
+      if (brandLogoEl) brandLogoEl.style.display = 'none';
+    } else if (brandLogoImg) {
+      brandLogoImg.src = '/newlogo.jpeg';
+    }
   }
 });
 
