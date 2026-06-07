@@ -879,20 +879,42 @@ async function loadTenants() {
     const tenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     CACHED_TENANTS = tenants;
 
-    // Fetch product/order counts + subscription tier in parallel per tenant.
-    // The legacy tenant.plan field still says 'starter' (createTenant sets
-    // it but doesn't update on tier changes) — the actual current tier lives
-    // in subscription/current, which we read here.
+    // Fetch product/order counts + subscription tier + settings tier in
+    // parallel per tenant.
+    //
+    // The legacy tenant.plan field still says 'starter' (createTenant
+    // sets it but doesn't update on tier changes), so we read tier from
+    // two places:
+    //   1. subscription/current.tier (private; preferred — also has status)
+    //   2. settings/store.tier (public mirror; fallback if (1) fails)
+    //
+    // The mirror is kept in sync by createTenant + confirmManualPayment +
+    // backfillSubscriptions. Either of these two sources reflects the
+    // truth, so we surface whichever is available.
+    //
+    // Errors are logged (no longer silently swallowed) so the next
+    // time something fails the cause is visible in DevTools.
     const counts = await Promise.all(tenants.map(async (t) => {
       try {
-        const [pCount, oCount, subSnap] = await Promise.all([
-          db.collection('tenants').doc(t.id).collection('products').count().get().then(r => r.data().count).catch(() => null),
-          db.collection('tenants').doc(t.id).collection('orders').count().get().then(r => r.data().count).catch(() => null),
-          db.collection('tenants').doc(t.id).collection('subscription').doc('current').get().catch(() => null)
+        const [pCount, oCount, subSnap, settingsSnap] = await Promise.all([
+          db.collection('tenants').doc(t.id).collection('products').count().get()
+            .then(r => r.data().count)
+            .catch(e => { console.warn('[loadTenants] products count failed for', t.id, ':', e.message); return null; }),
+          db.collection('tenants').doc(t.id).collection('orders').count().get()
+            .then(r => r.data().count)
+            .catch(e => { console.warn('[loadTenants] orders count failed for', t.id, ':', e.message); return null; }),
+          db.collection('tenants').doc(t.id).collection('subscription').doc('current').get()
+            .catch(e => { console.warn('[loadTenants] subscription read failed for', t.id, ':', e.message); return null; }),
+          db.collection('tenants').doc(t.id).collection('settings').doc('store').get()
+            .catch(e => { console.warn('[loadTenants] settings read failed for', t.id, ':', e.message); return null; })
         ]);
         const sub = (subSnap && subSnap.exists) ? subSnap.data() : null;
-        return { products: pCount, orders: oCount, sub };
-      } catch { return { products: null, orders: null, sub: null }; }
+        const settingsTier = (settingsSnap && settingsSnap.exists) ? (settingsSnap.data() || {}).tier : null;
+        return { products: pCount, orders: oCount, sub, settingsTier };
+      } catch (e) {
+        console.warn('[loadTenants] unhandled error for', t.id, ':', e.message);
+        return { products: null, orders: null, sub: null, settingsTier: null };
+      }
     }));
 
     CACHED_COUNTS = counts;
@@ -929,11 +951,11 @@ function renderTable(tenants, counts) {
   tbody.innerHTML = tenants.map((t, i) => {
     const c = counts[i] || {};
     // Read the real subscription tier/status (Free / Growth / Pro /
-    // Trialing / Past Due / ...). If no sub doc exists yet (legacy
-    // tenants pre-Phase-A, or a doc that hasn't synced), default to Free
-    // — that's what createTenant seeds new tenants with, and what the
-    // backfill function would assign too. Avoids "unknown" being shown
-    // for tenants that just need a backfill pass.
+    // Trialing / Past Due / ...). Three-tier fallback:
+    //   1. subscription/current — has tier AND status (private doc)
+    //   2. settings/store.tier  — public mirror; covers the case where
+    //      the private read fails for any reason
+    //   3. 'free' default       — for tenants with neither
     let pillClass = 'free';
     let pillLabel = 'free';
     if (c.sub) {
@@ -944,6 +966,12 @@ function renderTable(tenants, counts) {
         pillClass = status; pillLabel = status.replace('_', ' ');
       }
       else { pillClass = tier; pillLabel = tier; }
+    } else if (c.settingsTier) {
+      // Subscription read returned nothing (or failed), but the public
+      // tier mirror is available — use it.
+      const tier = c.settingsTier.toLowerCase();
+      pillClass = tier;
+      pillLabel = tier;
     }
     const owner = Array.isArray(t.ownerEmails) && t.ownerEmails.length > 0 ? t.ownerEmails[0] : (t.createdByEmail || '—');
     const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
@@ -988,9 +1016,12 @@ function openTenantModal(idx) {
   const cIdx = (typeof idx === 'number') ? idx : -1;
   const c = (cIdx >= 0 && Array.isArray(CACHED_COUNTS)) ? CACHED_COUNTS[cIdx] : null;
   const sub = c && c.sub ? c.sub : null;
-  const tierLabel = sub
-    ? (({ free: 'Free', growth: 'Growth', pro: 'Pro' })[sub.tier] || sub.tier || 'Free')
+  // Use subscription if available, fall back to settings.tier mirror.
+  const resolvedTier = sub ? sub.tier : (c && c.settingsTier ? c.settingsTier : null);
+  const tierLabel = resolvedTier
+    ? (({ free: 'Free', growth: 'Growth', pro: 'Pro' })[resolvedTier] || resolvedTier)
     : 'Free (no subscription doc)';
+  const tierSource = sub ? '' : (c && c.settingsTier ? ' (from settings mirror — subscription read unavailable)' : '');
   const statusLabel = sub
     ? (({ trialing: 'Trialing', active: 'Active', past_due: 'Past due', grace: 'Grace', suspended: 'Suspended', cancelled: 'Cancelled' })[sub.status] || sub.status || 'Active')
     : '—';
@@ -1002,7 +1033,7 @@ function openTenantModal(idx) {
   document.getElementById('tm-body').innerHTML = [
     modalRow('Store name', escText(t.name || '—')),
     modalRowMono('Slug', '/' + escText(t.id) + '/'),
-    modalRow('Plan', `${escText(tierLabel)} <span class="v sub" style="display:inline; margin-left:6px;">· status: ${escText(statusLabel)}</span>`),
+    modalRow('Plan', `${escText(tierLabel)}${escText(tierSource)} <span class="v sub" style="display:inline; margin-left:6px;">· status: ${escText(statusLabel)}</span>`),
     modalRow('Last confirmed payment', escText(lastConfirmed)),
     modalRow('Owner' + (owners.length > 1 ? 's' : ''), ownerHtml),
     modalRow('Created', t.createdAt ? formatDate(t.createdAt) : '—')
