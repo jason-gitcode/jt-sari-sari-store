@@ -22,19 +22,38 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
-<link rel="apple-touch-icon" href="/newlogo.jpeg" />
+<!-- Tab favicon is added dynamically by the IIFE below — only the seed
+     tenant gets /newlogo.jpeg up front. Non-jsminimart tenants either
+     get their uploaded custom logo (after settings snapshot) or no
+     icon at all, so the browser tab switcher never shows the seed
+     tenant's branding on another tenant's tab. -->
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="dns-prefetch" href="https://www.googleapis.com">
 <script>
   // Sync URL → root class so the jsminimart logo is hidden BEFORE the
-  // header paints on any other tenant. Avoids a "JS Mini Mart" flash
-  // when loading e.g. /ggssminimart/.
+  // header paints on any other tenant. Also gates the apple-touch-icon /
+  // favicon so non-jsminimart tenants don't show the seed tenant's logo
+  // in browser tab switchers. Avoids a "JS Mini Mart" flash when loading
+  // e.g. /ggssminimart/.
   (function () {
     var parts = window.location.pathname.split('/').filter(Boolean);
-    if (parts[0] && parts[0] !== 'jsminimart') {
+    var isSeed = parts[0] === 'jsminimart';
+    if (!isSeed) {
       document.documentElement.classList.add('no-default-logo');
+      return;
     }
+    // Seed tenant: inject the default JS Mini Mart icon links here so
+    // they only ever ship on /jsminimart/ pages.
+    var l1 = document.createElement('link');
+    l1.rel = 'apple-touch-icon';
+    l1.href = '/newlogo.jpeg';
+    document.head.appendChild(l1);
+    var l2 = document.createElement('link');
+    l2.rel = 'icon';
+    l2.type = 'image/jpeg';
+    l2.href = '/newlogo.jpeg';
+    document.head.appendChild(l2);
   })();
 </script>
 <style>
@@ -1435,7 +1454,33 @@ tdoc('settings', 'store').onSnapshot(snap => {
       brandLogoImg.src = '/newlogo.jpeg';
     }
   }
+  // Tab favicon: use the custom logo when uploaded, otherwise the seed
+  // tenant keeps the JS Mini Mart icon and every other tenant gets no
+  // icon (browser falls back to just the title text in tab switchers).
+  setStorefrontFavicon(
+    customLogoOn ? storeSettingsData.logoDataUrl
+      : (TENANT_ID === 'jsminimart' ? '/newlogo.jpeg' : null)
+  );
 });
+
+function setStorefrontFavicon(href) {
+  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"], link[rel="shortcut icon"]')
+    .forEach(l => l.remove());
+  if (!href) return;
+  const mime = href.startsWith('data:image/png') ? 'image/png'
+    : href.startsWith('data:image/') ? 'image/jpeg'
+    : (href.endsWith('.png') || href.endsWith('.PNG')) ? 'image/png'
+    : 'image/jpeg';
+  const apple = document.createElement('link');
+  apple.rel = 'apple-touch-icon';
+  apple.href = href;
+  document.head.appendChild(apple);
+  const icon = document.createElement('link');
+  icon.rel = 'icon';
+  icon.type = mime;
+  icon.href = href;
+  document.head.appendChild(icon);
+}
 
 // Re-evaluate every minute so the ticker flips automatically at 6am / 4pm
 // boundaries even without a Firestore update.
