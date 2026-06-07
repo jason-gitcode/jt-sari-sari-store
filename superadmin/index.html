@@ -693,7 +693,7 @@
       <span>📦 Seed starter pack</span>
     </div>
     <div class="section-card">
-      <div class="desc">Pick <strong>1 product per category</strong> from the seed tenant (<code>jsminimart</code>, image-preferred) and write them to root <code>starter_pack/*</code>. <code>createTenant</code> copies these into every new tenant's catalog. Overwrites any existing pack.</div>
+      <div class="desc">Pick <strong>5 random products from 5 random categories</strong> in the seed tenant (<code>jsminimart</code>, image-preferred) and write them to root <code>starter_pack/*</code>. <code>createTenant</code> copies these into every new tenant's catalog. New tenants then add the rest of their own categories from there. Overwrites any existing pack.</div>
       <button class="btn btn-primary" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed starter pack</button>
       <div class="form-status" id="seed-pack-status"></div>
     </div>
@@ -1556,9 +1556,11 @@ async function savePlatformBilling() {
 // ============================================================
 async function runSeedStarterPack() {
   const SEED_TENANT = 'jsminimart';
+  const TARGET_PRODUCTS = 5;     // 5 products total
+  const TARGET_CATEGORIES = 5;   // sampled from 5 random categories
   const btn = document.getElementById('seed-pack-btn');
   const status = document.getElementById('seed-pack-status');
-  if (!confirm(`Pick 1 product per category from /${SEED_TENANT}/ and write them to /starter_pack/*?\n\nNew tenants will receive these as their starting catalog (image preferred). Overwrites any existing starter pack.`)) return;
+  if (!confirm(`Pick ${TARGET_PRODUCTS} random products (1 each from ${TARGET_CATEGORIES} random categories) in /${SEED_TENANT}/ and write them to /starter_pack/*?\n\nNew tenants will receive these as their starting catalog. Overwrites any existing starter pack.`)) return;
   btn.disabled = true; btn.textContent = 'Seeding…';
   status.className = 'form-status'; status.textContent = 'Reading products…';
   try {
@@ -1574,21 +1576,28 @@ async function runSeedStarterPack() {
         [arr[i], arr[j]] = [arr[j], arr[i]];
       }
     };
+    // Group by category.
     const byCategory = new Map();
     candidates.forEach(p => {
       const cat = p.data.category || 'Uncategorized';
       if (!byCategory.has(cat)) byCategory.set(cat, []);
       byCategory.get(cat).push(p);
     });
+    // Pick TARGET_CATEGORIES random categories (or fewer if seed has less).
+    const allCategories = Array.from(byCategory.keys());
+    shuffle(allCategories);
+    const selectedCategories = allCategories.slice(0, TARGET_CATEGORIES);
+    // Pick 1 random product per selected category (image-preferred).
     const picked = [];
-    for (const [, items] of byCategory) {
+    for (const cat of selectedCategories) {
+      const items = byCategory.get(cat);
       const withImg = items.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0);
       const pool = withImg.length > 0 ? withImg : items;
       shuffle(pool);
       picked.push(pool[0]);
     }
     const pickedWithImages = picked.filter(p => Array.isArray(p.data.images) && p.data.images.length > 0).length;
-    status.textContent = `Picked ${picked.length} product${picked.length === 1 ? '' : 's'} across ${byCategory.size} categor${byCategory.size === 1 ? 'y' : 'ies'} (${pickedWithImages} with photos). Clearing old pack…`;
+    status.textContent = `Picked ${picked.length} product${picked.length === 1 ? '' : 's'} across ${selectedCategories.length} of ${byCategory.size} categor${byCategory.size === 1 ? 'y' : 'ies'} (${pickedWithImages} with photos). Clearing old pack…`;
 
     // Wipe existing
     const existingSnap = await db.collection('starter_pack').get();
