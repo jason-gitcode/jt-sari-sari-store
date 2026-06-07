@@ -1407,14 +1407,29 @@ tdoc('settings', 'store').onSnapshot(snap => {
   if (tagEl)  tagEl.style.visibility  = 'visible';
 
   // Custom logo: when enabled + uploaded, the logo image replaces the
-  // store-name text. The brand image slot already shows on both desktop
-  // and mobile, so swapping its src is enough — we just hide the h1.
+  // store-name text. We have to defeat two things that hide the brand
+  // image slot on non-jsminimart tenants:
+  //   1. CSS rule `html.no-default-logo .logo { display: none !important }`
+  //      added in <head> to prevent the JS Mini Mart logo flash.
+  //   2. boot() inline `style.display = 'none'` on #brand-logo for any
+  //      tenant != jsminimart (legacy single-tenant assumption).
+  // For a custom logo, drop the no-default-logo class and clear the
+  // inline display so the slot renders the uploaded image.
   const customLogoOn = (storeSettingsData.logoEnabled === true) && !!storeSettingsData.logoDataUrl;
-  const brandLogoImg = document.querySelector('#brand-logo img');
-  if (brandLogoImg) {
-    brandLogoImg.src = customLogoOn ? storeSettingsData.logoDataUrl : '/newlogo.jpeg';
+  const brandLogoEl  = document.getElementById('brand-logo');
+  const brandLogoImg = brandLogoEl && brandLogoEl.querySelector('img');
+  if (customLogoOn) {
+    document.documentElement.classList.remove('no-default-logo');
+    if (brandLogoEl) brandLogoEl.style.display = '';
+    if (brandLogoImg) brandLogoImg.src = storeSettingsData.logoDataUrl;
+    if (nameEl) nameEl.style.display = 'none';
+  } else {
+    if (brandLogoImg) brandLogoImg.src = '/newlogo.jpeg';
+    if (nameEl) nameEl.style.display = '';
+    // Leave the no-default-logo class + boot-set inline display:none
+    // alone for non-jsminimart tenants — they keep the text-only header
+    // as before.
   }
-  if (nameEl) nameEl.style.display = customLogoOn ? 'none' : '';
 });
 
 // Re-evaluate every minute so the ticker flips automatically at 6am / 4pm
