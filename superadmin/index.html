@@ -896,13 +896,20 @@ async function loadTenants() {
     // time something fails the cause is visible in DevTools.
     const counts = await Promise.all(tenants.map(async (t) => {
       try {
+        // NOTE: do NOT use collection.count().get() here — the aggregate
+        // count() API isn't exposed on Firestore compat in SDK 10.7.1 and
+        // throws *synchronously* with "count is not a function". That
+        // synchronous throw bypasses .catch() and bubbles up, aborting
+        // the entire Promise.all. snap.size from a normal get() is
+        // version-safe and fine at pilot scale (a few hundred reads per
+        // tenant). Revisit when a tenant crosses ~10K products/orders.
         const [pCount, oCount, subSnap, settingsSnap] = await Promise.all([
-          db.collection('tenants').doc(t.id).collection('products').count().get()
-            .then(r => r.data().count)
-            .catch(e => { console.warn('[loadTenants] products count failed for', t.id, ':', e.message); return null; }),
-          db.collection('tenants').doc(t.id).collection('orders').count().get()
-            .then(r => r.data().count)
-            .catch(e => { console.warn('[loadTenants] orders count failed for', t.id, ':', e.message); return null; }),
+          db.collection('tenants').doc(t.id).collection('products').get()
+            .then(snap => snap.size)
+            .catch(e => { console.warn('[loadTenants] products read failed for', t.id, ':', e.message); return null; }),
+          db.collection('tenants').doc(t.id).collection('orders').get()
+            .then(snap => snap.size)
+            .catch(e => { console.warn('[loadTenants] orders read failed for', t.id, ':', e.message); return null; }),
           db.collection('tenants').doc(t.id).collection('subscription').doc('current').get()
             .catch(e => { console.warn('[loadTenants] subscription read failed for', t.id, ':', e.message); return null; }),
           db.collection('tenants').doc(t.id).collection('settings').doc('store').get()
