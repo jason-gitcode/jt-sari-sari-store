@@ -687,6 +687,36 @@
     .supp-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
     .supp-modal-footer { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); background: var(--surface-2); }
     .supp-modal-footer .supp-status { font-size: 12px; color: var(--muted); margin-right: auto; }
+
+    /* Logo cropper — circular spotlight over the canvas with dark corners
+       indicating the area customers won't see. touch-action:none stops
+       the page from scrolling while the user drags inside the stage. */
+    .logo-crop-stage {
+      position: relative;
+      width: 280px; height: 280px;
+      margin: 0 auto;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #f1f5f9;
+      touch-action: none;
+      user-select: none;
+    }
+    .logo-crop-stage canvas {
+      display: block;
+      width: 280px; height: 280px;
+      cursor: grab;
+    }
+    .logo-crop-stage canvas:active { cursor: grabbing; }
+    .logo-crop-mask {
+      position: absolute;
+      top: 0; left: 0;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-sizing: border-box;
+    }
     .supp-modal-footer .btn-secondary { background: transparent; border: 1px solid var(--line); padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink-soft); }
     .supp-modal-footer .btn-secondary:hover { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
     .supp-modal-footer .btn-primary { background: var(--ink); border: 1px solid var(--ink); color: var(--surface); padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
@@ -3375,6 +3405,33 @@
   </div>
 </div>
 
+<!-- LOGO CROPPER MODAL — drag to reposition + slider/wheel to zoom; circle marks the visible area on the storefront. -->
+<div class="supp-modal-overlay" id="logo-crop-modal" onclick="closeLogoCropperBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 360px;">
+    <div class="supp-modal-header">
+      <h2>Adjust your logo</h2>
+      <button type="button" class="close-btn" onclick="closeLogoCropper()">×</button>
+    </div>
+    <div class="supp-modal-body">
+      <div class="logo-crop-stage" id="logo-crop-stage">
+        <canvas id="logo-crop-canvas" width="280" height="280"></canvas>
+        <div class="logo-crop-mask"></div>
+      </div>
+      <div style="margin-top: 14px;">
+        <label for="logo-zoom-slider" style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px;">Zoom</label>
+        <input type="range" id="logo-zoom-slider" min="0.5" max="3" step="0.01" value="1" style="width: 100%;" />
+      </div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.4;">
+        Drag to reposition. Use the slider (or scroll on desktop) to zoom. The circle shows what your customers will see in the storefront header.
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeLogoCropper()">Cancel</button>
+      <button type="button" class="btn-primary" onclick="applyLogoCrop()">Apply</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT VIEW MODAL (read-only quick look; Edit button hands off to the add/edit modal) -->
 <div class="supp-modal-overlay" id="product-view-modal" onclick="closeProductView(event)">
   <div class="supp-modal" onclick="event.stopPropagation()">
@@ -4374,6 +4431,14 @@ function compressImageToDataUrl(file, maxDim, quality, mime) {
   });
 }
 
+// ----- Logo cropper -----
+// Loads the picked file into an in-memory Image, opens the cropper modal,
+// and lets the tenant drag + zoom to frame their logo inside the circle
+// that the storefront will use. Apply renders to a 280px JPEG/PNG and
+// saves to settings/store.logoDataUrl.
+const LOGO_STAGE = 280;
+const logoCrop = { img: null, srcMime: null, scale: 1, tx: 0, ty: 0, coverScale: 1 };
+
 async function handleLogoUpload(input) {
   const file = input.files && input.files[0];
   if (!file) return;
@@ -4383,23 +4448,156 @@ async function handleLogoUpload(input) {
     return;
   }
   try {
-    // Preserve PNG (and WebP via PNG output) for transparency; JPEG for everything else.
-    const useMime = (file.type === 'image/png' || file.type === 'image/webp') ? 'image/png' : 'image/jpeg';
-    const quality = useMime === 'image/jpeg' ? 0.88 : 1;
-    const dataUrl = await compressImageToDataUrl(file, 240, quality, useMime);
-    if (dataUrl.length > 220000) {
-      alert('That image is too detailed even after resizing. Please try a simpler logo or a JPEG.');
-      input.value = '';
-      return;
-    }
-    await tdoc('settings', 'store').set({ logoDataUrl: dataUrl }, { merge: true });
-    showToast('Logo updated.', 'success');
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('Could not read the file.'));
+      r.readAsDataURL(file);
+    });
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Could not load the image — please try a different file.'));
+      i.src = dataUrl;
+    });
+    logoCrop.img = img;
+    logoCrop.srcMime = (file.type === 'image/png' || file.type === 'image/webp') ? 'image/png' : 'image/jpeg';
+    // Start at "cover" so the image already fills the circle and any
+    // user-driven zoom is on top of that, never revealing background.
+    logoCrop.coverScale = Math.max(LOGO_STAGE / img.width, LOGO_STAGE / img.height);
+    logoCrop.scale = 1;
+    logoCrop.tx = 0;
+    logoCrop.ty = 0;
+    const slider = document.getElementById('logo-zoom-slider');
+    if (slider) slider.value = '1';
+    document.getElementById('logo-crop-modal').classList.add('show');
+    drawLogoCropPreview();
   } catch (err) {
     console.error(err);
-    alert('Failed to upload logo: ' + (err && err.message ? err.message : err));
+    alert('Failed to load image: ' + (err && err.message ? err.message : err));
   }
   input.value = '';
 }
+
+function drawLogoCropPreview() {
+  const canvas = document.getElementById('logo-crop-canvas');
+  if (!canvas || !logoCrop.img) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, LOGO_STAGE, LOGO_STAGE);
+  // Light checkerboard background for transparency preview on PNG sources.
+  if (logoCrop.srcMime === 'image/png') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, LOGO_STAGE, LOGO_STAGE);
+  }
+  const s = logoCrop.coverScale * logoCrop.scale;
+  const w = logoCrop.img.width * s;
+  const h = logoCrop.img.height * s;
+  const x = (LOGO_STAGE - w) / 2 + logoCrop.tx;
+  const y = (LOGO_STAGE - h) / 2 + logoCrop.ty;
+  ctx.drawImage(logoCrop.img, x, y, w, h);
+}
+
+function closeLogoCropper() {
+  document.getElementById('logo-crop-modal').classList.remove('show');
+  logoCrop.img = null;
+}
+function closeLogoCropperBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeLogoCropper();
+}
+
+async function applyLogoCrop() {
+  if (!logoCrop.img) return;
+  const out = document.createElement('canvas');
+  out.width = LOGO_STAGE;
+  out.height = LOGO_STAGE;
+  const ctx = out.getContext('2d');
+  if (logoCrop.srcMime !== 'image/png') {
+    // JPEG can't carry transparency — paint white behind so the corners
+    // (which the storefront circle will mask away anyway) aren't black.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, LOGO_STAGE, LOGO_STAGE);
+  }
+  const s = logoCrop.coverScale * logoCrop.scale;
+  const w = logoCrop.img.width * s;
+  const h = logoCrop.img.height * s;
+  const x = (LOGO_STAGE - w) / 2 + logoCrop.tx;
+  const y = (LOGO_STAGE - h) / 2 + logoCrop.ty;
+  ctx.drawImage(logoCrop.img, x, y, w, h);
+
+  let dataUrl;
+  try {
+    dataUrl = out.toDataURL(logoCrop.srcMime, logoCrop.srcMime === 'image/jpeg' ? 0.88 : 1);
+  } catch (err) {
+    alert('Failed to render logo: ' + (err && err.message ? err.message : err));
+    return;
+  }
+  if (dataUrl.length > 220000) {
+    alert('That image is too detailed even after cropping. Please try a simpler logo or a JPEG.');
+    return;
+  }
+  try {
+    await tdoc('settings', 'store').set({ logoDataUrl: dataUrl }, { merge: true });
+    showToast('Logo updated.', 'success');
+    closeLogoCropper();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to save logo: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// Pointer + wheel + slider wiring. Pointer Events cover mouse and touch
+// uniformly; touch-action:none on the stage prevents page scrolling
+// while the user drags. Slider is the single zoom control for both
+// mobile (no easy pinch in vanilla JS) and desktop.
+(function wireLogoCropEvents() {
+  function init() {
+    const canvas = document.getElementById('logo-crop-canvas');
+    const slider = document.getElementById('logo-zoom-slider');
+    if (!canvas || !slider) return;
+    let dragging = false;
+    let lastX = 0, lastY = 0;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!logoCrop.img) return;
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      logoCrop.tx += e.clientX - lastX;
+      logoCrop.ty += e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      drawLogoCropPreview();
+    });
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (e) => {
+      if (!logoCrop.img) return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      logoCrop.scale = Math.max(0.5, Math.min(3, logoCrop.scale * factor));
+      slider.value = String(logoCrop.scale);
+      drawLogoCropPreview();
+    }, { passive: false });
+    slider.addEventListener('input', (e) => {
+      logoCrop.scale = parseFloat(e.target.value) || 1;
+      drawLogoCropPreview();
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 
 async function removeLogo() {
   if (!confirm('Remove your custom logo? The storefront will go back to showing your store name as text.')) return;
