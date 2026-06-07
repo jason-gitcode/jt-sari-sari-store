@@ -152,7 +152,8 @@ function getInitialSubscription({ tier = 'free' } = {}) {
   const tierConfig = SUBSCRIPTION_TIERS[tier] || SUBSCRIPTION_TIERS.free;
   const now = new Date();
   if (tier === 'free') {
-    // Free tier doesn't trial — it's permanently free.
+    // Free tier doesn't trial — it's permanently free. trialUsedAt stays
+    // null so this tenant can later claim a trial on first paid upgrade.
     return {
       tier: 'free',
       status: 'active',
@@ -160,6 +161,7 @@ function getInitialSubscription({ tier = 'free' } = {}) {
       currentPeriodStart: FieldValue.serverTimestamp(),
       currentPeriodEnd: null, // no renewal needed
       trialEndsAt: null,
+      trialUsedAt: null,
       pastDueSince: null,
       suspendedAt: null,
       cancelledAt: null,
@@ -168,7 +170,8 @@ function getInitialSubscription({ tier = 'free' } = {}) {
       createdAt: FieldValue.serverTimestamp()
     };
   }
-  // Paid tier: 30-day trial.
+  // Paid tier at signup: 30-day trial. trialUsedAt is set immediately —
+  // the one-trial-per-tenant entitlement is consumed by this signup.
   const trialEnd = new Date(now.getTime() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000);
   return {
     tier,
@@ -177,6 +180,7 @@ function getInitialSubscription({ tier = 'free' } = {}) {
     currentPeriodStart: FieldValue.serverTimestamp(),
     currentPeriodEnd: trialEnd, // trial ends here unless first payment lands
     trialEndsAt: trialEnd,
+    trialUsedAt: FieldValue.serverTimestamp(),
     pastDueSince: null,
     suspendedAt: null,
     cancelledAt: null,
@@ -523,6 +527,94 @@ exports.backfillSubscriptions = onCall(async (request) => {
 // so resubmitting the same month overwrites the previous pending doc
 // for that period — prevents duplicate submissions clogging the queue.
 // ============================================================
+// ============================================================
+// startFreeTrial — tenant admin callable. Moves a Free-tier tenant to a
+// paid tier (Growth or Pro) in a `trialing` status for FREE_TRIAL_DAYS,
+// without requiring a payment up front. Each tenant gets exactly ONE
+// free trial across their entire lifetime, tracked by `trialUsedAt` on
+// the subscription doc.
+//
+// Eligibility:
+//   - Tenant is currently on the Free plan (subscription.tier === 'free')
+//   - subscription.trialUsedAt is null (never trialed before)
+//
+// After the trial ends the existing pay flow is what they use to stay
+// on the paid tier — confirmManualPayment transitions trialing → active
+// in the same way it does for signup-direct-to-paid tenants.
+// ============================================================
+exports.startFreeTrial = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const requestedTier = String(data.tier || '').trim();
+
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  if (!SUBSCRIPTION_TIERS[requestedTier] || requestedTier === 'free') {
+    throw new HttpsError('invalid-argument', 'Choose a paid tier (Growth or Pro).');
+  }
+
+  // ---- Ownership check ----
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can start a trial.');
+  }
+
+  // ---- Eligibility + write in one transaction so a double-click can't
+  //      double-start the trial. ----
+  const subRef = tref.collection('subscription').doc('current');
+  const settingsRef = tref.collection('settings').doc('store');
+  const tierConfig = SUBSCRIPTION_TIERS[requestedTier];
+  const now = new Date();
+  const trialEnd = new Date(now.getTime() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+
+  await db.runTransaction(async (tx) => {
+    const subSnap = await tx.get(subRef);
+    const cur = subSnap.exists ? (subSnap.data() || {}) : {};
+    if (cur.tier && cur.tier !== 'free') {
+      throw new HttpsError('failed-precondition',
+        `Your store is already on ${SUBSCRIPTION_TIERS[cur.tier]?.name || cur.tier}. Trials are only available from Free.`);
+    }
+    if (cur.trialUsedAt) {
+      throw new HttpsError('failed-precondition',
+        'You\'ve already used your free trial. Switch plans by paying for the new plan from Billing.');
+    }
+    tx.set(subRef, {
+      tier: requestedTier,
+      status: 'trialing',
+      amount: tierConfig.amount,
+      currentPeriodStart: FieldValue.serverTimestamp(),
+      currentPeriodEnd: trialEnd,
+      trialEndsAt: trialEnd,
+      trialUsedAt: FieldValue.serverTimestamp(),
+      pastDueSince: null,
+      suspendedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      paymentMethod: 'manual_gcash'
+    }, { merge: true });
+    // Mirror tier to settings/store so storefront branding (Powered by
+    // footer, product cap pill) flips immediately without waiting for
+    // confirmManualPayment.
+    tx.set(settingsRef, { tier: requestedTier }, { merge: true });
+  });
+
+  return {
+    ok: true,
+    tier: requestedTier,
+    tierName: tierConfig.name,
+    trialEndsAt: trialEnd.toISOString()
+  };
+});
+
 exports.submitManualPayment = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
   const token = request.auth.token || {};
@@ -775,6 +867,11 @@ exports.confirmManualPayment = onCall(async (request) => {
     }
     const newEnd = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+    // Paying directly (without taking the free trial first) consumes the
+    // trial entitlement — we only ever grant one trial per tenant.
+    // trialUsedAt is preserved if already set (e.g. they're paying after
+    // their trial), otherwise set now.
+    const trialUsedAt = (sub && sub.trialUsedAt) ? sub.trialUsedAt : FieldValue.serverTimestamp();
     tx.set(sref, {
       tier,
       status: 'active',
@@ -782,6 +879,7 @@ exports.confirmManualPayment = onCall(async (request) => {
       currentPeriodStart: ssnap.exists && sub.currentPeriodEnd ? sub.currentPeriodEnd : FieldValue.serverTimestamp(),
       currentPeriodEnd: newEnd,
       trialEndsAt: null,
+      trialUsedAt,
       pastDueSince: null,
       suspendedAt: null,
       cancelledAt: null,

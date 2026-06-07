@@ -3926,6 +3926,10 @@ function renderBillingTab() {
 
   // ---- Tier comparison ----
   const currentTier = (subscriptionData && subscriptionData.tier) || 'free';
+  // Trial eligibility — Free + never trialed before. trialUsedAt is a
+  // Firestore Timestamp once set; undefined / null on legacy tenants
+  // until they trigger a startFreeTrial / confirmManualPayment path.
+  const trialEligible = currentTier === 'free' && !(subscriptionData && subscriptionData.trialUsedAt);
   const tierOrder = ['free', 'growth', 'pro'];
   grid.innerHTML = tierOrder.map(t => {
     const info = TIER_INFO[t];
@@ -3933,9 +3937,22 @@ function renderBillingTab() {
     const priceLine = info.amount === 0
       ? `₱0<span> /mo</span>`
       : `${fmtPHP(info.amount)}<span> /mo</span>`;
-    const ctaText = isCurrent ? 'Current plan' : (t === 'free' ? 'Downgrade' : 'Choose this plan');
+    let ctaText, ctaAction, trialBadge = '';
+    if (isCurrent) {
+      ctaText = 'Current plan';
+      ctaAction = '';
+    } else if (t === 'free') {
+      ctaText = 'Downgrade';
+      ctaAction = `onclick="requestTierChange('${t}')"`;
+    } else if (trialEligible) {
+      ctaText = 'Start 30-day free trial';
+      ctaAction = `onclick="startTenantTrial('${t}')"`;
+      trialBadge = `<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:6px;text-align:center;">No charge for 30 days · Cancel anytime</div>`;
+    } else {
+      ctaText = 'Choose this plan';
+      ctaAction = `onclick="requestTierChange('${t}')"`;
+    }
     const ctaClass = isCurrent ? 'billing-tier-card-cta current' : 'billing-tier-card-cta';
-    const ctaAction = isCurrent ? '' : `onclick="requestTierChange('${t}')"`;
     return `
       <div class="billing-tier-card${isCurrent ? ' current' : ''}">
         <div class="billing-tier-card-name">${info.name}</div>
@@ -3944,9 +3961,34 @@ function renderBillingTab() {
           ${info.features.map(f => `<li>${f}</li>`).join('')}
         </ul>
         <button class="${ctaClass}" ${ctaAction} ${isCurrent ? 'disabled' : ''}>${ctaText}</button>
+        ${trialBadge}
       </div>
     `;
   }).join('');
+}
+
+// Free → Growth/Pro via the trial path (no payment up front). Backend
+// enforces "one trial per tenant" via subscription.trialUsedAt.
+async function startTenantTrial(tier) {
+  const info = TIER_INFO[tier];
+  if (!info) return;
+  const confirmMsg = `Start your 30-day free trial of ${info.name}?\n\n`
+    + `You'll get all ${info.name} features (${info.productCap.toLocaleString()} products and more) free for 30 days. `
+    + `No payment is required until your trial ends.\n\n`
+    + `Each store gets one free trial — once you switch up from Free, this option is gone.`;
+  if (!confirm(confirmMsg)) return;
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('startFreeTrial');
+    const result = await fn({ tid: TENANT_ID, tier });
+    const r = result && result.data;
+    showToast(`Trial started — enjoy ${r && r.tierName ? r.tierName : info.name} for 30 days.`, 'success');
+    // Billing tab + plan cards refresh automatically via the
+    // subscription/current snapshot listener.
+  } catch (err) {
+    console.error('startFreeTrial failed:', err);
+    const msg = (err && err.message) ? err.message : 'Could not start the trial.';
+    alert('Failed to start trial: ' + msg);
+  }
 }
 
 function renderBillingHistory() {
