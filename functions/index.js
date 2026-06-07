@@ -666,6 +666,70 @@ exports.listPendingPayments = onCall(async (request) => {
 });
 
 // ============================================================
+// listPaymentsAll — superadmin-only. Returns recent payments across
+// all tenants (or filtered to one tenant), sorted by submittedAt desc.
+// Used by the Transaction history table in /superadmin/.
+//
+// Iterates each tenant's payments subcollection then merges — avoids
+// the collectionGroup composite index dance for this single-field
+// orderBy. Fine at pilot scale (3 tenants × ~30 payments each = 90
+// reads). Revisit at 100+ paying tenants.
+// ============================================================
+exports.listPaymentsAll = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const tidFilter = data.tid ? String(data.tid).trim() : null;
+  const statusFilter = data.status ? String(data.status).trim() : null;
+  const limit = Math.min(500, Math.max(1, parseInt(data.limit) || 200));
+
+  // Build the tenant set to scan.
+  let tenantDocs;
+  if (tidFilter) {
+    const single = await db.collection('tenants').doc(tidFilter).get();
+    tenantDocs = single.exists ? [single] : [];
+  } else {
+    const all = await db.collection('tenants').get();
+    tenantDocs = all.docs;
+  }
+
+  const allPayments = [];
+  for (const tDoc of tenantDocs) {
+    const tName = (tDoc.data() || {}).name || tDoc.id;
+    let q = tDoc.ref.collection('payments').orderBy('submittedAt', 'desc');
+    if (statusFilter) q = q.where('status', '==', statusFilter);
+    const psnap = await q.limit(50).get();
+    psnap.docs.forEach(d => {
+      const v = d.data() || {};
+      allPayments.push({
+        tid: tDoc.id,
+        tenantName: tName,
+        paymentId: d.id,
+        referenceCode: v.referenceCode || d.id,
+        tier: v.tier,
+        amount: v.amount,
+        period: v.period,
+        status: v.status,
+        submittedAt: v.submittedAt ? v.submittedAt.toMillis() : null,
+        submittedBy: v.submittedBy || null,
+        confirmedAt: v.confirmedAt ? v.confirmedAt.toMillis() : null,
+        confirmedBy: v.confirmedBy || null,
+        rejectedAt: v.rejectedAt ? v.rejectedAt.toMillis() : null,
+        rejectedReason: v.rejectedReason || null,
+        receiptDataUrl: v.receiptDataUrl || null,
+        receiptName: v.receiptName || null,
+        senderNote: v.senderNote || null
+      });
+    });
+  }
+  allPayments.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+  return { payments: allPayments.slice(0, limit), total: allPayments.length };
+});
+
+// ============================================================
 // confirmManualPayment — superadmin-only. Marks a payment confirmed +
 // extends the tenant's subscription by 30 days, switches tier if needed,
 // clears any past_due / grace / suspended state.

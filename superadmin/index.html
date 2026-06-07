@@ -578,8 +578,8 @@
       <table id="tenants-table">
         <thead>
           <tr>
-            <th class="mobile-hide">Slug</th>
             <th>Name</th>
+            <th class="mobile-hide">Slug</th>
             <th>Plan</th>
             <th class="mobile-hide">Owner</th>
             <th class="mobile-hide">Created</th>
@@ -605,6 +605,52 @@
       <div class="desc">Tenants who submitted manual GCash / Maya payments awaiting your verification. Cross-check each against your real wallet transaction log using the reference code.</div>
       <div id="pending-payments-list">
         <div class="pending-empty">Click Refresh to load pending payments.</div>
+      </div>
+    </div>
+
+    <!-- ===== TRANSACTION HISTORY ===== -->
+    <div class="section-title" style="margin-top:32px;">
+      <span>📊 Transaction history</span>
+      <div class="actions">
+        <button class="btn btn-icon" onclick="loadTransactionHistory()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="desc">All subscription payments across every tenant, sorted by most recent first. Filter by tenant to view per-store history.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; align-items:flex-end;">
+        <div style="flex: 1; min-width: 180px;">
+          <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;">Tenant</label>
+          <select id="tx-filter-tenant" onchange="loadTransactionHistory()" style="width:100%; padding: 7px 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-size: 13px;">
+            <option value="">All tenants</option>
+          </select>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+          <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;">Status</label>
+          <select id="tx-filter-status" onchange="loadTransactionHistory()" style="width:100%; padding: 7px 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-size: 13px;">
+            <option value="">All statuses</option>
+            <option value="pending_verification">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="tx-table-wrap">
+        <table id="tx-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="mobile-hide">Tenant</th>
+              <th>Plan</th>
+              <th class="numeric">Amount</th>
+              <th>Status</th>
+              <th class="mobile-hide">Reference</th>
+              <th>Receipt</th>
+            </tr>
+          </thead>
+          <tbody id="tx-tbody">
+            <tr><td colspan="7" class="loading">Click Refresh to load.</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -757,6 +803,7 @@ const generateInviteCodeFn   = functions.httpsCallable('generateInviteCode');
 const listInviteCodesFn      = functions.httpsCallable('listInviteCodes');
 const revokeInviteCodeFn     = functions.httpsCallable('revokeInviteCode');
 const listPendingPaymentsFn  = functions.httpsCallable('listPendingPayments');
+const listPaymentsAllFn      = functions.httpsCallable('listPaymentsAll');
 const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
 const rejectManualPaymentFn  = functions.httpsCallable('rejectManualPayment');
 
@@ -822,6 +869,7 @@ function shortEmail(e) {
 }
 
 let CACHED_TENANTS = [];
+let CACHED_COUNTS = [];
 
 async function loadTenants() {
   const tbody = document.getElementById('tenants-tbody');
@@ -847,6 +895,7 @@ async function loadTenants() {
       } catch { return { products: null, orders: null, sub: null }; }
     }));
 
+    CACHED_COUNTS = counts;
     renderStats(tenants, counts);
     renderTable(tenants, counts);
   } catch (err) {
@@ -900,8 +949,8 @@ function renderTable(tenants, counts) {
     const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
     return `
       <tr>
-        <td class="slug mobile-hide">${t.id}</td>
         <td class="name"><button class="row-open-btn" onclick="openTenantModal(${i})" title="${escText(t.name || t.id)}">${escText(t.name || '—')}</button></td>
+        <td class="slug mobile-hide">${t.id}</td>
         <td class="plan"><span class="pill ${pillClass}">${pillLabel}</span></td>
         <td class="owner mobile-hide" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
         <td class="created mobile-hide">${formatDate(t.createdAt)}</td>
@@ -933,11 +982,28 @@ function openTenantModal(idx) {
   if (!t) return;
   const owners = Array.isArray(t.ownerEmails) ? t.ownerEmails : [];
   const ownerHtml = owners.length === 0 ? '—' : owners.map(e => escText(e)).join('<br>');
+  // Pull the cached subscription from the parallel counts array so we can
+  // surface the real tier/status the same way the Plan pill in the table
+  // does — useful diagnostic when the table looks out of date.
+  const cIdx = (typeof idx === 'number') ? idx : -1;
+  const c = (cIdx >= 0 && Array.isArray(CACHED_COUNTS)) ? CACHED_COUNTS[cIdx] : null;
+  const sub = c && c.sub ? c.sub : null;
+  const tierLabel = sub
+    ? (({ free: 'Free', growth: 'Growth', pro: 'Pro' })[sub.tier] || sub.tier || 'Free')
+    : 'Free (no subscription doc)';
+  const statusLabel = sub
+    ? (({ trialing: 'Trialing', active: 'Active', past_due: 'Past due', grace: 'Grace', suspended: 'Suspended', cancelled: 'Cancelled' })[sub.status] || sub.status || 'Active')
+    : '—';
+  const lastConfirmed = (sub && sub.lastConfirmedAt)
+    ? (sub.lastConfirmedAt.toDate ? formatDate(sub.lastConfirmedAt) : formatDate(new Date(sub.lastConfirmedAt)))
+    : '—';
 
   document.getElementById('tm-title').textContent = t.name || t.id;
   document.getElementById('tm-body').innerHTML = [
     modalRow('Store name', escText(t.name || '—')),
     modalRowMono('Slug', '/' + escText(t.id) + '/'),
+    modalRow('Plan', `${escText(tierLabel)} <span class="v sub" style="display:inline; margin-left:6px;">· status: ${escText(statusLabel)}</span>`),
+    modalRow('Last confirmed payment', escText(lastConfirmed)),
     modalRow('Owner' + (owners.length > 1 ? 's' : ''), ownerHtml),
     modalRow('Created', t.createdAt ? formatDate(t.createdAt) : '—')
   ].join('');
@@ -1075,7 +1141,87 @@ auth.onAuthStateChanged(user => {
   loadInviteCodes();
   loadPendingPayments();
   subscribePlatformBilling();
+  // Populate the tx history tenant filter when tenants finish loading.
+  setTimeout(populateTxTenantFilter, 800);
+  // Auto-load the tx history table on first sign-in.
+  loadTransactionHistory();
 });
+
+// ============================================================
+// TRANSACTION HISTORY (all + per-tenant)
+// ============================================================
+let __lastTxHistory = [];
+
+function populateTxTenantFilter() {
+  const sel = document.getElementById('tx-filter-tenant');
+  if (!sel) return;
+  if (!CACHED_TENANTS || CACHED_TENANTS.length === 0) {
+    setTimeout(populateTxTenantFilter, 800);
+    return;
+  }
+  const current = sel.value;
+  const options = ['<option value="">All tenants</option>'].concat(
+    CACHED_TENANTS.map(t => `<option value="${escTextSA(t.id)}">${escTextSA(t.name || t.id)}</option>`)
+  );
+  sel.innerHTML = options.join('');
+  sel.value = current;
+}
+
+async function loadTransactionHistory() {
+  const tbody = document.getElementById('tx-tbody');
+  if (!tbody) return;
+  populateTxTenantFilter();
+  const tid = (document.getElementById('tx-filter-tenant').value || '').trim();
+  const status = (document.getElementById('tx-filter-status').value || '').trim();
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading transactions…</td></tr>';
+  try {
+    const { data } = await listPaymentsAllFn({ tid: tid || null, status: status || null, limit: 200 });
+    __lastTxHistory = (data && data.payments) || [];
+    renderTransactionHistory();
+  } catch (err) {
+    console.error('listPaymentsAll failed:', err);
+    tbody.innerHTML = `<tr><td colspan="7" class="loading" style="color:#fca5a5;">❌ ${escTextSA(err.message || err)}</td></tr>`;
+  }
+}
+
+function renderTransactionHistory() {
+  const tbody = document.getElementById('tx-tbody');
+  if (!tbody) return;
+  if (__lastTxHistory.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No transactions match the current filter.</td></tr>';
+    return;
+  }
+  const fmtDt = ms => ms ? new Date(ms).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  const fmtTier = t => ({ growth: 'Growth', pro: 'Pro' }[t] || t || '—');
+  const statusPill = s => {
+    const map = {
+      pending_verification: { label: 'Pending',   color: '#0369a1', bg: 'rgba(3,105,161,0.12)' },
+      confirmed:            { label: 'Confirmed', color: '#16a34a', bg: 'rgba(22,163,74,0.12)' },
+      rejected:             { label: 'Rejected',  color: '#dc2626', bg: 'rgba(220,38,38,0.12)' }
+    };
+    const info = map[s] || { label: s, color: 'var(--muted)', bg: 'var(--surface-2)' };
+    return `<span style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; background:${info.bg}; color:${info.color};">${info.label}</span>`;
+  };
+  tbody.innerHTML = __lastTxHistory.map((p, i) => `
+    <tr>
+      <td>${escTextSA(fmtDt(p.submittedAt))}</td>
+      <td class="mobile-hide">${escTextSA(p.tenantName || p.tid)}<br><span style="color:var(--muted);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">/${escTextSA(p.tid)}/</span></td>
+      <td>${escTextSA(fmtTier(p.tier))}</td>
+      <td class="numeric">₱${p.amount}</td>
+      <td>${statusPill(p.status)}</td>
+      <td class="mobile-hide" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;">${escTextSA(p.referenceCode)}</td>
+      <td>${p.receiptDataUrl ? `<button type="button" class="btn btn-icon" onclick="viewTxReceipt(${i})">🖼️ View</button>` : '<span style="color:var(--muted);">—</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function viewTxReceipt(idx) {
+  const p = __lastTxHistory[idx];
+  if (!p || !p.receiptDataUrl) return;
+  const img = document.getElementById('receipt-modal-img');
+  if (img) img.src = p.receiptDataUrl;
+  document.getElementById('receipt-modal').classList.add('show');
+}
 
 // ============================================================
 // INVITE CODES
