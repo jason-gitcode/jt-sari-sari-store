@@ -3405,6 +3405,42 @@
   </div>
 </div>
 
+<!-- TRIAL CONFIRM MODAL — replaces the native confirm() so the "Start free trial" flow stays visually consistent with the rest of admin. -->
+<div class="supp-modal-overlay" id="trial-confirm-modal" onclick="closeTrialConfirmBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 460px;">
+    <div class="supp-modal-header">
+      <h2 id="trial-confirm-title">Start your free trial</h2>
+      <button type="button" class="close-btn" onclick="closeTrialConfirmModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 24px;">
+      <div style="font-size: 14px; color: var(--muted); line-height: 1.55; margin-bottom: 18px;">
+        You're about to switch from PabiliMart Free to <strong id="trial-confirm-tier" style="color: var(--ink);">—</strong> for 30 days, free.
+      </div>
+      <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px;">What you get</div>
+        <ul id="trial-confirm-features" style="list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.7; color: var(--ink);"></ul>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px; margin-bottom: 18px;">
+        <div>
+          <div style="color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Trial ends</div>
+          <div id="trial-confirm-ends" style="color: var(--ink); font-weight: 600;">—</div>
+        </div>
+        <div>
+          <div style="color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Then</div>
+          <div id="trial-confirm-rate" style="color: var(--ink); font-weight: 600;">—</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--muted); line-height: 1.5; padding-top: 14px; border-top: 1px dashed var(--line);">
+        💡 Each store gets one free trial. Once it ends or you switch to paid, this option is gone.
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeTrialConfirmModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="trial-confirm-go-btn" onclick="confirmStartTrial()">Start free trial</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOGO CROPPER MODAL — drag to reposition + slider/wheel to zoom; circle marks the visible area on the storefront. -->
 <div class="supp-modal-overlay" id="logo-crop-modal" onclick="closeLogoCropperBackdrop(event)">
   <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 360px;">
@@ -3969,24 +4005,56 @@ function renderBillingTab() {
 
 // Free → Growth/Pro via the trial path (no payment up front). Backend
 // enforces "one trial per tenant" via subscription.trialUsedAt.
-async function startTenantTrial(tier) {
+let pendingTrialTier = null;
+
+function startTenantTrial(tier) {
   const info = TIER_INFO[tier];
   if (!info) return;
-  const confirmMsg = `Start your 30-day free trial of ${info.name}?\n\n`
-    + `You'll get all ${info.name} features (${info.productCap.toLocaleString()} products and more) free for 30 days. `
-    + `No payment is required until your trial ends.\n\n`
-    + `Each store gets one free trial — once you switch up from Free, this option is gone.`;
-  if (!confirm(confirmMsg)) return;
+  pendingTrialTier = tier;
+  document.getElementById('trial-confirm-title').textContent = `Start your 30-day free trial`;
+  document.getElementById('trial-confirm-tier').textContent = info.name;
+  // Mirror the same feature list shown on the plan card, including any
+  // inline <em> tags — TIER_INFO.features is HTML-safe by construction.
+  document.getElementById('trial-confirm-features').innerHTML =
+    info.features.map(f => `<li style="position: relative; padding-left: 22px;"><span style="position: absolute; left: 0; color: #16a34a; font-weight: 700;">✓</span> ${f}</li>`).join('');
+  const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  document.getElementById('trial-confirm-ends').textContent =
+    trialEnd.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  document.getElementById('trial-confirm-rate').textContent = `${fmtPHP(info.amount)} / month`;
+  document.getElementById('trial-confirm-go-btn').disabled = false;
+  document.getElementById('trial-confirm-go-btn').textContent = 'Start free trial';
+  document.getElementById('trial-confirm-modal').classList.add('show');
+}
+
+function closeTrialConfirmModal() {
+  document.getElementById('trial-confirm-modal').classList.remove('show');
+  pendingTrialTier = null;
+}
+function closeTrialConfirmBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeTrialConfirmModal();
+}
+
+async function confirmStartTrial() {
+  if (!pendingTrialTier) return;
+  const tier = pendingTrialTier;
+  const info = TIER_INFO[tier];
+  const btn = document.getElementById('trial-confirm-go-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
   try {
     const fn = firebase.app().functions('asia-southeast1').httpsCallable('startFreeTrial');
     const result = await fn({ tid: TENANT_ID, tier });
     const r = result && result.data;
+    closeTrialConfirmModal();
     showToast(`Trial started — enjoy ${r && r.tierName ? r.tierName : info.name} for 30 days.`, 'success');
     // Billing tab + plan cards refresh automatically via the
     // subscription/current snapshot listener.
   } catch (err) {
     console.error('startFreeTrial failed:', err);
     const msg = (err && err.message) ? err.message : 'Could not start the trial.';
+    btn.disabled = false;
+    btn.textContent = 'Start free trial';
     alert('Failed to start trial: ' + msg);
   }
 }
