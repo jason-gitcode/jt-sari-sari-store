@@ -400,6 +400,40 @@
   }
   .modal input:focus { outline: none; border-color: var(--accent); }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  /* Tenant-detail modal actions: equal-width grid so all 4 buttons fit
+     on one row with consistent sizing. Drops to 2×2 on narrow screens. */
+  .tm-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .tm-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 9px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+  @media (max-width: 520px) {
+    .tm-actions { grid-template-columns: repeat(2, 1fr); }
+  }
+  /* Rename inline-edit reuses the same container — switch to flex so
+     the input can flex-grow alongside Save/Cancel buttons. */
+  .tm-actions.tm-actions--editing {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .tm-actions.tm-actions--editing .btn { width: auto; flex: 0 0 auto; }
+  .tm-actions.tm-actions--editing #rename-input { flex: 1 1 auto; min-width: 0; }
   .modal-status { font-size: 12px; color: var(--muted); margin-top: 12px; min-height: 16px; }
   .modal-status.success { color: var(--success); }
   .modal-status.error { color: var(--error); }
@@ -835,7 +869,7 @@
     <button type="button" class="modal-x-close" onclick="closeTenantModal()" aria-label="Close">×</button>
     <h3 id="tm-title">Tenant details</h3>
     <div id="tm-body" class="modal-detail-list"></div>
-    <div class="modal-actions" id="tm-actions" style="flex-wrap:wrap; gap:8px; justify-content:flex-end;"></div>
+    <div class="tm-actions" id="tm-actions"></div>
   </div>
 </div>
 
@@ -1258,9 +1292,12 @@ function openTenantModal(idx) {
     modalRow('Created', t.createdAt ? formatDate(t.createdAt) : '—')
   ].join('');
 
-  document.getElementById('tm-actions').innerHTML = `
-    <a class="btn" href="/${t.id}/" target="_blank" rel="noopener" style="text-decoration:none;">🌐 Storefront</a>
-    <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener" style="text-decoration:none;">⚙️ Admin</a>
+  const tmActions = document.getElementById('tm-actions');
+  // Drop the editing-mode flex layout — re-render is the action-grid.
+  tmActions.classList.remove('tm-actions--editing');
+  tmActions.innerHTML = `
+    <a class="btn" href="/${t.id}/" target="_blank" rel="noopener">🌐 Storefront</a>
+    <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener">⚙️ Admin</a>
     <button type="button" class="btn" onclick="renameTenantStart()">✏️ Rename</button>
     <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete</button>
   `;
@@ -1293,9 +1330,12 @@ function renameTenantStart() {
   const t = CACHED_TENANTS && CACHED_TENANTS[CURRENT_TENANT_IDX];
   if (!t) return;
   const actions = document.getElementById('tm-actions');
+  // Swap to flex layout for the input + Save/Cancel row (default
+  // tm-actions is a 4-column grid, which would crush the input).
+  actions.classList.add('tm-actions--editing');
   actions.innerHTML = `
     <input type="text" id="rename-input" maxlength="100"
-      style="flex:1; min-width:0; padding:8px 12px; border:1px solid var(--line); border-radius:6px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--ink);" />
+      style="padding:8px 12px; border:1px solid var(--line); border-radius:6px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--ink);" />
     <button type="button" class="btn btn-primary" id="rename-save-btn" onclick="renameTenantSave()">Save</button>
     <button type="button" class="btn" onclick="renameTenantCancel()">Cancel</button>
   `;
