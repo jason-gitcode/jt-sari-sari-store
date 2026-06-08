@@ -1152,9 +1152,9 @@
       </p>
       <p id="success-seeded" style="font-size: 13px; color: var(--muted); margin-bottom: 16px;"></p>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Storefront (share this with customers):</p>
-      <a id="success-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 14px;">—</a>
+      <div id="success-url" class="slug-preview" style="display: block; margin-bottom: 14px; user-select: all;">—</div>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Admin (manage your products + orders):</p>
-      <a id="success-admin-url" href="#" target="_blank" class="slug-preview" style="display: block; text-decoration: none; margin-bottom: 20px;">—</a>
+      <div id="success-admin-url" class="slug-preview" style="display: block; margin-bottom: 20px; user-select: all;">—</div>
       <a id="open-admin-btn" href="#" class="btn btn-primary" style="text-decoration: none;">Open my admin →</a>
     </div>
   </div>
@@ -1448,6 +1448,15 @@ function showStep(id) {
   ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
+  // After a long form, the form's submit button sits far below the page's
+  // signup section start. When it collapses into the much shorter success
+  // (or already-owner) state, the user is left scrolled past it — onto
+  // the FAQ section — and never sees the admin link. Snap back to the
+  // signup section any time the visible step changes.
+  const sect = document.getElementById('signup');
+  if (sect && typeof sect.scrollIntoView === 'function') {
+    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 document.getElementById('signin-btn').addEventListener('click', async () => {
@@ -1490,12 +1499,10 @@ async function submitForm(e) {
         ? `Pre-loaded with ${r.starterPackCopied} starter products — you can edit, hide, or add more in the admin.`
         : 'Your store starts with an empty catalog. Add products from the admin.';
     }
-    const storeLink = document.getElementById('success-url');
-    storeLink.href = r.url;
-    storeLink.textContent = r.url;
-    const adminLink = document.getElementById('success-admin-url');
-    adminLink.href = r.adminUrl;
-    adminLink.textContent = r.adminUrl;
+    // URLs are display-only text so tenants can read / copy them but the
+    // single "Open my admin" button is the only path to actually navigate.
+    document.getElementById('success-url').textContent = r.url;
+    document.getElementById('success-admin-url').textContent = r.adminUrl;
     document.getElementById('open-admin-btn').href = r.adminUrl;
     showStep('step-success');
   } catch (err) {

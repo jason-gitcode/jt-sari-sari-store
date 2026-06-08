@@ -548,8 +548,53 @@
     .storefront-btn:active { transform: translate(-50%, -50%) scale(0.97); }
     .storefront-btn svg { flex-shrink: 0; }
     @media (max-width: 700px) {
-      .storefront-btn span { display: none; }
-      .storefront-btn { padding: 8px 12px; }
+      .storefront-btn { padding: 7px 12px; font-size: 12px; gap: 6px; }
+    }
+
+    /* Home dashboard storefront card — always-visible URL + Visit button. */
+    .dash-storefront-card {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px; margin-bottom: 18px;
+      background: linear-gradient(90deg, rgba(22,163,74,0.08), rgba(37,99,235,0.06));
+      border: 1px solid rgba(22,163,74,0.20);
+      border-radius: 10px;
+      flex-wrap: wrap;
+    }
+    .dash-sf-info { flex: 1; min-width: 0; }
+    .dash-sf-label {
+      font-size: 11px; font-weight: 700; color: var(--ok, #16a34a);
+      letter-spacing: 0.06em; text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .dash-sf-url {
+      font-size: 14px; font-weight: 600; color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      word-break: break-all; user-select: all;
+    }
+    .dash-sf-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .dash-sf-copy, .dash-sf-visit {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      text-decoration: none; cursor: pointer;
+      font-family: inherit;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .dash-sf-copy {
+      background: var(--surface); color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .dash-sf-copy:hover { background: var(--surface-2); }
+    .dash-sf-copy.copied { color: var(--ok, #16a34a); border-color: rgba(22,163,74,0.40); }
+    .dash-sf-visit {
+      background: var(--ok, #16a34a); color: #fff;
+      border: 1px solid var(--ok, #16a34a);
+    }
+    .dash-sf-visit:hover { background: #15803d; border-color: #15803d; color: #fff; }
+    @media (max-width: 600px) {
+      .dash-storefront-card { padding: 12px 14px; gap: 12px; }
+      .dash-sf-actions { width: 100%; }
+      .dash-sf-copy, .dash-sf-visit { flex: 1; justify-content: center; padding: 8px 10px; }
     }
     .icon-btn {
       width: 36px; height: 36px;
@@ -2474,6 +2519,26 @@
         </div>
       </div>
 
+      <!-- Storefront access card — the shareable URL + a Visit button so the
+           owner always has a one-tap path to view (and copy/share) their
+           public storefront from the main dashboard. -->
+      <div class="dash-storefront-card">
+        <div class="dash-sf-info">
+          <div class="dash-sf-label">Your storefront</div>
+          <div class="dash-sf-url" id="dash-storefront-url">—</div>
+        </div>
+        <div class="dash-sf-actions">
+          <button type="button" class="dash-sf-copy" id="dash-storefront-copy" onclick="copyStorefrontUrl()" title="Copy storefront link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span>Copy</span>
+          </button>
+          <a class="dash-sf-visit" id="dash-storefront-visit" target="_blank" rel="noopener" href="#">
+            <span>Visit store</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M7 17 17 7"></path><path d="M7 7h10v10"></path></svg>
+          </a>
+        </div>
+      </div>
+
       <div class="dash-filter-bar">
         <button class="dash-preset-btn active" data-preset="today"     onclick="setDashPreset('today')">Today</button>
         <button class="dash-preset-btn" data-preset="yesterday" onclick="setDashPreset('yesterday')">Yesterday</button>
@@ -3631,6 +3696,39 @@ function tcol(name) {
   return db.collection('tenants').doc(TENANT_ID).collection(name);
 }
 function tdoc(name, id) { return tcol(name).doc(id); }
+// Copy the dashboard storefront URL to the clipboard + flash the button
+// label so the owner gets immediate feedback. Fallback uses execCommand
+// for older browsers that don't expose navigator.clipboard.
+function copyStorefrontUrl() {
+  const urlEl = document.getElementById('dash-storefront-url');
+  const btn   = document.getElementById('dash-storefront-copy');
+  if (!urlEl || !btn) return;
+  const url = 'https://' + urlEl.textContent.replace(/^https?:\/\//, '');
+  const flash = () => {
+    btn.classList.add('copied');
+    const label = btn.querySelector('span');
+    const original = label ? label.textContent : 'Copy';
+    if (label) label.textContent = 'Copied';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      if (label) label.textContent = original;
+    }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(flash).catch(() => {
+      showToast('Could not copy. Long-press the URL to select instead.', 'error');
+    });
+  } else {
+    // Legacy fallback
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); flash(); }
+    catch (_) { showToast('Could not copy.', 'error'); }
+    document.body.removeChild(ta);
+  }
+}
+
 function tenantUrl(suffix) {
   const s = suffix.startsWith('/') ? suffix.slice(1) : suffix;
   return '/' + (TENANT_ID || 'jsminimart') + '/' + s;
@@ -5710,9 +5808,21 @@ function showLogin() {
 function showAdmin() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'flex';
-  // Point the Storefront button at this tenant's storefront URL.
+  // Point both the header Storefront button AND the dashboard Visit-store
+  // card at this tenant's storefront URL. The card always shows the URL
+  // text so owners have an obvious, copy-friendly link without needing
+  // to know the small house icon up top is the storefront.
   const sfLink = document.getElementById('storefront-link');
-  if (sfLink && TENANT_ID) sfLink.href = tenantUrl('');
+  const sfHref = TENANT_ID ? tenantUrl('') : '#';
+  if (sfLink && TENANT_ID) sfLink.href = sfHref;
+  const dashSfUrl = document.getElementById('dash-storefront-url');
+  if (dashSfUrl) {
+    // Strip the protocol from the display string — looks cleaner and the
+    // anchor still has the full URL on its href.
+    dashSfUrl.textContent = sfHref.replace(/^https?:\/\//, '');
+  }
+  const dashSfVisit = document.getElementById('dash-storefront-visit');
+  if (dashSfVisit) dashSfVisit.href = sfHref;
   subscribeToProducts();
   subscribeToOrders();
   subscribeToSuppliers();
