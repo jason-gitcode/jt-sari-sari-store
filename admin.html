@@ -3764,8 +3764,15 @@ function tdoc(name, id) { return tcol(name).doc(id); }
 //   - The user releases past PTR_THRESHOLD
 // The pull amount is rubber-banded (dy * 0.5) so it feels responsive
 // without flying off the screen.
-const PTR_THRESHOLD = 70;
-const PTR_MAX_PULL  = 110;
+// Dialed back from threshold:70/damp:0.5 after Jason flagged the PTR as
+// over-eager — small overscroll attempts at the top of a tab were
+// triggering it. Higher threshold + stiffer dampening + a small dead
+// zone before the indicator activates means a deliberate sustained
+// pull is needed (~275px of raw finger travel) instead of a casual one.
+const PTR_THRESHOLD = 100;
+const PTR_MAX_PULL  = 150;
+const PTR_DEAD_ZONE = 14;
+const PTR_DAMP      = 0.38;
 let ptrStartY = null;
 let ptrActive = false;
 let ptrLastDelta = 0;
@@ -3869,12 +3876,21 @@ function registerPullToRefresh() {
   document.addEventListener('touchmove', (e) => {
     if (!ptrActive || ptrStartY == null) return;
     const dy = e.touches[0].clientY - ptrStartY;
-    if (dy <= 0) { ptrSetIndicator(0, false); ptrLastDelta = 0; return; }
+    // Dead zone: don't engage PTR until the user has pulled past a
+    // few pixels of slop. Lets tiny accidental touches at the top of
+    // the page resolve without flashing the spinner.
+    if (dy <= PTR_DEAD_ZONE) {
+      ptrSetIndicator(0, false);
+      ptrLastDelta = 0;
+      return;
+    }
     const scroller = ptrGetActiveScroller();
     if (!scroller || scroller.scrollTop > 0) {
       ptrActive = false; ptrReset(); return;
     }
-    const dampened = Math.min(PTR_MAX_PULL, dy * 0.5);
+    // Subtract the dead zone so the indicator starts from 0 once the
+    // user crosses the slop threshold, then dampen the rest.
+    const dampened = Math.min(PTR_MAX_PULL, (dy - PTR_DEAD_ZONE) * PTR_DAMP);
     ptrLastDelta = dampened;
     ptrSetIndicator(dampened, dampened >= PTR_THRESHOLD);
     if (e.cancelable) e.preventDefault();
