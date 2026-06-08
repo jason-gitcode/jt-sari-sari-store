@@ -2808,7 +2808,7 @@
           </label>
           <label class="restock-control">
             <span class="restock-control-label">Cover next</span>
-            <input type="number" id="restock-cover" value="14" min="1" max="90" onchange="onRestockControlChange()" />
+            <input type="number" id="restock-cover" value="14" min="1" max="90" inputmode="numeric" onchange="onRestockControlChange()" />
             <span class="restock-control-label">days</span>
           </label>
           <label class="restock-control">
@@ -2834,7 +2834,7 @@
           <div class="budget-planner-controls">
             <label class="bp-control">
               <span class="bp-control-label">Budget (₱)</span>
-              <input type="number" id="bp-amount" min="0" step="50" placeholder="e.g. 2000" oninput="onBudgetCalculate()" />
+              <input type="number" id="bp-amount" min="0" step="50" inputmode="decimal" placeholder="e.g. 2000" oninput="onBudgetCalculate()" />
             </label>
             <label class="bp-control">
               <span class="bp-control-label">Strategy</span>
@@ -3228,7 +3228,7 @@
                 <div class="setting-desc">Cash on Delivery is auto-hidden once a customer's cart reaches this amount — they're nudged to GCash instead. Set to <strong>0</strong> to allow COD on any order amount.</div>
                 <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
                   <span style="color:var(--muted);font-size:13px;">₱</span>
-                  <input type="number" id="cod-limit-amount" min="0" max="100000" step="1" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                  <input type="number" id="cod-limit-amount" min="0" max="100000" step="1" inputmode="numeric" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
                 </div>
                 <div id="cod-limit-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
               </div>
@@ -3282,7 +3282,7 @@
                 <div class="setting-desc">Charged on delivery orders that don't qualify for free delivery.</div>
                 <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
                   <span style="color:var(--muted);font-size:13px;">₱</span>
-                  <input type="number" id="del-fee-amount" min="0" max="100000" step="1" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                  <input type="number" id="del-fee-amount" min="0" max="100000" step="1" inputmode="numeric" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
                 </div>
                 <div id="del-fee-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
               </div>
@@ -3310,7 +3310,7 @@
                 <div class="setting-desc">Customers see "Free delivery on orders min. Php X" in the storefront ticker.</div>
                 <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
                   <span style="color:var(--muted);font-size:13px;">₱</span>
-                  <input type="number" id="free-del-threshold" min="1" max="100000" step="1" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                  <input type="number" id="free-del-threshold" min="1" max="100000" step="1" inputmode="numeric" style="width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
                 </div>
                 <div id="free-del-status" style="font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;"></div>
               </div>
@@ -3439,7 +3439,7 @@
                 <div class="setting-desc">Products with stock at or below this number are highlighted on the Products tab.</div>
               </div>
               <div class="setting-control">
-                <input type="number" id="set-lowstock-input" class="threshold-input" min="0" max="999" step="1" onchange="updateLowStockThreshold(this.value)">
+                <input type="number" id="set-lowstock-input" class="threshold-input" min="0" max="999" step="1" inputmode="numeric" onchange="updateLowStockThreshold(this.value)">
               </div>
             </div>
           </section>
@@ -3597,7 +3597,7 @@
         </div>
         <div class="field">
           <label>Price (₱) *</label>
-          <input type="number" id="product-price" step="0.01" placeholder="0.00" oninput="updateProfitMargin()" required />
+          <input type="number" id="product-price" step="0.01" inputmode="decimal" placeholder="0.00" oninput="updateProfitMargin()" required />
           <div id="price-range-hint" style="display:none;font-size:12px;color:var(--muted);margin-top:4px;"></div>
         </div>
       </div>
@@ -3605,7 +3605,7 @@
       <div class="form-grid" id="cost-row">
         <div class="field">
           <label>Cost per Item (₱)</label>
-          <input type="number" id="product-cost" step="0.01" placeholder="0.00" oninput="updateProfitMargin()" />
+          <input type="number" id="product-cost" step="0.01" inputmode="decimal" placeholder="0.00" oninput="updateProfitMargin()" />
           <small>Used for Profit &amp; Margin reporting</small>
         </div>
         <div class="field">
@@ -3648,7 +3648,7 @@
       <div class="form-grid">
         <div class="field">
           <label>Stock Quantity</label>
-          <input type="number" id="product-stock" step="1" placeholder="Leave blank for unlimited" />
+          <input type="number" id="product-stock" step="1" inputmode="numeric" placeholder="Leave blank for unlimited" />
           <small id="stock-variant-hint" style="display:none;">Managed by variants — total: <strong id="stock-variant-total">0</strong></small>
         </div>
       </div>
@@ -3748,6 +3748,15 @@ let ptrLastDelta = 0;
 function ptrGetActiveScroller() {
   return document.querySelector('.tab-panel.active');
 }
+// Don't fire PTR while a modal is open — the user is interacting with a
+// dialog (logo crop, supplier add/edit, trial confirm, locked feature,
+// pay now, etc.) and any pull-down should scroll the modal body, not
+// hijack the page into a reload.
+function ptrModalOpen() {
+  return !!document.querySelector(
+    '.supp-modal-overlay.show, .product-form-overlay.show, .receipt-modal-overlay.show, .confirm-overlay.show'
+  );
+}
 function ptrSetIndicator(delta, ready) {
   const el = document.getElementById('ptr');
   if (!el) return;
@@ -3794,6 +3803,7 @@ function registerPullToRefresh() {
   ptrRegistered = true;
   document.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { ptrActive = false; return; }
+    if (ptrModalOpen()) { ptrActive = false; return; }
     const scroller = ptrGetActiveScroller();
     if (!scroller || scroller.scrollTop > 0) { ptrActive = false; return; }
     ptrStartY = e.touches[0].clientY;
@@ -6428,8 +6438,8 @@ function renderSupplierFormBody(s) {
       <div class="supp-row">
         <div class="supp-cell">
           <label class="supp-label">Contact numbers</label>
-          <input type="text" class="supp-input" data-field="contactNumber" value="${escAttr(s.contactNumber)}" placeholder="Primary, e.g. 09171234567" />
-          <input type="text" class="supp-input" data-field="contactNumber2" value="${escAttr(s.contactNumber2 || '')}" placeholder="Secondary (optional)" style="margin-top:6px;" />
+          <input type="tel" class="supp-input" data-field="contactNumber" value="${escAttr(s.contactNumber)}" placeholder="Primary, e.g. 09171234567" inputmode="numeric" autocomplete="off" />
+          <input type="tel" class="supp-input" data-field="contactNumber2" value="${escAttr(s.contactNumber2 || '')}" placeholder="Secondary (optional)" style="margin-top:6px;" inputmode="numeric" autocomplete="off" />
         </div>
         <div class="supp-cell">
           <label class="supp-label">Next delivery / schedule</label>
@@ -6462,6 +6472,20 @@ function renderSupplierFormBody(s) {
       </div>
     </div>
   `;
+}
+
+// Build a tappable tel: link for the supplier view modal. Strips
+// non-digit characters (spaces, dashes, parentheses); converts a
+// local 09XXXXXXXXX into +639XXXXXXXXX so calls dial correctly even
+// when the device defaults to PH country code. Falls back to a plain
+// span when the number isn't usable.
+function telLink(raw) {
+  if (!raw) return '';
+  const digits = String(raw).replace(/[^\d+]/g, '');
+  if (!digits) return escText(raw);
+  let dial = digits;
+  if (/^09\d{9}$/.test(digits)) dial = '+63' + digits.slice(1);
+  return `<a href="tel:${escAttr(dial)}" style="color:var(--accent);text-decoration:underline;">${escText(raw)}</a>`;
 }
 
 function renderSupplierViewBody(s) {
@@ -6499,8 +6523,8 @@ function renderSupplierViewBody(s) {
     <div class="supp-view-grid">
       ${row('Business name', escText(s.businessName), !s.businessName)}
       ${row('Contact person', escText(s.contactPerson), !s.contactPerson)}
-      ${row('Contact number', escText(s.contactNumber), !s.contactNumber)}
-      ${s.contactNumber2 ? row('Contact number 2', escText(s.contactNumber2), false) : ''}
+      ${row('Contact number', telLink(s.contactNumber), !s.contactNumber)}
+      ${s.contactNumber2 ? row('Contact number 2', telLink(s.contactNumber2), false) : ''}
       ${row('Email address', emailHtml, !s.email)}
       ${row('Website', websiteHtml, !s.website)}
       ${row('Address', escText(s.address).replace(/\n/g, '<br>'), !s.address)}
@@ -8024,11 +8048,11 @@ function addVariantField(name = '', price = '', stock = 0, cost = '') {
       </div>
       <div class="v-field v-field-cost">
         <span class="v-label">Cost per Item (₱)</span>
-        <input type="number" data-variant-cost="${idx}" step="0.01" placeholder="0.00" value="${cost}" />
+        <input type="number" data-variant-cost="${idx}" step="0.01" inputmode="decimal" placeholder="0.00" value="${cost}" />
       </div>
       <div class="v-field v-field-price">
         <span class="v-label">Price (₱)</span>
-        <input type="number" data-variant-price="${idx}" step="0.01" placeholder="0.00" value="${price}" />
+        <input type="number" data-variant-price="${idx}" step="0.01" inputmode="decimal" placeholder="0.00" value="${price}" />
       </div>
       <button type="button" class="remove-btn" onclick="this.closest('.variant-item').remove(); updateProfitMargin();">×</button>
       <div class="variant-profit" data-variant-profit="${idx}">Profit: <strong>—</strong> &middot; Margin: <strong>—</strong></div>

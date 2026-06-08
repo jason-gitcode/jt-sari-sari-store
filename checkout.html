@@ -841,7 +841,7 @@ function init() {
       </div>
       <div class="field">
         <label for="cust-phone">Mobile number</label>
-        <input type="tel" id="cust-phone" placeholder="09171234567" maxlength="11" value="${savedCustomer?.phone || ''}" />
+        <input type="tel" id="cust-phone" placeholder="09171234567" maxlength="11" inputmode="numeric" autocomplete="tel" value="${savedCustomer?.phone || ''}" />
         <div id="phone-error" style="color:#dc2626;font-size:12px;margin-top:4px;display:none;">Mobile number must be 11 digits and start with 09.</div>
       </div>
     </div>
