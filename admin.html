@@ -953,11 +953,115 @@
       background: var(--surface);
     }
     .products-main { overscroll-behavior: none; }
-    .admin-cats {
-      display: flex; flex-direction: column; gap: 6px;
-      width: 200px; flex-shrink: 0; padding: 4px 0;
-      overflow-y: auto;
+    /* Categories now live inside the search pill as a dropdown menu;
+       the legacy vertical-rail layout (200px column flanking the
+       products grid) is gone. */
+
+    /* Search pill — mirrors the storefront's search-row pattern.
+       Magnifier icon, input, clear-X, divider, then the funnel
+       trigger that opens the categories dropdown. */
+    .admin-search {
+      position: relative; width: 100%;
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 999px; padding: 6px 8px 6px 14px;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
+    .admin-search:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft, rgba(37,99,235,0.12));
+    }
+    .admin-search-icon { font-size: 14px; line-height: 1; flex-shrink: 0; opacity: 0.7; }
+    .admin-search input {
+      flex: 1; min-width: 0;
+      border: 0; outline: 0; background: transparent;
+      color: var(--ink); font-size: var(--fs-base);
+      padding: 4px 0;
+      font-family: inherit;
+    }
+    #admin-search-clear {
+      flex-shrink: 0;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: transparent; border: 0;
+      font-size: 16px; color: var(--muted); line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #admin-search-clear:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+    .admin-search-divider {
+      width: 1px; height: 20px;
+      background: var(--line); flex-shrink: 0; margin: 0 2px;
+    }
+    .admin-cat-filter-btn {
+      flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: transparent; border: 0;
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.12s, color 0.12s;
+    }
+    .admin-cat-filter-btn:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+    .admin-cat-filter-btn:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 2px;
+    }
+    .admin-cat-filter-btn svg { width: 16px; height: 16px; }
+    .admin-cat-filter-btn.has-filter {
+      background: var(--accent); color: #fff;
+    }
+    .admin-cat-filter-btn.has-filter:hover {
+      background: var(--accent-dark, #1d4ed8); color: #fff;
+    }
+
+    /* Dropdown menu — anchored to the right of the search pill, drops
+       down under the funnel button. Scrolls when there are many
+       categories. Each row shows the name + count + (for non-All) a
+       delete × that calls the existing deleteCategory(). */
+    .admin-cat-dropdown-menu {
+      position: absolute; top: calc(100% + 6px); right: 0; left: auto;
+      min-width: 240px; max-height: 360px;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(15,23,42,0.14);
+      padding: 6px;
+      display: flex; flex-direction: column; gap: 2px;
+      overflow-y: auto;
+      z-index: 40;
+    }
+    .admin-cat-dropdown-menu.hidden { display: none; }
+    .admin-cat-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-radius: 8px;
+      background: transparent; border: 0;
+      font-size: var(--fs-base); font-weight: 500;
+      color: var(--ink); cursor: pointer;
+      text-align: left; width: 100%;
+      font-family: inherit;
+    }
+    .admin-cat-item:hover { background: var(--surface-2); }
+    .admin-cat-item.active {
+      background: var(--accent-soft, #dbeafe);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .admin-cat-item .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .admin-cat-item .count {
+      display: inline-block; padding: 1px 8px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 999px;
+      font-size: var(--fs-xs); font-weight: 600;
+      color: var(--muted);
+    }
+    .admin-cat-item.active .count { background: rgba(255,255,255,0.55); color: var(--accent); }
+    .admin-cat-row { display: flex; align-items: stretch; gap: 4px; }
+    .admin-cat-row .admin-cat-item { flex: 1; }
+    .admin-cat-row .admin-cat-del {
+      flex-shrink: 0;
+      width: 32px; border-radius: 8px;
+      background: transparent; border: 0;
+      color: var(--muted); font-size: 16px; line-height: 1;
+      cursor: pointer;
+    }
+    .admin-cat-row .admin-cat-del:hover { background: var(--danger-soft, #fee2e2); color: var(--danger); }
     .chip-group { display: flex; align-items: stretch; width: 100%; }
     .admin-chip {
       flex: 1; padding: 9px 14px;
@@ -2613,12 +2717,22 @@
         </div>
       </div>
       <div class="products-toolbar">
-        <div class="search-bar">
-          <input type="search" id="product-search" placeholder="Search products by name, category, or description" oninput="setSearchTerm(this.value)" />
+        <div class="admin-search">
+          <span class="admin-search-icon" aria-hidden="true">🔍</span>
+          <input type="text" id="product-search" placeholder="Search products by name, category, or description" oninput="setSearchTerm(this.value)" autocomplete="off" />
+          <button type="button" id="admin-search-clear" onclick="clearAdminSearch()" style="display:none;" aria-label="Clear search">×</button>
+          <span class="admin-search-divider" aria-hidden="true"></span>
+          <button type="button" class="admin-cat-filter-btn" id="admin-cat-filter-btn" onclick="toggleAdminCatDropdown(event)" aria-label="Filter by category" title="Filter by category">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="7" y1="12" x2="17" y2="12" />
+              <line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+          </button>
+          <div class="admin-cat-dropdown-menu hidden" id="admin-cats"></div>
         </div>
       </div>
       <div class="products-layout">
-        <div class="admin-cats" id="admin-cats"></div>
         <div class="products-main">
           <div class="products-grid" id="products-list"></div>
         </div>
@@ -7420,12 +7534,45 @@ function switchTab(tab, reset = true) {
 // keypress. Filter happens once when typing pauses.
 let __adminSearchDebounce = 0;
 function setSearchTerm(value) {
+  // Toggle the clear-X immediately (sync with what the user just typed)
+  // even though the actual filter is debounced.
+  const clearBtn = document.getElementById('admin-search-clear');
+  if (clearBtn) clearBtn.style.display = value ? 'flex' : 'none';
   clearTimeout(__adminSearchDebounce);
   __adminSearchDebounce = setTimeout(() => {
     searchTerm = value.trim().toLowerCase();
     renderProducts();
   }, 180);
 }
+function clearAdminSearch() {
+  const input = document.getElementById('product-search');
+  if (input) { input.value = ''; input.focus(); }
+  setSearchTerm('');
+}
+
+// Funnel dropdown — opens the categories list anchored under the funnel
+// button inside the search pill. Mirrors the storefront pattern. Click
+// outside / Escape close; clicks inside the search pill (including the
+// menu itself) keep it open.
+function toggleAdminCatDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('admin-cats');
+  if (menu) menu.classList.toggle('hidden');
+}
+function closeAdminCatDropdown() {
+  const menu = document.getElementById('admin-cats');
+  if (menu) menu.classList.add('hidden');
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('admin-cats');
+  if (!menu || menu.classList.contains('hidden')) return;
+  const search = document.querySelector('.admin-search');
+  if (search && search.contains(e.target)) return;
+  closeAdminCatDropdown();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAdminCatDropdown();
+});
 
 function renderAdminCategories() {
   const cats = new Set(['All']);
@@ -7437,20 +7584,27 @@ function renderAdminCategories() {
     const active = c === adminActiveCategory ? 'active' : '';
     const safeC = c.replace(/'/g, "\\'");
     const count = c === 'All' ? products.length : products.filter(p => p.category === c).length;
-    const badge = `<span class="chip-count">${count}</span>`;
+    const countBadge = `<span class="count">${count}</span>`;
     if (c === 'All') {
-      return `<button class="admin-chip ${active}" onclick="pickAdminCategory('${safeC}')"><span class="chip-label">${c}</span>${badge}</button>`;
+      return `<button type="button" class="admin-cat-item ${active}" onclick="pickAdminCategory('${safeC}')"><span class="label">All</span>${countBadge}</button>`;
     }
-    return `<span class="chip-group">
-      <button class="chip-del" onclick="deleteCategory('${safeC}')" title="Delete category">×</button>
-      <button class="admin-chip with-del ${active}" onclick="pickAdminCategory('${safeC}')"><span class="chip-label">${c}</span>${badge}</button>
-    </span>`;
+    // Non-All rows pair the pick-button with a delete × so the dropdown
+    // also functions as category management. deleteCategory blocks the
+    // remove when products are still tagged to that category.
+    return `<div class="admin-cat-row">
+      <button type="button" class="admin-cat-item ${active}" onclick="pickAdminCategory('${safeC}')"><span class="label">${escText(c)}</span>${countBadge}</button>
+      <button type="button" class="admin-cat-del" onclick="event.stopPropagation();deleteCategory('${safeC}')" title="Delete category" aria-label="Delete category">×</button>
+    </div>`;
   }).join('');
   updateCategorySelect();
+  // Funnel goes accent-filled when a non-All filter is active.
+  const filterBtn = document.getElementById('admin-cat-filter-btn');
+  if (filterBtn) filterBtn.classList.toggle('has-filter', adminActiveCategory && adminActiveCategory !== 'All');
 }
 
 function pickAdminCategory(cat) {
   adminActiveCategory = cat;
+  closeAdminCatDropdown();
   renderAdminCategories();
   renderProducts();
 }
