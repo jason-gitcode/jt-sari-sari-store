@@ -226,6 +226,10 @@ exports.createTenant = onCall(async (request) => {
   const pickupAddress = validatePickupAddress(data.pickupAddress);
   const gcashAccountName = validateGcashAccountName(data.gcashAccountName);
   const gcashNumber = validateGcashNumber(data.gcashNumber);
+  // Tier picked on the signup page. Default to Free for any value we don't
+  // recognize so a corrupt payload can't bypass the trial entitlement.
+  const requestedTier = String(data.tier || '').trim();
+  const initialTier = SUBSCRIPTION_TIERS[requestedTier] ? requestedTier : 'free';
 
   // ---------- INVITE-CODE GATE (non-superadmin only) ----------
   // Self-serve signup requires a valid invite code minted by a superadmin.
@@ -356,13 +360,14 @@ exports.createTenant = onCall(async (request) => {
     // so the customer-facing storefront can gate the "Powered by Pabili
     // Mart" footer on Free tier without relaxing the (private) subscription
     // doc rules. Kept in sync by confirmManualPayment + backfillSubscriptions.
-    tier: 'free'
+    tier: initialTier
   });
 
   // ---------- SEED SUBSCRIPTION DOC ----------
-  // New tenants land on PabiliMart Free by default. They can upgrade
-  // from the Billing tab. Free has no trial because it's permanently free.
-  await ref.collection('subscription').doc('current').set(getInitialSubscription({ tier: 'free' }));
+  // Paid tiers (Growth/Pro) start in 'trialing' status for FREE_TRIAL_DAYS
+  // via getInitialSubscription — it sets trialUsedAt to serverTimestamp so
+  // the one-trial-per-tenant entitlement is consumed by this signup.
+  await ref.collection('subscription').doc('current').set(getInitialSubscription({ tier: initialTier }));
 
   // ---------- COPY STARTER PACK PRODUCTS ----------
   // The root /starter_pack collection is curated by superadmin via the
@@ -408,7 +413,10 @@ exports.createTenant = onCall(async (request) => {
     name,
     url: `https://pabilimart.com/${slug}/`,
     adminUrl: `https://pabilimart.com/${slug}/admin/`,
-    starterPackCopied
+    starterPackCopied,
+    tier: initialTier,
+    tierName: SUBSCRIPTION_TIERS[initialTier].name,
+    trialing: initialTier !== 'free'
   };
 });
 

@@ -400,6 +400,13 @@
     box-shadow: var(--shadow-glow);
     transform: scale(1.02);
   }
+  .plan-card.plan-picked {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .plan-card.featured.plan-picked {
+    box-shadow: var(--shadow-glow), 0 0 0 3px var(--accent-soft);
+  }
   .plan-badge {
     position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
     background: linear-gradient(90deg, var(--accent), var(--accent-grad-end));
@@ -449,9 +456,10 @@
     display: inline-flex; align-items: center; justify-content: center;
     width: 100%; padding: 12px 20px;
     border-radius: var(--radius-sm);
-    font-size: 15px; font-weight: 600;
+    font-size: 15px; font-weight: 600; font-family: inherit;
     text-decoration: none; border: 1px solid var(--line);
     background: var(--surface); color: var(--ink);
+    cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
   }
   .plan-cta:hover { background: var(--surface-2); }
@@ -481,6 +489,32 @@
     padding: 36px 32px;
     box-shadow: var(--shadow);
     width: 100%;
+  }
+  /* Selected plan banner — only shown after a tier is picked from the
+     Pricing section. Tappable to re-pick. */
+  .selected-plan-banner {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--accent-soft), rgba(124,58,237,0.10));
+    border: 1px solid rgba(37,99,235,0.30);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .selected-plan-banner:hover { background: linear-gradient(90deg, rgba(37,99,235,0.16), rgba(124,58,237,0.14)); }
+  .selected-plan-banner.tier-free { background: var(--surface-2); border-color: var(--line); }
+  .selected-plan-banner.tier-free:hover { background: rgba(15,23,42,0.04); }
+  .sp-icon { font-size: 24px; flex-shrink: 0; }
+  .sp-text { flex: 1; min-width: 0; }
+  .sp-title { font-size: 14px; color: var(--ink); line-height: 1.3; }
+  .sp-title strong { color: var(--accent-dark); }
+  .selected-plan-banner.tier-free .sp-title strong { color: var(--ink); }
+  .sp-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sp-change {
+    flex-shrink: 0; font-size: 12px; font-weight: 600;
+    color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
   /* Keep the .card class as an alias for backwards-compat with anything
      still expecting it. */
@@ -976,7 +1010,7 @@
   <div class="container">
     <div class="section-head">
       <h2>Simple, transparent pricing.</h2>
-      <p>Every store starts on the Free plan. Upgrade anytime from your admin's Billing tab — your first paid plan comes with a 30-day free trial.</p>
+      <p>Start on the Free plan or kick off your 30-day free trial of Growth or Pro right away. You can switch up or down anytime from your admin's Billing tab.</p>
     </div>
     <div class="pricing-grid">
       <div class="plan-card">
@@ -992,7 +1026,7 @@
           <li>Pabili Mart branding</li>
           <li>No custom domain</li>
         </ul>
-        <a href="#signup" class="plan-cta">Start free</a>
+        <button type="button" class="plan-cta" onclick="selectTier('free')">Start free</button>
         <div class="plan-note">No credit card required</div>
       </div>
 
@@ -1010,8 +1044,8 @@
           <li>Custom subdomain</li>
           <li>No Pabili Mart branding</li>
         </ul>
-        <a href="#signup" class="plan-cta">Start free</a>
-        <div class="plan-note">30-day free trial on first upgrade · ₱149/mo after</div>
+        <button type="button" class="plan-cta" onclick="selectTier('growth')">Start 30-day free trial</button>
+        <div class="plan-note">No credit card · ₱149/mo after the trial</div>
       </div>
 
       <div class="plan-card">
@@ -1027,8 +1061,8 @@
           <li>Priority support</li>
           <li>Custom domain</li>
         </ul>
-        <a href="#signup" class="plan-cta">Start free</a>
-        <div class="plan-note">30-day free trial on first upgrade · ₱399/mo after</div>
+        <button type="button" class="plan-cta" onclick="selectTier('pro')">Start 30-day free trial</button>
+        <div class="plan-note">No credit card · ₱399/mo after the trial</div>
       </div>
     </div>
   </div>
@@ -1043,6 +1077,18 @@
       <h2>Create your store.</h2>
       <p>Sign in with Google, then fill in your store details. We'll have you live in 2 minutes.</p>
     </div>
+    <!-- Selected plan banner — appears once the user has picked a tier
+         from the Pricing section. selectTier() updates the text + class
+         and scrolls the signup card into view. -->
+    <div id="selected-plan-banner" class="selected-plan-banner hidden" onclick="scrollToPricing()" role="button" tabindex="0">
+      <div class="sp-icon">🎁</div>
+      <div class="sp-text">
+        <div class="sp-title">You're signing up for <strong id="sp-tier-name">PabiliMart Free</strong></div>
+        <div class="sp-sub" id="sp-tier-sub">No credit card required</div>
+      </div>
+      <div class="sp-change">Change</div>
+    </div>
+
     <div class="signup-card">
 
   <!-- STEP 1: SIGN IN -->
@@ -1444,6 +1490,49 @@ function clearStatus() {
   s.textContent = '';
 }
 
+// Plan picked from the Pricing section. Defaults to 'free'; user clicks
+// on a plan-cta call selectTier() to update + scroll into the form.
+let selectedTier = 'free';
+const TIER_LABELS = {
+  free:   { name: 'PabiliMart Free',   sub: 'No credit card required' },
+  growth: { name: 'PabiliMart Growth', sub: '30-day free trial — no payment until day 31 (₱149/mo after)' },
+  pro:    { name: 'PabiliMart Pro',    sub: '30-day free trial — no payment until day 31 (₱399/mo after)' }
+};
+
+function selectTier(tier) {
+  if (!TIER_LABELS[tier]) tier = 'free';
+  selectedTier = tier;
+  // Visually mark the picked plan card so it stays highlighted as the
+  // user scrolls down to the form.
+  document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('plan-picked'));
+  const idx = ['free', 'growth', 'pro'].indexOf(tier);
+  if (idx >= 0) {
+    const cards = document.querySelectorAll('.plan-card');
+    if (cards[idx]) cards[idx].classList.add('plan-picked');
+  }
+  // Banner update.
+  const banner = document.getElementById('selected-plan-banner');
+  const nameEl = document.getElementById('sp-tier-name');
+  const subEl  = document.getElementById('sp-tier-sub');
+  if (banner && nameEl && subEl) {
+    nameEl.textContent = TIER_LABELS[tier].name;
+    subEl.textContent  = TIER_LABELS[tier].sub;
+    banner.classList.toggle('tier-free', tier === 'free');
+    banner.classList.remove('hidden');
+  }
+  // Jump to the form so the user doesn't have to manually scroll.
+  const sect = document.getElementById('signup');
+  if (sect && typeof sect.scrollIntoView === 'function') {
+    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+function scrollToPricing() {
+  const sect = document.getElementById('pricing');
+  if (sect && typeof sect.scrollIntoView === 'function') {
+    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 function showStep(id) {
   ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
@@ -1490,14 +1579,17 @@ async function submitForm(e) {
   btn.disabled = true;
   btn.textContent = 'Creating your store...';
   try {
-    const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber, inviteCode });
+    const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber, inviteCode, tier: selectedTier });
     const r = result.data;
     document.getElementById('success-name').textContent = r.name;
     const seededEl = document.getElementById('success-seeded');
     if (seededEl) {
-      seededEl.textContent = (r.starterPackCopied > 0)
+      const seedLine = (r.starterPackCopied > 0)
         ? `Pre-loaded with ${r.starterPackCopied} starter products — you can edit, hide, or add more in the admin.`
         : 'Your store starts with an empty catalog. Add products from the admin.';
+      seededEl.textContent = r.trialing
+        ? `🎉 Your 30-day free trial of ${r.tierName} is active. ${seedLine}`
+        : seedLine;
     }
     // URLs are display-only text so tenants can read / copy them but the
     // single "Open my admin" button is the only path to actually navigate.
