@@ -209,18 +209,19 @@
     max-width: 100%;
   }
   /* Search row sits below the ticker — categories dropdown on the LEFT,
-     search input on the right. Dropdown takes ~25% of the row, search
-     takes the rest (~75%), so both feel like a matched pair of pills
-     where the dropdown is the compact "filter" and the search is the
-     primary action. Horizontal padding matches .container so the row's
-     edges line up with the product grid below. */
+     search input on the right. Both share an equal 50/50 split of the
+     row so they read as a matched pair of pills the same width.
+     Horizontal padding (20px) is intentionally larger than .container's
+     16px so the row's pill edges land flush with the rounded product
+     card edges below (cards effectively start ~4px inset from the
+     container's padding edge due to their corner radius). */
   .search-row {
     max-width: 1100px; margin: 0 auto;
-    padding: 10px 16px 16px;
+    padding: 10px 20px 16px;
     display: flex; gap: 10px; align-items: stretch;
   }
   .search {
-    flex: 3 1 0; min-width: 0;
+    flex: 1 1 0; min-width: 0;
     position: relative;
     display: flex; align-items: center; gap: 8px;
     background: var(--soft); border: 1px solid var(--line);
@@ -682,7 +683,7 @@
     #store-name.scale-sm,
     #store-name.scale-xs { font-size: 13px; }
     #store-tag { font-size: 11px; }
-    .search-row { padding: 8px 16px 12px; gap: 8px; }
+    .search-row { padding: 8px 20px 12px; gap: 8px; }
     .search { padding: 7px 14px; }
     .cat-dropdown-btn { padding: 7px 10px; font-size: 13px; }
     .cat-dropdown-menu { min-width: 160px; }
