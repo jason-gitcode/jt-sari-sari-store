@@ -102,8 +102,20 @@
   .nav-link {
     font-size: 14px; font-weight: 500; color: var(--text);
     text-decoration: none; transition: color 0.15s;
+    padding: 6px 4px; border-bottom: 2px solid transparent;
   }
   .nav-link:hover { color: var(--accent); }
+  .nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* ============================================================
+     Page router — sections matching the current data-page show,
+     others hide. Drives hash-based navigation between "Home /
+     Features / Plans / FAQ / Sign in" without a server round-trip.
+     ============================================================ */
+  [data-page] { display: none; }
+  [data-page].is-active { display: block; }
+  /* Hero section uses display:block on its inner; ensure :is-active wins */
+  .hero[data-page].is-active { display: block; }
   .nav-cta {
     background: var(--ink); color: #fff;
     padding: 8px 16px; border-radius: 8px;
@@ -315,6 +327,127 @@
   .mock-card-price {
     font-size: 11px; font-weight: 700; color: var(--accent);
   }
+
+  /* ============================================================
+     Hero carousel + storefront-accurate mock styles
+     ============================================================ */
+  .mock-carousel { overflow: hidden; position: relative; }
+  .mock-carousel-track {
+    display: flex; width: 200%;
+    transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+    height: 100%;
+  }
+  .mock-carousel-slide {
+    width: 50%; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: #fff;
+  }
+  .mock-carousel-dots {
+    display: flex; justify-content: center; gap: 8px;
+    margin-top: 16px;
+  }
+  .mock-carousel-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--line); border: 0; padding: 0;
+    cursor: pointer; transition: background 0.15s, transform 0.15s;
+  }
+  .mock-carousel-dot.active { background: var(--ink); transform: scale(1.3); }
+  .mock-carousel-dot:hover { background: var(--muted); }
+  .mock-carousel-caption {
+    text-align: center; font-size: 13px; color: var(--muted);
+    margin-top: 10px; font-weight: 500;
+  }
+
+  /* Real-storefront-style header — centered store name between
+     small round logo (left) and cart icon with badge (right). */
+  .mock-header-real {
+    padding: 6px 14px 8px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mock-header-real .mock-logo { flex-shrink: 0; }
+  .mock-header-real .mock-store-text {
+    flex: 1; min-width: 0; text-align: center;
+  }
+  .mock-header-real .mock-store-name {
+    font-size: 13px; font-weight: 700; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mock-header-real .mock-cart { margin-left: 0; }
+
+  /* Search row with magnifier + placeholder + 1px divider + funnel
+     icon, matching the storefront pill exactly. */
+  .mock-search-row { padding: 8px 14px 8px; }
+  .mock-search-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 6px 5px 12px;
+  }
+  .mock-search-mag { font-size: 10px; flex-shrink: 0; opacity: 0.7; }
+  .mock-search-ph { flex: 1; font-size: 10px; color: var(--muted); }
+  .mock-search-div { width: 1px; height: 14px; background: var(--line); }
+  .mock-search-funnel {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); flex-shrink: 0;
+  }
+  .mock-search-funnel svg { width: 12px; height: 12px; }
+
+  /* Grid cards — same as before but with a + button bottom-right
+     and an OUT OF STOCK overlay for sold-out demo items. */
+  .mock-grid-real { padding: 8px 14px 12px; gap: 8px; }
+  .mock-grid-real .mock-card {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 6px;
+    background: #fff;
+    display: flex; flex-direction: column;
+  }
+  .mock-card-oos {
+    position: absolute; top: 6px; left: 6px; z-index: 2;
+    background: #dc2626; color: #fff;
+    font-size: 7px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 5px; border-radius: 3px;
+  }
+  .mock-card-bottom {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 4px;
+  }
+  .mock-card-bottom .mock-card-price {
+    font-size: 11px; font-weight: 700; color: var(--ink);
+  }
+  .mock-card-add {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mock-card-add-dim { background: var(--line); color: var(--muted); }
+
+  /* Storefront footer block — mini hours/delivery row + powered-by bar */
+  .mock-foot {
+    margin-top: auto;
+    padding: 8px 14px 0;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .mock-foot-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 6px 0;
+  }
+  .mock-foot-col { text-align: center; }
+  .mock-foot-label {
+    font-size: 7px; font-weight: 700; color: var(--muted);
+    letter-spacing: 0.08em; margin-bottom: 2px;
+  }
+  .mock-foot-val { font-size: 9px; color: var(--ink); font-weight: 500; }
+  .mock-foot-bar {
+    text-align: center;
+    padding: 5px 0 7px;
+    border-top: 1px solid var(--line);
+    font-size: 7px; color: var(--muted);
+  }
+  .mock-foot-bar strong { color: var(--accent); font-weight: 600; }
   /* The phone-screen sits inside .layout-col which has text-align:center
      (for the layout name + desc beneath the phone). Reset the screen
      contents to start text from the left so List category headers and
@@ -470,6 +603,150 @@
      Pricing
      ============================================================ */
   .pricing { background: var(--surface); }
+
+  /* ============================================================
+     Plans page — tab nav at top, then a hero card + feature grid
+     per tier. Replaces the older single-row 3-card pricing table.
+     ============================================================ */
+  .plans-page { background: var(--surface); }
+  .plan-tabs {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    background: var(--surface-2);
+    border-radius: 14px; padding: 6px;
+    margin: 0 auto 40px; max-width: 720px;
+  }
+  .plan-tab {
+    flex: 1 1 auto; min-width: 160px;
+    padding: 12px 18px; border: 0; border-radius: 10px;
+    background: transparent; color: var(--text);
+    font-size: 14px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .plan-tab:hover { color: var(--ink); }
+  .plan-tab.active {
+    background: var(--surface); color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .plan-panel { display: none; }
+  .plan-panel.active { display: block; }
+
+  /* Plan hero card — large name, big price, tagline, CTA */
+  .plan-hero {
+    background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(124,58,237,0.06));
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 36px 32px;
+    margin-bottom: 40px;
+    position: relative;
+    text-align: center;
+  }
+  .plan-hero-featured {
+    background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(124,58,237,0.10));
+    border: 2px solid var(--accent);
+  }
+  .plan-hero-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(90deg, var(--accent), var(--accent-grad-end));
+    color: #fff;
+    padding: 5px 14px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .plan-hero-name {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .plan-hero-price {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .plan-hero-amount {
+    font-size: 56px; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.04em; line-height: 1;
+  }
+  .plan-hero-period { font-size: 18px; color: var(--muted); }
+  .plan-hero-tagline {
+    font-size: 16px; color: var(--text);
+    max-width: 460px; margin: 0 auto 24px; line-height: 1.5;
+  }
+  .plan-hero-cta { display: inline-flex; }
+  .plan-hero-note {
+    font-size: 13px; color: var(--muted);
+    margin-top: 12px;
+  }
+
+  /* Feature grid — 2-up on tablet, 3-up on desktop, 1-up on mobile */
+  .plan-section-title {
+    font-size: 22px; font-weight: 700; color: var(--ink);
+    text-align: center; margin-bottom: 28px;
+    letter-spacing: -0.01em;
+  }
+  .plan-feat-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    max-width: 1000px; margin: 0 auto;
+  }
+  .plan-feat-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 22px;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .plan-feat-card:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+  .plan-feat-card h4 {
+    font-size: 17px; font-weight: 700; color: var(--ink);
+    margin-bottom: 8px; letter-spacing: -0.01em;
+  }
+  .plan-feat-card p {
+    font-size: 14px; color: var(--muted); line-height: 1.55;
+  }
+
+  /* Feature visual — top-of-card "what this looks like" preview */
+  .plan-feat-visual {
+    height: 84px;
+    background: linear-gradient(135deg, var(--surface-2), rgba(0,0,0,0.02));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .plan-feat-icon { font-size: 32px; line-height: 1; }
+  .plan-feat-num {
+    font-size: 14px; font-weight: 800; color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .plan-feat-mini {
+    font-size: 10px; color: var(--muted); font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .plan-feat-url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--ink); font-weight: 500;
+    padding: 0 12px; text-align: center; word-break: break-all;
+  }
+  .plan-feat-url em {
+    color: var(--accent); font-style: normal; font-weight: 700;
+  }
+  .plan-feat-url-pro {
+    font-size: 14px; font-weight: 700;
+  }
+  .plan-feat-foot {
+    font-size: 9px; color: var(--muted);
+    padding: 5px 10px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    width: 100%; text-align: center;
+    margin-top: auto;
+  }
+  .plan-feat-foot strong { color: var(--accent); font-weight: 600; }
+  .plan-feat-foot-clean { color: var(--muted); }
   .pricing-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
     max-width: 1040px; margin: 0 auto;
@@ -912,6 +1189,8 @@
     .hero-cta-row { align-items: center; }
     .feature-grid { grid-template-columns: repeat(2, 1fr); }
     .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
+    .plan-feat-grid { grid-template-columns: repeat(2, 1fr); }
+    .plan-hero-amount { font-size: 48px; }
     .plan-card.featured { transform: none; }
     .layout-demo { grid-template-columns: 1fr; gap: 56px; max-width: 360px; }
   }
@@ -919,7 +1198,17 @@
     section { padding: 48px 0; }
     .container { padding: 0 18px; }
     .topbar-inner { padding: 12px 18px; }
-    .nav-link.hide-sm { display: none; }
+    .topbar-inner { padding: 10px 14px; }
+    .nav-actions { gap: 8px; }
+    .nav-link { font-size: 12px; padding: 4px 2px; }
+    .nav-cta { font-size: 12px; padding: 6px 12px; }
+    .brand { font-size: 14px; }
+    .brand-mark { width: 22px; height: 22px; font-size: 11px; }
+    .plan-tab { padding: 10px 12px; font-size: 12px; min-width: auto; }
+    .plan-hero { padding: 28px 22px; }
+    .plan-hero-amount { font-size: 40px; }
+    .plan-feat-grid { grid-template-columns: 1fr; gap: 14px; }
+    .plan-feat-card { padding: 20px 18px; }
     .hero { padding: 36px 0 24px; }
     .hero h1 { font-size: 30px; }
     .hero-sub { font-size: 16px; }
@@ -956,14 +1245,15 @@
      ============================================================ -->
 <nav class="topbar">
   <div class="topbar-inner">
-    <a href="#" class="brand">
+    <a href="#home" class="brand" data-page-link="home">
       <span class="brand-mark">P</span>
       Pabili Mart
     </a>
     <div class="nav-actions">
-      <a href="#pricing" class="nav-link hide-sm">Pricing</a>
-      <a href="#faq" class="nav-link hide-sm">FAQ</a>
-      <a href="#signup" class="nav-cta">Sign in</a>
+      <a href="#features" class="nav-link" data-page-link="features">Features</a>
+      <a href="#plans"    class="nav-link" data-page-link="plans">Plans</a>
+      <a href="#faq"      class="nav-link" data-page-link="faq">FAQ</a>
+      <a href="#signup"   class="nav-cta"  data-page-link="signup">Sign in</a>
     </div>
   </div>
 </nav>
@@ -971,7 +1261,7 @@
 <!-- ============================================================
      Hero
      ============================================================ -->
-<section class="hero">
+<section class="hero is-active" data-page="home" id="home">
   <div class="hero-inner">
     <div class="hero-text">
       <span class="hero-eyebrow"><span class="dot"></span> Built for Filipino small businesses</span>
@@ -984,68 +1274,172 @@
     </div>
     <div class="hero-mock" aria-hidden="true">
       <div class="phone-frame">
-        <div class="phone-screen">
-          <div class="phone-statusbar">
-            <span>9:41</span>
-            <span class="phone-statusbar-icons">📶 100%</span>
-          </div>
-          <div class="mock-header">
-            <div class="mock-logo">🏪</div>
-            <div>
-              <div class="mock-store-name">Tindahan ni Maria</div>
-              <div class="mock-store-tag">Delivery · Pickup</div>
+        <!-- Carousel: 2 slides (Grid + List) auto-rotating every 6s.
+             Dots below the phone are the manual nav. -->
+        <div class="phone-screen mock-carousel" id="heroCarousel">
+          <div class="mock-carousel-track" id="heroCarouselTrack">
+            <!-- ===== SLIDE 1: GRID MODE ===== -->
+            <div class="mock-carousel-slide">
+              <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
+              <div class="mock-header mock-header-real">
+                <div class="mock-logo">🏪</div>
+                <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Maria</div></div>
+                <div class="mock-cart">🛒<span class="mock-cart-badge">2</span></div>
+              </div>
+              <div class="mock-ticker">
+                <span><span class="mock-ticker-dot"></span>Open · 6am–4pm</span>
+                <span>Free ≥ ₱400</span>
+              </div>
+              <div class="mock-search-row">
+                <div class="mock-search-pill">
+                  <span class="mock-search-mag">🔍</span>
+                  <span class="mock-search-ph">Search products…</span>
+                  <span class="mock-search-div"></span>
+                  <span class="mock-search-funnel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="mock-grid mock-grid-real">
+                <div class="mock-card">
+                  <div class="mock-card-img a">🥤</div>
+                  <div class="mock-card-name">Coke Mismo</div>
+                  <div class="mock-card-meta">per bottle</div>
+                  <div class="mock-card-bottom">
+                    <span class="mock-card-price">₱15.00</span>
+                    <span class="mock-card-add">+</span>
+                  </div>
+                </div>
+                <div class="mock-card">
+                  <div class="mock-card-img b">🍞</div>
+                  <div class="mock-card-name">Tasty Loaf</div>
+                  <div class="mock-card-meta">per pack</div>
+                  <div class="mock-card-bottom">
+                    <span class="mock-card-price">₱40.00</span>
+                    <span class="mock-card-add">+</span>
+                  </div>
+                </div>
+                <div class="mock-card">
+                  <div class="mock-card-oos">OUT OF STOCK</div>
+                  <div class="mock-card-img c">🧴</div>
+                  <div class="mock-card-name">Shampoo Sachet</div>
+                  <div class="mock-card-meta">per piece</div>
+                  <div class="mock-card-bottom">
+                    <span class="mock-card-price">₱5.00</span>
+                    <span class="mock-card-add mock-card-add-dim">+</span>
+                  </div>
+                </div>
+                <div class="mock-card">
+                  <div class="mock-card-img d">🍫</div>
+                  <div class="mock-card-name">Cloud 9</div>
+                  <div class="mock-card-meta">per piece</div>
+                  <div class="mock-card-bottom">
+                    <span class="mock-card-price">₱8.00</span>
+                    <span class="mock-card-add">+</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-foot">
+                <div class="mock-foot-row">
+                  <div class="mock-foot-col">
+                    <div class="mock-foot-label">🕐 HOURS</div>
+                    <div class="mock-foot-val">6am – 4pm</div>
+                  </div>
+                  <div class="mock-foot-col">
+                    <div class="mock-foot-label">🛵 DELIVERY</div>
+                    <div class="mock-foot-val">10am · 2pm · 4pm</div>
+                  </div>
+                </div>
+                <div class="mock-foot-bar">Powered by <strong>Pabili Mart</strong></div>
+              </div>
             </div>
-            <div class="mock-cart">🛒<span class="mock-cart-badge">3</span></div>
-          </div>
-          <div class="mock-ticker">
-            <span><span class="mock-ticker-dot"></span>Open · 6am–4pm</span>
-            <span>Free ≥ ₱400</span>
-          </div>
-          <div class="mock-search">
-            <div class="mock-search-bar">🔍 Search products…</div>
-          </div>
-          <div class="mock-cats">
-            <span class="mock-cat active">All</span>
-            <span class="mock-cat">Drinks</span>
-            <span class="mock-cat">Snacks</span>
-            <span class="mock-cat">Bread</span>
-          </div>
-          <div class="mock-grid">
-            <div class="mock-card">
-              <div class="mock-card-img a">🥤</div>
-              <div class="mock-card-name">Coke Mismo</div>
-              <div class="mock-card-meta">per bottle</div>
-              <div class="mock-card-price">₱15</div>
-            </div>
-            <div class="mock-card">
-              <div class="mock-card-img b">🍞</div>
-              <div class="mock-card-name">Tasty Loaf</div>
-              <div class="mock-card-meta">per pack</div>
-              <div class="mock-card-price">₱40</div>
-            </div>
-            <div class="mock-card">
-              <div class="mock-card-img c">🧴</div>
-              <div class="mock-card-name">Shampoo Sachet</div>
-              <div class="mock-card-meta">per piece</div>
-              <div class="mock-card-price">₱5</div>
-            </div>
-            <div class="mock-card">
-              <div class="mock-card-img d">🍫</div>
-              <div class="mock-card-name">Cloud 9</div>
-              <div class="mock-card-meta">per piece</div>
-              <div class="mock-card-price">₱8</div>
+
+            <!-- ===== SLIDE 2: LIST MODE ===== -->
+            <div class="mock-carousel-slide">
+              <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
+              <div class="mock-header mock-header-real">
+                <div class="mock-logo">🍳</div>
+                <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Maria</div></div>
+                <div class="mock-cart">🛒<span class="mock-cart-badge">3</span></div>
+              </div>
+              <div class="mock-ticker">
+                <span><span class="mock-ticker-dot"></span>Open · 6am–4pm</span>
+                <span>Free ≥ ₱400</span>
+              </div>
+              <div class="mock-search-row">
+                <div class="mock-search-pill">
+                  <span class="mock-search-mag">🔍</span>
+                  <span class="mock-search-ph">Search food…</span>
+                  <span class="mock-search-div"></span>
+                  <span class="mock-search-funnel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="mock-list">
+                <div class="mock-list-cat">Sabaw</div>
+                <div class="mock-list-row">
+                  <div class="mock-list-info">
+                    <div class="mock-list-name">Bulalo</div>
+                    <div class="mock-list-price">₱180.00</div>
+                  </div>
+                  <div class="mock-list-img-wrap">
+                    <div class="mock-list-img a">🍜</div>
+                    <span class="mock-list-add">+</span>
+                  </div>
+                </div>
+                <div class="mock-list-cat">Ulam</div>
+                <div class="mock-list-row">
+                  <div class="mock-list-info">
+                    <div class="mock-list-name">Adobo Rice Bowl</div>
+                    <div class="mock-list-price">₱120.00</div>
+                  </div>
+                  <div class="mock-list-img-wrap">
+                    <div class="mock-list-img b">🍛</div>
+                    <span class="mock-list-add">+</span>
+                  </div>
+                </div>
+                <div class="mock-list-row">
+                  <div class="mock-list-info">
+                    <div class="mock-list-name">Pancit Canton</div>
+                    <div class="mock-list-price">₱95.00</div>
+                  </div>
+                  <div class="mock-list-img-wrap">
+                    <div class="mock-list-img c">🥘</div>
+                    <span class="mock-list-add">+</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-foot">
+                <div class="mock-foot-row">
+                  <div class="mock-foot-col">
+                    <div class="mock-foot-label">🕐 HOURS</div>
+                    <div class="mock-foot-val">6am – 4pm</div>
+                  </div>
+                  <div class="mock-foot-col">
+                    <div class="mock-foot-label">🛵 DELIVERY</div>
+                    <div class="mock-foot-val">10am · 2pm · 4pm</div>
+                  </div>
+                </div>
+                <div class="mock-foot-bar">Powered by <strong>Pabili Mart</strong></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <div class="mock-carousel-dots" id="heroCarouselDots">
+        <button type="button" class="mock-carousel-dot active" data-idx="0" aria-label="Grid layout"></button>
+        <button type="button" class="mock-carousel-dot" data-idx="1" aria-label="List layout"></button>
+      </div>
+      <div class="mock-carousel-caption" id="heroCarouselCaption">Grid layout — for product stores</div>
     </div>
   </div>
 </section>
 
 <!-- ============================================================
-     Trust strip
+     Trust strip — part of the home page
      ============================================================ -->
-<div class="trust-strip">
+<div class="trust-strip is-active" data-page="home">
   <div class="trust-inner">
     <div class="trust-item"><span class="trust-icon">⚡</span> Setup in 2 minutes</div>
     <div class="trust-item"><span class="trust-icon">🆓</span> Free forever plan</div>
@@ -1056,7 +1450,7 @@
 <!-- ============================================================
      Two layouts demo
      ============================================================ -->
-<section class="layouts">
+<section class="layouts" data-page="features">
   <div class="container">
     <div class="section-head">
       <h2>Two layouts. One platform.</h2>
@@ -1191,7 +1585,7 @@
 <!-- ============================================================
      Features
      ============================================================ -->
-<section class="features">
+<section class="features" data-page="features" id="features">
   <div class="container">
     <div class="section-head">
       <h2>Everything you need to sell online.</h2>
@@ -1235,66 +1629,138 @@
 <!-- ============================================================
      Pricing
      ============================================================ -->
-<section id="pricing" class="pricing">
+<section id="plans" class="plans-page" data-page="plans">
   <div class="container">
     <div class="section-head">
-      <h2>Simple, transparent pricing.</h2>
-      <p>Start on the Free plan or kick off your 30-day free trial of Growth or Pro right away. You can switch up or down anytime from your admin's Billing tab.</p>
+      <h2>Pick your plan.</h2>
+      <p>Start free or kick off your 30-day trial of Growth or Pro. Switch up or down anytime from your admin's Billing tab.</p>
     </div>
-    <div class="pricing-grid">
-      <div class="plan-card">
-        <div class="plan-name">PabiliMart Free</div>
-        <div class="plan-price">
-          <span class="plan-price-amount">₱0</span>
-          <span class="plan-price-period">/ month</span>
+
+    <div class="plan-tabs" role="tablist">
+      <button type="button" class="plan-tab active" data-plan="free"   onclick="showPlanPanel('free')">PabiliMart Free</button>
+      <button type="button" class="plan-tab"        data-plan="growth" onclick="showPlanPanel('growth')">PabiliMart Growth</button>
+      <button type="button" class="plan-tab"        data-plan="pro"    onclick="showPlanPanel('pro')">PabiliMart Pro</button>
+    </div>
+
+    <!-- ===== FREE PANEL ===== -->
+    <div class="plan-panel active" data-plan-panel="free">
+      <div class="plan-hero">
+        <div class="plan-hero-text">
+          <div class="plan-hero-name">PabiliMart Free</div>
+          <div class="plan-hero-price"><span class="plan-hero-amount">₱0</span><span class="plan-hero-period">/ month</span></div>
+          <div class="plan-hero-tagline">Permanent — no trial expiration. Try the platform with a small catalog.</div>
+          <button type="button" class="btn-hero plan-hero-cta" onclick="selectTier('free')">Start free <span class="arrow">→</span></button>
+          <div class="plan-hero-note">No credit card required.</div>
         </div>
-        <div class="plan-tagline">For trying out a small online catalog.</div>
-        <ul class="plan-features">
-          <li>5 products</li>
-          <li>1 supplier</li>
-          <li><span>Storefront on pabilimart.com/<em>[store-name]</em>/</span></li>
-          <li>Pabili Mart branding</li>
-          <li>No custom domain</li>
-        </ul>
-        <button type="button" class="plan-cta" onclick="selectTier('free')">Start free</button>
-        <div class="plan-note">No credit card required</div>
       </div>
 
-      <div class="plan-card featured">
-        <span class="plan-badge">Most popular</span>
-        <div class="plan-name">PabiliMart Growth</div>
-        <div class="plan-price">
-          <span class="plan-price-amount">₱149</span>
-          <span class="plan-price-period">/ month</span>
+      <h3 class="plan-section-title">What's included</h3>
+      <div class="plan-feat-grid">
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">📦</div><div class="plan-feat-num">5</div></div>
+          <h4>5 products</h4>
+          <p>Add up to five SKUs to your storefront. Perfect for a quick test or a tiny menu.</p>
         </div>
-        <div class="plan-tagline">For a real catalog you sell from every day.</div>
-        <ul class="plan-features">
-          <li>500 products</li>
-          <li>Sales reports + analytics</li>
-          <li>Unlimited suppliers</li>
-          <li>Custom subdomain</li>
-          <li>No Pabili Mart branding</li>
-        </ul>
-        <button type="button" class="plan-cta" onclick="selectTier('growth')">Start 30-day free trial</button>
-        <div class="plan-note">No credit card · ₱149/mo after the trial</div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">🏭</div><div class="plan-feat-num">1</div></div>
+          <h4>1 supplier</h4>
+          <p>Track contact info, categories, and the next delivery date for your main supplier.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual plan-feat-url"><span>pabilimart.com/</span><em>your-store</em></div>
+          <h4>Free storefront URL</h4>
+          <p>Your shareable link on pabilimart.com — print it, post it to Facebook, send via Viber.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-foot">Powered by <strong>Pabili Mart</strong></div></div>
+          <h4>Pabili Mart branding</h4>
+          <p>"Powered by Pabili Mart" footer appears on your storefront. Removed automatically on Growth or Pro.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GROWTH PANEL ===== -->
+    <div class="plan-panel" data-plan-panel="growth">
+      <div class="plan-hero plan-hero-featured">
+        <span class="plan-hero-badge">Most popular</span>
+        <div class="plan-hero-text">
+          <div class="plan-hero-name">PabiliMart Growth</div>
+          <div class="plan-hero-price"><span class="plan-hero-amount">₱149</span><span class="plan-hero-period">/ month</span></div>
+          <div class="plan-hero-tagline">For a real catalog you sell from every day. 30-day free trial — no payment for 30 days.</div>
+          <button type="button" class="btn-hero plan-hero-cta" onclick="selectTier('growth')">Start 30-day free trial <span class="arrow">→</span></button>
+          <div class="plan-hero-note">No credit card · ₱149/mo after the trial.</div>
+        </div>
       </div>
 
-      <div class="plan-card">
-        <div class="plan-name">PabiliMart Pro</div>
-        <div class="plan-price">
-          <span class="plan-price-amount">₱399</span>
-          <span class="plan-price-period">/ month</span>
+      <h3 class="plan-section-title">What's included</h3>
+      <div class="plan-feat-grid">
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">📦</div><div class="plan-feat-num">500</div></div>
+          <h4>500 products</h4>
+          <p>Run a full catalog for a busy sari-sari or a complete carinderia menu without hitting a cap.</p>
         </div>
-        <div class="plan-tagline">For larger shops or multiple branches.</div>
-        <ul class="plan-features">
-          <li>10,000 products</li>
-          <li>Unlimited suppliers</li>
-          <li>Multi-branch support</li>
-          <li>Priority support</li>
-          <li>Custom domain</li>
-        </ul>
-        <button type="button" class="plan-cta" onclick="selectTier('pro')">Start 30-day free trial</button>
-        <div class="plan-note">No credit card · ₱399/mo after the trial</div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">📊</div></div>
+          <h4>Sales reports + analytics</h4>
+          <p>Period KPIs, top sellers, payment-method mix, daily breakdown, CSV/PDF export — locked on Free.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">🏭</div></div>
+          <h4>Unlimited suppliers</h4>
+          <p>Track every vendor — snacks, drinks, bread, toiletries, frozen — with contacts and delivery schedules.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual plan-feat-url"><em>your-store</em><span>.pabilimart.com</span></div>
+          <h4>Custom subdomain</h4>
+          <p>Upgrade your URL from a path to a clean subdomain — easier to remember, better for QR codes.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-foot plan-feat-foot-clean">© 2026 Your Store</div></div>
+          <h4>No Pabili Mart branding</h4>
+          <p>"Powered by Pabili Mart" footer is hidden — looks like an independent storefront to your customers.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PRO PANEL ===== -->
+    <div class="plan-panel" data-plan-panel="pro">
+      <div class="plan-hero">
+        <div class="plan-hero-text">
+          <div class="plan-hero-name">PabiliMart Pro</div>
+          <div class="plan-hero-price"><span class="plan-hero-amount">₱399</span><span class="plan-hero-period">/ month</span></div>
+          <div class="plan-hero-tagline">For larger shops or multiple branches with one shared admin. 30-day free trial.</div>
+          <button type="button" class="btn-hero plan-hero-cta" onclick="selectTier('pro')">Start 30-day free trial <span class="arrow">→</span></button>
+          <div class="plan-hero-note">No credit card · ₱399/mo after the trial.</div>
+        </div>
+      </div>
+
+      <h3 class="plan-section-title">What's included</h3>
+      <div class="plan-feat-grid">
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">📦</div><div class="plan-feat-num">10K</div></div>
+          <h4>10,000 products</h4>
+          <p>Effectively unlimited at neighborhood-shop scale. Run a real distribution business.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">🏢</div><span class="plan-feat-mini">Branch 1 · Branch 2 · Branch 3</span></div>
+          <h4>Multi-branch support</h4>
+          <p>One shared admin, separate inventory and orders per branch, central reporting across all locations.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">🎧</div><span class="plan-feat-mini">~4 hr response</span></div>
+          <h4>Priority support</h4>
+          <p>Direct line and a 4-business-hour response SLA. Skip the general inbox.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual plan-feat-url plan-feat-url-pro"><em>mystore.com</em></div>
+          <h4>Custom domain</h4>
+          <p>Point a domain you already own — like <em>tindahanjacob.com</em> — at your storefront. Fully branded.</p>
+        </div>
+        <div class="plan-feat-card">
+          <div class="plan-feat-visual"><div class="plan-feat-icon">🏭</div></div>
+          <h4>Unlimited suppliers</h4>
+          <p>Inherited from Growth — no cap, every vendor on file.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1303,7 +1769,7 @@
 <!-- ============================================================
      Signup (existing 2-step flow, restyled wrapper)
      ============================================================ -->
-<section id="signup" class="signup-section">
+<section id="signup" class="signup-section" data-page="signup">
   <div class="signup-inner">
     <div class="section-head">
       <h2>Create your store.</h2>
@@ -1461,7 +1927,7 @@
 <!-- ============================================================
      FAQ
      ============================================================ -->
-<section id="faq" class="faq">
+<section id="faq" class="faq" data-page="faq">
   <div class="container">
     <div class="section-head">
       <h2>Common questions.</h2>
@@ -1479,6 +1945,10 @@
       <details class="faq-item">
         <summary>What if I want to cancel or switch plans?</summary>
         <div class="faq-answer">Switch up or down anytime from your admin's Billing tab. Cancellations take effect at the end of your current billing period, so you don't lose what you already paid for. Your storefront stays online on the Free plan even after cancelling a paid plan — your products and orders are never deleted.</div>
+      </details>
+      <details class="faq-item">
+        <summary>What happens to my products if I downgrade to Free with more than 5 items?</summary>
+        <div class="faq-answer">Nothing gets deleted. All your existing products stay in your admin and stay shoppable on your storefront — the 5-product cap only applies to <em>new</em> products you try to add. So if you downgrade from Growth with 80 products, all 80 keep working; you just can't add a #81 until you're back under 5 (or you upgrade again). When you're ready, you can also hide individual products from the storefront from the admin without deleting them.</div>
       </details>
       <details class="faq-item">
         <summary>Do I need a website or technical skills to use this?</summary>
@@ -1724,6 +2194,84 @@ function clearStatus() {
 
 // Plan picked from the Pricing section. Defaults to 'free'; user clicks
 // on a plan-cta call selectTier() to update + scroll into the form.
+// ============================================================
+// Hash-based page router
+// ============================================================
+// The landing page presents Home / Features / Plans / FAQ / Sign in as
+// separate "pages" — sections with [data-page] only show when their
+// page is active. URL hash drives the state so refresh + back-button
+// behave like a real multi-page site.
+const PAGE_LIST = ['home', 'features', 'plans', 'faq', 'signup'];
+function getPageFromHash() {
+  const raw = (location.hash || '').replace(/^#/, '').toLowerCase();
+  // Allow #pricing (legacy CTA target) to alias into Plans for back-compat.
+  if (raw === 'pricing') return 'plans';
+  return PAGE_LIST.includes(raw) ? raw : 'home';
+}
+function showPage(name, opts = {}) {
+  const target = PAGE_LIST.includes(name) ? name : 'home';
+  document.querySelectorAll('[data-page]').forEach(sec => {
+    sec.classList.toggle('is-active', sec.getAttribute('data-page') === target);
+  });
+  document.querySelectorAll('[data-page-link]').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('data-page-link') === target);
+  });
+  // Scroll back to the top whenever the page changes (mimics a normal
+  // multi-page navigation).
+  if (opts.scroll !== false) {
+    window.scrollTo({ top: 0, behavior: opts.smooth === false ? 'auto' : 'smooth' });
+  }
+  document.body.setAttribute('data-current-page', target);
+}
+window.addEventListener('hashchange', () => showPage(getPageFromHash()));
+// Initial render — no smooth scroll on first paint (jumpy on slow phones).
+showPage(getPageFromHash(), { smooth: false });
+
+// ============================================================
+// Plans page — tab switcher
+// ============================================================
+function showPlanPanel(plan) {
+  document.querySelectorAll('.plan-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-plan') === plan);
+  });
+  document.querySelectorAll('.plan-panel').forEach(p => {
+    p.classList.toggle('active', p.getAttribute('data-plan-panel') === plan);
+  });
+}
+
+// Hero carousel — auto-rotates between the Grid and List storefront
+// mockups. Dot clicks cancel the auto timer so the user can dwell on
+// whichever slide they're inspecting.
+(function initHeroCarousel() {
+  const track   = document.getElementById('heroCarouselTrack');
+  const dots    = document.querySelectorAll('#heroCarouselDots .mock-carousel-dot');
+  const caption = document.getElementById('heroCarouselCaption');
+  if (!track || !dots.length) return;
+  const SLIDES = [
+    'Grid layout — for product stores',
+    'List layout — for restaurants & carinderias'
+  ];
+  let idx = 0, autoTimer = 0;
+  function go(n) {
+    idx = (n + SLIDES.length) % SLIDES.length;
+    track.style.transform = `translateX(${-50 * idx}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    if (caption) caption.textContent = SLIDES[idx];
+  }
+  function rotate() { go(idx + 1); }
+  function startAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(rotate, 6000);
+  }
+  dots.forEach((d, i) => {
+    d.addEventListener('click', () => {
+      go(i);
+      startAuto();   // restart timer from this user-triggered slide
+    });
+  });
+  startAuto();
+})();
+
 let selectedTier = 'free';
 const TIER_LABELS = {
   free:   { name: 'PabiliMart Free',   sub: 'No credit card required' },
@@ -1752,17 +2300,14 @@ function selectTier(tier) {
     banner.classList.toggle('tier-free', tier === 'free');
     banner.classList.remove('hidden');
   }
-  // Jump to the form so the user doesn't have to manually scroll.
-  const sect = document.getElementById('signup');
-  if (sect && typeof sect.scrollIntoView === 'function') {
-    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  // Navigate to the signup "page" via the router. Updating location.hash
+  // fires the hashchange listener which shows the signup section and
+  // scrolls to top.
+  location.hash = '#signup';
 }
 function scrollToPricing() {
-  const sect = document.getElementById('pricing');
-  if (sect && typeof sect.scrollIntoView === 'function') {
-    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  // Legacy callsite — Plans page now hosts the pricing UI.
+  location.hash = '#plans';
 }
 
 // First showStep call comes from the initial onAuthStateChanged hookup
