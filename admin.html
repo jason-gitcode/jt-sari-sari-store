@@ -590,36 +590,6 @@
       .storefront-btn { padding: 7px 12px; font-size: 12px; gap: 6px; }
     }
 
-    /* Home dashboard storefront card — the URL is the link. */
-    .dash-storefront-card {
-      padding: 14px 18px; margin-bottom: 18px;
-      background: linear-gradient(90deg, rgba(22,163,74,0.08), rgba(22,163,74,0.04));
-      border: 1px solid rgba(22,163,74,0.22);
-      border-radius: 10px;
-    }
-    .dash-sf-info { min-width: 0; }
-    .dash-sf-label {
-      font-size: 11px; font-weight: 700; color: var(--ok, #16a34a);
-      letter-spacing: 0.06em; text-transform: uppercase;
-      margin-bottom: 6px;
-    }
-    .dash-sf-url {
-      display: inline-block;
-      font-size: 15px; font-weight: 600;
-      color: var(--ok, #16a34a);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      word-break: break-all;
-      text-decoration: underline;
-      text-decoration-color: rgba(22,163,74,0.35);
-      text-underline-offset: 3px;
-      transition: color 0.12s, text-decoration-color 0.12s;
-    }
-    .dash-sf-url:hover,
-    .dash-sf-url:focus { color: #15803d; text-decoration-color: #15803d; }
-    @media (max-width: 600px) {
-      .dash-storefront-card { padding: 12px 14px; }
-      .dash-sf-url { font-size: 14px; }
-    }
     .icon-btn {
       width: 36px; height: 36px;
       display: grid; place-items: center;
@@ -2543,7 +2513,7 @@
       <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">📋 Orders<span class="order-badge" id="order-badge" style="display:none;"></span></button>
       <button class="tab-btn" data-tab="products" onclick="switchTab('products')">📦 Products</button>
       <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">🏭 Suppliers</button>
-      <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">📊 Reports</button>
+      <button class="tab-btn" data-tab="reports" id="reports-tab-btn" onclick="switchTab('reports')">📊 Reports<span id="reports-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
       <button class="tab-btn" data-tab="billing" onclick="switchTab('billing')">💳 Billing</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
@@ -2554,15 +2524,6 @@
         <div>
           <div class="page-title" id="home-greeting">Welcome back</div>
           <div class="page-subtitle">Here&rsquo;s how your store is doing.</div>
-        </div>
-      </div>
-
-      <!-- Storefront access card — the URL itself is the link; tapping it
-           opens the public storefront in a new tab. -->
-      <div class="dash-storefront-card">
-        <div class="dash-sf-info">
-          <div class="dash-sf-label">Your storefront</div>
-          <a class="dash-sf-url" id="dash-storefront-url" target="_blank" rel="noopener" href="#">—</a>
         </div>
       </div>
 
@@ -2669,8 +2630,24 @@
           <div class="page-title">Suppliers</div>
           <div class="page-subtitle">Track your suppliers, their contacts, and when they deliver to you.</div>
         </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button class="btn-add-product" onclick="openSupplierAdd()">+ Add Supplier</button>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="product-cap-pill" id="supplier-cap-pill" title=""></span>
+          <button class="btn-add-product" id="add-supplier-btn" onclick="openSupplierAdd()">+ Add Supplier</button>
+        </div>
+      </div>
+      <!-- Tier cap nudge (mirrors the Products tab pattern). renderSupplierCapStatus
+           shows / hides this based on supplier count vs the tenant's tier cap. -->
+      <div id="supplier-cap-upgrade-banner" class="cap-banner" style="display:none;">
+        <div class="cap-banner-row">
+          <div class="cap-banner-text">
+            <div class="cap-banner-full">
+              <strong id="supplier-cap-banner-title"></strong>
+              <div id="supplier-cap-banner-msg" style="color: var(--muted); margin-top: 2px;"></div>
+            </div>
+            <div class="cap-banner-compact" id="supplier-cap-banner-msg-compact"></div>
+          </div>
+          <button type="button" class="cap-banner-upgrade" onclick="switchTab('billing')">Upgrade →</button>
+          <button type="button" id="supplier-cap-banner-dismiss" onclick="dismissSupplierCapBanner()" aria-label="Dismiss" class="cap-banner-dismiss">×</button>
         </div>
       </div>
       <div id="suppliers-list"></div>
@@ -3497,6 +3474,33 @@
   </div>
 </div>
 
+<!-- FEATURE LOCKED MODAL — opens when a Free-tier tenant taps a Growth+
+     feature (e.g. Reports tab). Either offers the 30-day trial if it
+     hasn't been used yet, or routes the tenant to Billing for a direct
+     upgrade if it has. -->
+<div class="supp-modal-overlay" id="locked-feature-modal" onclick="closeLockedFeatureBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 440px;">
+    <div class="supp-modal-header">
+      <h2 id="locked-feature-title">Growth feature</h2>
+      <button type="button" class="close-btn" onclick="closeLockedFeatureModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 24px;">
+      <div style="font-size: 36px; margin-bottom: 12px; text-align: center;" id="locked-feature-icon">🔒</div>
+      <div style="font-size: 14px; color: var(--ink); line-height: 1.55; text-align: center; margin-bottom: 18px;" id="locked-feature-blurb">
+        This feature is part of PabiliMart Growth.
+      </div>
+      <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">What you unlock</div>
+        <ul id="locked-feature-list" style="list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.7; color: var(--ink);"></ul>
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeLockedFeatureModal()">Maybe later</button>
+      <button type="button" class="btn-primary" id="locked-feature-cta" onclick="lockedFeatureCta()">Start 30-day free trial</button>
+    </div>
+  </div>
+</div>
+
 <!-- TRIAL CONFIRM MODAL — replaces the native confirm() so the "Start free trial" flow stays visually consistent with the rest of admin. -->
 <div class="supp-modal-overlay" id="trial-confirm-modal" onclick="closeTrialConfirmBackdrop(event)">
   <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 460px;">
@@ -3958,8 +3962,11 @@ firebase.auth().onAuthStateChanged(user => {
   __subscriptionUnsub = tdoc('subscription', 'current').onSnapshot(snap => {
     subscriptionData = snap.exists ? snap.data() : null;
     renderTierBadge();
-    // Phase D: tier change → re-evaluate the product cap pill + banner.
+    // Phase D: tier change → re-evaluate the product / supplier caps and
+    // the Reports tab lock state.
     if (typeof renderProductCapStatus === 'function') renderProductCapStatus();
+    if (typeof renderSupplierCapStatus === 'function') renderSupplierCapStatus();
+    if (typeof applyReportsTabLock === 'function') applyReportsTabLock();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
@@ -3994,14 +4001,14 @@ function renderTierBadge() {
 // Mirror of SUBSCRIPTION_TIERS in functions/index.js — single source of
 // truth for tier copy. If you edit one, edit the other.
 const TIER_INFO = {
-  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,
-            features: ['5 products', 'Storefront on pabilimart.com/<em>[store-name]</em>/',
+  free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,    supplierCap: 1,
+            features: ['5 products', '1 supplier', 'Storefront on pabilimart.com/<em>[store-name]</em>/',
                        'Pabili Mart branding', 'No custom domain'] },
-  growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,
-            features: ['500 products', 'Analytics + marketing nudges',
+  growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 500,
+            features: ['500 products', 'Unlimited suppliers', 'Sales reports + analytics',
                        'Custom subdomain', 'No Pabili Mart branding'] },
-  pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000,
-            features: ['10,000 products', 'Multi-branch support',
+  pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000, supplierCap: 10000,
+            features: ['10,000 products', 'Unlimited suppliers', 'Multi-branch support',
                        'Priority support', 'Custom domain'] }
 };
 
@@ -5903,17 +5910,9 @@ function showAdmin() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'flex';
   registerPullToRefresh();
-  // Point both the header Storefront button AND the dashboard "Your
-  // storefront" card link at this tenant's storefront URL. The dashboard
-  // shows the full https:// URL as a single tappable green link.
+  // Point the header Storefront button at this tenant's storefront URL.
   const sfLink = document.getElementById('storefront-link');
-  const sfHref = TENANT_ID ? tenantUrl('') : '#';
-  if (sfLink && TENANT_ID) sfLink.href = sfHref;
-  const dashSfUrl = document.getElementById('dash-storefront-url');
-  if (dashSfUrl) {
-    dashSfUrl.href = sfHref;
-    dashSfUrl.textContent = sfHref;
-  }
+  if (sfLink && TENANT_ID) sfLink.href = tenantUrl('');
   subscribeToProducts();
   subscribeToOrders();
   subscribeToSuppliers();
@@ -6022,6 +6021,140 @@ function dismissProductCapBanner() {
   if (banner) banner.style.display = 'none';
 }
 
+// Suppliers cap — Free starts capped at 1 to nudge upgrades on a feature
+// most sari-sari shops outgrow within a week (snacks, drinks, bread,
+// toiletries, frozen are usually different vendors). Growth + Pro raise
+// the cap so high it's effectively unlimited.
+function renderSupplierCapStatus() {
+  const pill = document.getElementById('supplier-cap-pill');
+  const addBtn = document.getElementById('add-supplier-btn');
+  const banner = document.getElementById('supplier-cap-upgrade-banner');
+  const bannerTitle = document.getElementById('supplier-cap-banner-title');
+  const bannerMsg = document.getElementById('supplier-cap-banner-msg');
+  const bannerCompact = document.getElementById('supplier-cap-banner-msg-compact');
+  if (!pill || !addBtn) return;
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const info = TIER_INFO[tier] || TIER_INFO.free;
+  const cap = info.supplierCap;
+  const count = (suppliers || []).length;
+  const dismissed = sessionStorage.getItem('supplierCapBannerDismissed') === '1';
+
+  // Growth / Pro effectively-unlimited path — show count only, skip warnings.
+  if (cap >= 500) {
+    pill.textContent = `${count.toLocaleString()} suppliers`;
+    pill.className = 'product-cap-pill unlimited';
+    pill.title = `${info.name} — effectively unlimited`;
+    addBtn.disabled = false;
+    addBtn.classList.remove('disabled');
+    addBtn.title = '';
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  pill.textContent = `${count} / ${cap} suppliers`;
+  pill.title = `${info.name} plan limit`;
+  if (count >= cap) {
+    pill.classList.remove('healthy', 'approaching', 'unlimited');
+    pill.classList.add('at-cap', 'product-cap-pill');
+    addBtn.disabled = true;
+    addBtn.classList.add('disabled');
+    addBtn.title = `You've reached the ${info.name} limit of ${cap} supplier${cap === 1 ? '' : 's'}. Upgrade to add more.`;
+    if (banner) {
+      banner.style.display = dismissed ? 'none' : '';
+      if (bannerTitle) bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} supplier${cap === 1 ? '' : 's'})`;
+      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for unlimited suppliers.';
+      if (bannerCompact) bannerCompact.textContent = 'Limit reached.';
+    }
+  } else {
+    pill.classList.remove('approaching', 'at-cap', 'unlimited');
+    pill.classList.add('healthy', 'product-cap-pill');
+    addBtn.disabled = false;
+    addBtn.classList.remove('disabled');
+    addBtn.title = '';
+    if (banner) banner.style.display = 'none';
+  }
+}
+
+function dismissSupplierCapBanner() {
+  sessionStorage.setItem('supplierCapBannerDismissed', '1');
+  const banner = document.getElementById('supplier-cap-upgrade-banner');
+  if (banner) banner.style.display = 'none';
+}
+
+// Reports is a Growth+ feature. On Free tier the tab is visible but
+// shows a 🔒 next to its label so the lock is communicated before tap.
+// switchTab('reports') intercepts the click and opens the locked-feature
+// modal instead of routing into the tab.
+function applyReportsTabLock() {
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const lock = document.getElementById('reports-lock-icon');
+  if (lock) lock.style.display = (tier === 'free') ? '' : 'none';
+}
+
+// Locked-feature modal — generic across any future Growth+ feature.
+// Each entry describes:
+//   - title          → modal header text
+//   - icon           → emoji shown above the blurb
+//   - blurb          → one-paragraph "what this is" copy
+//   - tier           → which paid tier unlocks it (currently always 'growth')
+//   - unlocksWith    → ✓ list rendered in the "What you unlock" card
+const LOCKED_FEATURES = {
+  reports: {
+    title: '📊 Reports — a Growth feature',
+    icon: '📊',
+    blurb: 'Period-summarized sales analytics — pick a date range, see what sold, what didn\'t, the payment-method mix, and download CSV/PDF for your bookkeeper.',
+    tier: 'growth',
+    unlocksWith: [
+      'KPIs: orders, revenue, average order value',
+      'Top 10 by units sold + top 10 by revenue',
+      'Worst sellers (with at least one sale)',
+      'Payment method mix (GCash / Cash / COD)',
+      'Daily breakdown + cancellations & refunds',
+      'Download CSV · Print / Save as PDF'
+    ]
+  }
+};
+let lockedFeatureKey = null;
+
+function openLockedFeatureModal(key) {
+  const def = LOCKED_FEATURES[key];
+  if (!def) return;
+  lockedFeatureKey = key;
+  document.getElementById('locked-feature-title').textContent = def.title;
+  document.getElementById('locked-feature-icon').textContent = def.icon;
+  document.getElementById('locked-feature-blurb').textContent = def.blurb;
+  document.getElementById('locked-feature-list').innerHTML =
+    def.unlocksWith.map(item => `<li style="position: relative; padding-left: 22px;"><span style="position: absolute; left: 0; color: #16a34a; font-weight: 700;">✓</span> ${item}</li>`).join('');
+  // CTA branches on trial eligibility — eligible tenants see the trial
+  // path, already-used tenants see "Take me to Billing →" so they can
+  // pay directly without thinking the trial is being denied silently.
+  const cta = document.getElementById('locked-feature-cta');
+  const eligible = (subscriptionData && !subscriptionData.trialUsedAt);
+  cta.textContent = eligible ? `Start 30-day free trial` : `Take me to Billing →`;
+  document.getElementById('locked-feature-modal').classList.add('show');
+}
+
+function closeLockedFeatureModal() {
+  document.getElementById('locked-feature-modal').classList.remove('show');
+  lockedFeatureKey = null;
+}
+function closeLockedFeatureBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeLockedFeatureModal();
+}
+
+function lockedFeatureCta() {
+  const def = lockedFeatureKey ? LOCKED_FEATURES[lockedFeatureKey] : null;
+  if (!def) { closeLockedFeatureModal(); return; }
+  closeLockedFeatureModal();
+  const eligible = (subscriptionData && !subscriptionData.trialUsedAt);
+  if (eligible) {
+    startTenantTrial(def.tier);
+  } else {
+    switchTab('billing');
+  }
+}
+
 // ---------- ORDERS ----------
 function subscribeToOrders() {
   if (unsubscribeOrders) unsubscribeOrders();
@@ -6053,6 +6186,7 @@ function subscribeToSuppliers() {
     suppliers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
     suppliers.sort((a, b) => (a.businessName || '').localeCompare(b.businessName || ''));
     renderSuppliers();
+    renderSupplierCapStatus();
   }, err => console.error('Suppliers listener error:', err));
 }
 
@@ -7047,6 +7181,17 @@ function copyPhone(btn, phone) {
 
 // ---------- TABS ----------
 function switchTab(tab, reset = true) {
+  // Reports is a Growth+ feature. On Free tier we keep the tab visible
+  // (discoverability) but intercept the click and pop the upgrade modal
+  // instead of actually switching. Other tabs fall through normally.
+  if (tab === 'reports') {
+    const tier = (subscriptionData && subscriptionData.tier) || 'free';
+    if (tier === 'free') {
+      openLockedFeatureModal('reports');
+      return;
+    }
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
 
