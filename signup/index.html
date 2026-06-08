@@ -54,7 +54,13 @@
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Sticky-footer column layout — body fills the viewport, footer is
+       pinned to the bottom (margin-top: auto pushes it down) so short
+       pages like "FAQ" don't leave empty space below the footer. */
+    display: flex; flex-direction: column;
+    min-height: 100vh;
   }
+  footer { margin-top: auto; }
   a { color: inherit; }
   button { font: inherit; cursor: pointer; }
 
@@ -196,7 +202,7 @@
   }
 
   /* Phone mockup */
-  .hero-mock { display: flex; justify-content: center; align-items: center; }
+  .hero-mock { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; }
   .phone-frame {
     width: 280px; height: 568px;
     background: #0f0f0f;
@@ -344,7 +350,6 @@
   }
   .mock-carousel-dots {
     display: flex; justify-content: center; gap: 8px;
-    margin-top: 16px;
   }
   .mock-carousel-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -355,7 +360,7 @@
   .mock-carousel-dot:hover { background: var(--muted); }
   .mock-carousel-caption {
     text-align: center; font-size: 13px; color: var(--muted);
-    margin-top: 10px; font-weight: 500;
+    font-weight: 500;
   }
 
   /* Real-storefront-style header — centered store name between
@@ -603,6 +608,100 @@
      Pricing
      ============================================================ */
   .pricing { background: var(--surface); }
+
+  /* ============================================================
+     How it works — Home page 3-step guide
+     ============================================================ */
+  .how-it-works { background: var(--bg); }
+  .step-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    max-width: 1040px; margin: 0 auto;
+  }
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    position: relative;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .step-card:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
+  }
+  .step-num {
+    position: absolute; top: -16px; left: 28px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-grad-end));
+    color: #fff; font-weight: 700; font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+  }
+  .step-visual {
+    height: 100px;
+    background: linear-gradient(135deg, var(--surface-2), rgba(0,0,0,0.02));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 12px 0 20px;
+    overflow: hidden;
+    padding: 0 18px;
+  }
+  .step-card h3 {
+    font-size: 18px; font-weight: 700; color: var(--ink);
+    margin-bottom: 10px; letter-spacing: -0.01em;
+  }
+  .step-card p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+  /* Step 1 visual — Google sign-in button preview */
+  .step-visual-google {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 14px;
+    font-size: 13px; font-weight: 500; color: var(--ink);
+    box-shadow: var(--shadow-xs);
+  }
+  /* Step 2 visual — products grid mini */
+  .step-visual-products {
+    display: flex; gap: 6px;
+  }
+  .step-prod-tile {
+    width: 46px; height: 56px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 4px;
+    padding: 5px;
+  }
+  .step-prod-emoji { font-size: 18px; line-height: 1; }
+  .step-prod-line {
+    width: 28px; height: 4px; border-radius: 2px;
+    background: var(--line);
+  }
+  .step-prod-tile-add {
+    background: var(--accent-soft); border-color: rgba(37,99,235,0.30);
+    color: var(--accent); font-size: 22px; font-weight: 700;
+  }
+  /* Step 3 visual — URL share row */
+  .step-visual-link {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px 10px;
+    font-size: 11px; color: var(--ink);
+    box-shadow: var(--shadow-xs);
+    max-width: 100%;
+  }
+  .step-link-url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--ink); font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .step-link-share {
+    flex-shrink: 0;
+    background: var(--accent); color: #fff;
+    padding: 4px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 600;
+  }
 
   /* ============================================================
      Plans page — tab nav at top, then a hero card + feature grid
@@ -1191,6 +1290,7 @@
     .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
     .plan-feat-grid { grid-template-columns: repeat(2, 1fr); }
     .plan-hero-amount { font-size: 48px; }
+    .step-grid { grid-template-columns: 1fr; max-width: 480px; gap: 32px; }
     .plan-card.featured { transform: none; }
     .layout-demo { grid-template-columns: 1fr; gap: 56px; max-width: 360px; }
   }
@@ -1209,6 +1309,8 @@
     .plan-hero-amount { font-size: 40px; }
     .plan-feat-grid { grid-template-columns: 1fr; gap: 14px; }
     .plan-feat-card { padding: 20px 18px; }
+    .step-card { padding: 28px 22px; }
+    .step-visual { height: 84px; }
     .hero { padding: 36px 0 24px; }
     .hero h1 { font-size: 30px; }
     .hero-sub { font-size: 16px; }
@@ -1448,6 +1550,54 @@
 </div>
 
 <!-- ============================================================
+     Home: How it works — 3-step illustrated guide
+     ============================================================ -->
+<section class="how-it-works is-active" data-page="home">
+  <div class="container">
+    <div class="section-head">
+      <h2>How it works.</h2>
+      <p>From signed-out to taking your first order — three short steps.</p>
+    </div>
+    <div class="step-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-visual">
+          <div class="step-visual-google">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            <span>Continue with Google</span>
+          </div>
+        </div>
+        <h3>Sign up in 30 seconds</h3>
+        <p>Continue with your Google account, pick a store URL, drop in your GCash details. No credit card needed.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-visual">
+          <div class="step-visual-products">
+            <div class="step-prod-tile"><span class="step-prod-emoji">🥤</span><span class="step-prod-line"></span></div>
+            <div class="step-prod-tile"><span class="step-prod-emoji">🍞</span><span class="step-prod-line"></span></div>
+            <div class="step-prod-tile step-prod-tile-add"><span>+</span></div>
+          </div>
+        </div>
+        <h3>Add your products</h3>
+        <p>We pre-load a starter pack of common items. Edit names, prices, and photos in your admin — or upload your own.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-visual">
+          <div class="step-visual-link">
+            <span class="step-link-url">pabilimart.com/your-store</span>
+            <span class="step-link-share">📤 Share</span>
+          </div>
+        </div>
+        <h3>Share your link</h3>
+        <p>Post it on Facebook, send via Viber, print it on a flyer. Customers order, you confirm, you deliver or they pick up.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
      Two layouts demo
      ============================================================ -->
 <section class="layouts" data-page="features">
@@ -1460,48 +1610,57 @@
       <div class="layout-col">
         <div class="phone-frame phone-frame-sm">
           <div class="phone-screen">
-            <div class="phone-statusbar">
-              <span>9:41</span>
-              <span class="phone-statusbar-icons">📶 100%</span>
-            </div>
-            <div class="mock-header">
+            <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
+            <div class="mock-header mock-header-real">
               <div class="mock-logo">🏪</div>
-              <div>
-                <div class="mock-store-name">Tindahan ni Maria</div>
-                <div class="mock-store-tag">Delivery · Pickup</div>
+              <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Maria</div></div>
+              <div class="mock-cart">🛒<span class="mock-cart-badge">2</span></div>
+            </div>
+            <div class="mock-ticker">
+              <span><span class="mock-ticker-dot"></span>Open · 6am–4pm</span>
+              <span>Free ≥ ₱400</span>
+            </div>
+            <div class="mock-search-row">
+              <div class="mock-search-pill">
+                <span class="mock-search-mag">🔍</span>
+                <span class="mock-search-ph">Search products…</span>
+                <span class="mock-search-div"></span>
+                <span class="mock-search-funnel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg></span>
               </div>
-              <div class="mock-cart">🛒</div>
             </div>
-            <div class="mock-cats">
-              <span class="mock-cat active">All</span>
-              <span class="mock-cat">Drinks</span>
-              <span class="mock-cat">Snacks</span>
-            </div>
-            <div class="mock-grid">
+            <div class="mock-grid mock-grid-real">
               <div class="mock-card">
                 <div class="mock-card-img a">🥤</div>
                 <div class="mock-card-name">Coke Mismo</div>
                 <div class="mock-card-meta">per bottle</div>
-                <div class="mock-card-price">₱15</div>
+                <div class="mock-card-bottom"><span class="mock-card-price">₱15.00</span><span class="mock-card-add">+</span></div>
               </div>
               <div class="mock-card">
                 <div class="mock-card-img b">🍞</div>
                 <div class="mock-card-name">Tasty Loaf</div>
                 <div class="mock-card-meta">per pack</div>
-                <div class="mock-card-price">₱40</div>
+                <div class="mock-card-bottom"><span class="mock-card-price">₱40.00</span><span class="mock-card-add">+</span></div>
               </div>
               <div class="mock-card">
+                <div class="mock-card-oos">OUT OF STOCK</div>
                 <div class="mock-card-img c">🧴</div>
                 <div class="mock-card-name">Shampoo Sachet</div>
                 <div class="mock-card-meta">per piece</div>
-                <div class="mock-card-price">₱5</div>
+                <div class="mock-card-bottom"><span class="mock-card-price">₱5.00</span><span class="mock-card-add mock-card-add-dim">+</span></div>
               </div>
               <div class="mock-card">
                 <div class="mock-card-img d">🍫</div>
                 <div class="mock-card-name">Cloud 9</div>
                 <div class="mock-card-meta">per piece</div>
-                <div class="mock-card-price">₱8</div>
+                <div class="mock-card-bottom"><span class="mock-card-price">₱8.00</span><span class="mock-card-add">+</span></div>
               </div>
+            </div>
+            <div class="mock-foot">
+              <div class="mock-foot-row">
+                <div class="mock-foot-col"><div class="mock-foot-label">🕐 HOURS</div><div class="mock-foot-val">6am – 4pm</div></div>
+                <div class="mock-foot-col"><div class="mock-foot-label">🛵 DELIVERY</div><div class="mock-foot-val">10am · 2pm · 4pm</div></div>
+              </div>
+              <div class="mock-foot-bar">Powered by <strong>Pabili Mart</strong></div>
             </div>
           </div>
         </div>
@@ -1512,66 +1671,50 @@
       <div class="layout-col">
         <div class="phone-frame phone-frame-sm">
           <div class="phone-screen">
-            <div class="phone-statusbar">
-              <span>9:41</span>
-              <span class="phone-statusbar-icons">📶 100%</span>
-            </div>
-            <div class="mock-header">
+            <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
+            <div class="mock-header mock-header-real">
               <div class="mock-logo">🍳</div>
-              <div>
-                <div class="mock-store-name">Carinderia ni Maria</div>
-                <div class="mock-store-tag">Lutong bahay daily</div>
-              </div>
-              <div class="mock-cart">🛒</div>
+              <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Maria</div></div>
+              <div class="mock-cart">🛒<span class="mock-cart-badge">3</span></div>
             </div>
-            <div class="mock-cats">
-              <span class="mock-cat active">All</span>
-              <span class="mock-cat">Ulam</span>
-              <span class="mock-cat">Sabaw</span>
+            <div class="mock-ticker">
+              <span><span class="mock-ticker-dot"></span>Open · 6am–4pm</span>
+              <span>Free ≥ ₱400</span>
+            </div>
+            <div class="mock-search-row">
+              <div class="mock-search-pill">
+                <span class="mock-search-mag">🔍</span>
+                <span class="mock-search-ph">Search food…</span>
+                <span class="mock-search-div"></span>
+                <span class="mock-search-funnel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg></span>
+              </div>
             </div>
             <div class="mock-list">
               <div class="mock-list-cat">Sabaw</div>
               <div class="mock-list-row">
-                <div class="mock-list-info">
-                  <div class="mock-list-name">Bulalo</div>
-                  <div class="mock-list-price">₱180.00</div>
-                </div>
-                <div class="mock-list-img-wrap">
-                  <div class="mock-list-img a">🍜</div>
-                  <span class="mock-list-add">+</span>
-                </div>
+                <div class="mock-list-info"><div class="mock-list-name">Bulalo</div><div class="mock-list-price">₱180.00</div></div>
+                <div class="mock-list-img-wrap"><div class="mock-list-img a">🍜</div><span class="mock-list-add">+</span></div>
               </div>
               <div class="mock-list-cat">Ulam</div>
               <div class="mock-list-row">
-                <div class="mock-list-info">
-                  <div class="mock-list-name">Adobo Rice Bowl</div>
-                  <div class="mock-list-price">₱120.00</div>
-                </div>
-                <div class="mock-list-img-wrap">
-                  <div class="mock-list-img b">🍛</div>
-                  <span class="mock-list-add">+</span>
-                </div>
+                <div class="mock-list-info"><div class="mock-list-name">Adobo Rice Bowl</div><div class="mock-list-price">₱120.00</div></div>
+                <div class="mock-list-img-wrap"><div class="mock-list-img b">🍛</div><span class="mock-list-add">+</span></div>
               </div>
               <div class="mock-list-row">
-                <div class="mock-list-info">
-                  <div class="mock-list-name">Pancit Canton</div>
-                  <div class="mock-list-price">₱95.00</div>
-                </div>
-                <div class="mock-list-img-wrap">
-                  <div class="mock-list-img c">🥘</div>
-                  <span class="mock-list-add">+</span>
-                </div>
+                <div class="mock-list-info"><div class="mock-list-name">Pancit Canton</div><div class="mock-list-price">₱95.00</div></div>
+                <div class="mock-list-img-wrap"><div class="mock-list-img c">🥘</div><span class="mock-list-add">+</span></div>
               </div>
               <div class="mock-list-row">
-                <div class="mock-list-info">
-                  <div class="mock-list-name">Lechon Manok</div>
-                  <div class="mock-list-price">₱130.00</div>
-                </div>
-                <div class="mock-list-img-wrap">
-                  <div class="mock-list-img d">🍗</div>
-                  <span class="mock-list-add">+</span>
-                </div>
+                <div class="mock-list-info"><div class="mock-list-name">Lechon Manok</div><div class="mock-list-price">₱130.00</div></div>
+                <div class="mock-list-img-wrap"><div class="mock-list-img d">🍗</div><span class="mock-list-add">+</span></div>
               </div>
+            </div>
+            <div class="mock-foot">
+              <div class="mock-foot-row">
+                <div class="mock-foot-col"><div class="mock-foot-label">🕐 HOURS</div><div class="mock-foot-val">6am – 4pm</div></div>
+                <div class="mock-foot-col"><div class="mock-foot-label">🛵 DELIVERY</div><div class="mock-foot-val">10am · 2pm · 4pm</div></div>
+              </div>
+              <div class="mock-foot-bar">Powered by <strong>Pabili Mart</strong></div>
             </div>
           </div>
         </div>
@@ -1947,8 +2090,8 @@
         <div class="faq-answer">Switch up or down anytime from your admin's Billing tab. Cancellations take effect at the end of your current billing period, so you don't lose what you already paid for. Your storefront stays online on the Free plan even after cancelling a paid plan — your products and orders are never deleted.</div>
       </details>
       <details class="faq-item">
-        <summary>What happens to my products if I downgrade to Free with more than 5 items?</summary>
-        <div class="faq-answer">Nothing gets deleted. All your existing products stay in your admin and stay shoppable on your storefront — the 5-product cap only applies to <em>new</em> products you try to add. So if you downgrade from Growth with 80 products, all 80 keep working; you just can't add a #81 until you're back under 5 (or you upgrade again). When you're ready, you can also hide individual products from the storefront from the admin without deleting them.</div>
+        <summary>What happens to my products if I downgrade?</summary>
+        <div class="faq-answer">Downgrades ask you to <strong>pick which products to retain</strong> up to the new plan's cap — your other products are archived (still in your admin, but hidden from your storefront), never deleted. The same applies in all directions: Growth → Free (choose 5 to keep shoppable), Pro → Growth (choose 500), Pro → Free (choose 5). You can swap which products are visible anytime, and if you upgrade again the full catalog comes back online. Orders and customer data are always preserved regardless of plan.</div>
       </details>
       <details class="faq-item">
         <summary>Do I need a website or technical skills to use this?</summary>
