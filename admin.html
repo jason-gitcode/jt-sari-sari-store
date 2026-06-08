@@ -3474,6 +3474,28 @@
   </div>
 </div>
 
+<!-- DESTRUCTIVE CONFIRM MODAL — replaces native confirm() for delete /
+     remove actions so the prompt matches the rest of the admin theme.
+     Opened by confirmDestructive({ title, message, confirmLabel, onConfirm }). -->
+<div class="supp-modal-overlay" id="destructive-confirm-modal" onclick="closeDestructiveConfirmBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 380px;">
+    <div class="supp-modal-header">
+      <h2 id="destructive-confirm-title">Confirm</h2>
+      <button type="button" class="close-btn" onclick="closeDestructiveConfirm()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 20px 24px;">
+      <div style="display: flex; align-items: flex-start; gap: 14px;">
+        <div style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 20px;">⚠️</div>
+        <div style="font-size: 14px; color: var(--ink); line-height: 1.55;" id="destructive-confirm-message">Are you sure?</div>
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeDestructiveConfirm()">Cancel</button>
+      <button type="button" class="supp-del-btn" id="destructive-confirm-go-btn" onclick="destructiveConfirmGo()" style="background: var(--danger); color: #fff; border-color: var(--danger);">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- FEATURE LOCKED MODAL — opens when a Free-tier tenant taps a Growth+
      feature (e.g. Reports tab). Either offers the 30-day trial if it
      hasn't been used yet, or routes the tenant to Billing for a direct
@@ -3744,6 +3766,36 @@ const PTR_MAX_PULL  = 110;
 let ptrStartY = null;
 let ptrActive = false;
 let ptrLastDelta = 0;
+
+// Themed replacement for native confirm() on destructive actions.
+// Caller passes { title, message, confirmLabel, onConfirm }.
+// onConfirm fires when the red primary button is clicked.
+let _destructivePending = null;
+function confirmDestructive({ title, message, confirmLabel, onConfirm }) {
+  _destructivePending = onConfirm || null;
+  document.getElementById('destructive-confirm-title').textContent = title || 'Confirm';
+  document.getElementById('destructive-confirm-message').textContent = message || 'Are you sure?';
+  const btn = document.getElementById('destructive-confirm-go-btn');
+  btn.textContent = confirmLabel || 'Delete';
+  btn.disabled = false;
+  document.getElementById('destructive-confirm-modal').classList.add('show');
+}
+function closeDestructiveConfirm() {
+  document.getElementById('destructive-confirm-modal').classList.remove('show');
+  _destructivePending = null;
+}
+function closeDestructiveConfirmBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeDestructiveConfirm();
+}
+async function destructiveConfirmGo() {
+  const cb = _destructivePending;
+  _destructivePending = null;
+  document.getElementById('destructive-confirm-modal').classList.remove('show');
+  if (typeof cb === 'function') {
+    try { await cb(); } catch (err) { console.error('confirmDestructive callback error:', err); }
+  }
+}
 
 function ptrGetActiveScroller() {
   return document.querySelector('.tab-panel.active');
@@ -4918,17 +4970,23 @@ async function applyLogoCrop() {
   }
 })();
 
-async function removeLogo() {
-  if (!confirm('Remove your custom logo? The storefront will go back to showing your store name as text.')) return;
-  try {
-    await tdoc('settings', 'store').set({
-      logoDataUrl: firebase.firestore.FieldValue.delete()
-    }, { merge: true });
-    showToast('Logo removed.', 'success');
-  } catch (err) {
-    console.error(err);
-    alert('Failed to remove logo: ' + (err && err.message ? err.message : err));
-  }
+function removeLogo() {
+  confirmDestructive({
+    title: 'Remove custom logo?',
+    message: 'Your storefront will go back to showing your store name as text. You can re-upload anytime.',
+    confirmLabel: 'Remove logo',
+    onConfirm: async () => {
+      try {
+        await tdoc('settings', 'store').set({
+          logoDataUrl: firebase.firestore.FieldValue.delete()
+        }, { merge: true });
+        showToast('Logo removed.', 'success');
+      } catch (err) {
+        console.error(err);
+        alert('Failed to remove logo: ' + (err && err.message ? err.message : err));
+      }
+    }
+  });
 }
 
 function refreshLogoSubEditor() {
@@ -6552,19 +6610,25 @@ function closeSupplierView(e) {
   document.getElementById('supplier-view-modal').classList.remove('show');
   currentViewSupplierId = null;
 }
-async function deleteFromSupplierView() {
+function deleteFromSupplierView() {
   const id = currentViewSupplierId;
   if (!id) return;
   const sup = suppliers.find(x => x.id === id);
   const name = (sup && sup.businessName) || 'this supplier';
-  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-  try {
-    await tdoc('suppliers', id).delete();
-    closeSupplierView();
-  } catch (err) {
-    console.error(err);
-    alert('Failed to delete: ' + (err && err.message ? err.message : err));
-  }
+  confirmDestructive({
+    title: `Delete ${name}?`,
+    message: `This supplier record will be permanently removed. This cannot be undone.`,
+    confirmLabel: 'Delete supplier',
+    onConfirm: async () => {
+      try {
+        await tdoc('suppliers', id).delete();
+        closeSupplierView();
+      } catch (err) {
+        console.error(err);
+        alert('Failed to delete: ' + (err && err.message ? err.message : err));
+      }
+    }
+  });
 }
 
 function editFromView() {
@@ -6648,21 +6712,29 @@ async function saveSupplierFromEdit() {
     status.style.color = 'var(--danger)';
   }
 }
-async function deleteSupplierFromEdit() {
+function deleteSupplierFromEdit() {
   const id = currentEditSupplierId;
   if (!id) return;
   const sup = suppliers.find(x => x.id === id);
   const name = (sup && sup.businessName) || 'this supplier';
-  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-  try {
-    await tdoc('suppliers', id).delete();
-    closeSupplierEdit();
-  } catch (err) {
-    console.error(err);
-    const st = document.getElementById('edit-modal-status');
-    st.textContent = '❌ ' + (err && err.message ? err.message : err);
-    st.style.color = 'var(--danger)';
-  }
+  confirmDestructive({
+    title: `Delete ${name}?`,
+    message: `This supplier record will be permanently removed. This cannot be undone.`,
+    confirmLabel: 'Delete supplier',
+    onConfirm: async () => {
+      try {
+        await tdoc('suppliers', id).delete();
+        closeSupplierEdit();
+      } catch (err) {
+        console.error(err);
+        const st = document.getElementById('edit-modal-status');
+        if (st) {
+          st.textContent = '❌ ' + (err && err.message ? err.message : err);
+          st.style.color = 'var(--danger)';
+        }
+      }
+    }
+  });
 }
 
 function notifyNewOrder(order, orderId) {
