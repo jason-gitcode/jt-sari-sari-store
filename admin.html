@@ -3038,8 +3038,8 @@
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Store name</div>
-                <div class="setting-desc">Displayed at the top of your storefront and in pickup instructions.</div>
-                <input type="text" id="si-store-name" maxlength="100" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
+                <div class="setting-desc">Set at signup and locked for consistency. Contact support if you need this changed.</div>
+                <div id="si-store-name-display" style="width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);font-size:14px;color:var(--ink);font-weight:600;">—</div>
               </div>
             </div>
             <div class="setting-row">
@@ -5556,7 +5556,9 @@ function syncStoreInfoForm() {
   ensureHourSelectsPopulated();
   ensureDayCheckboxesPopulated();
   const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };
-  f('si-store-name', storeSettingsData.storeName);
+  // Store name is read-only post-signup; write it into the display div.
+  const sn = document.getElementById('si-store-name-display');
+  if (sn) sn.textContent = storeSettingsData.storeName || '—';
   f('si-pickup-address', storeSettingsData.pickupAddress);
   f('si-gcash-name', storeSettingsData.gcashAccountName);
   f('si-gcash-number', storeSettingsData.gcashNumber);
@@ -5608,13 +5610,12 @@ function syncStoreInfoForm() {
 async function saveStoreInfo() {
   const status = document.getElementById('si-status');
   const btn = document.getElementById('si-save-btn');
-  const storeName = document.getElementById('si-store-name').value.trim();
+  // Store name is locked after signup; we don't read or write it here.
   const pickupAddress = document.getElementById('si-pickup-address').value.trim();
   const gcashAccountName = document.getElementById('si-gcash-name').value.trim();
   const gcashNumber = document.getElementById('si-gcash-number').value.trim();
   const storeOpenHour  = parseInt(document.getElementById('si-open-hour').value, 10);
   const storeCloseHour = parseInt(document.getElementById('si-close-hour').value, 10);
-  if (storeName.length < 2) { status.textContent = 'Store name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
   if (pickupAddress.length < 5) { status.textContent = 'Pickup address must be at least 5 characters.'; status.style.color = '#dc2626'; return; }
   if (gcashAccountName.length < 2) { status.textContent = 'GCash account name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
   if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.style.color = '#dc2626'; return; }
@@ -5629,7 +5630,7 @@ async function saveStoreInfo() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    const payload = { storeName, pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays };
+    const payload = { pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays };
     if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
       payload.pickupLat = siPickupLat;
       payload.pickupLng = siPickupLng;
