@@ -315,6 +315,12 @@
   .mock-card-price {
     font-size: 11px; font-weight: 700; color: var(--accent);
   }
+  /* The phone-screen sits inside .layout-col which has text-align:center
+     (for the layout name + desc beneath the phone). Reset the screen
+     contents to start text from the left so List category headers and
+     product names align like the real storefront. */
+  .phone-screen { text-align: left; }
+
   /* List-layout mockup — mirrors the actual storefront List layout:
      category header on its own row, then product rows with name + price
      on the left and a square image on the right with a "+" button
