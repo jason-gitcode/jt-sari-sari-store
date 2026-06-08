@@ -1406,14 +1406,15 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   }
 }
 
-// Phase D: Free-tier branding footer toggle. Shown when settings/store.tier
-// is 'free' or missing; hidden on paid tiers (Growth, Pro). Tier is mirrored
-// into settings/store by createTenant + confirmManualPayment.
+// Phase D: PabiliMart branding footer toggle. Shown on Free + Growth (both
+// keep PM branding); hidden only on Pro. Tier is mirrored into
+// settings/store by createTenant + confirmManualPayment + startFreeTrial +
+// backfillSubscriptions.
 function applyPoweredByFooter() {
   const el = document.getElementById('powered-by-footer');
   if (!el) return;
   const tier = (storeSettingsData && storeSettingsData.tier) || 'free';
-  el.classList.toggle('shown', tier === 'free');
+  el.classList.toggle('shown', tier !== 'pro');
 }
 
 function applyRainMode(active) {

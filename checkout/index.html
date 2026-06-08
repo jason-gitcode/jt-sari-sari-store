@@ -640,13 +640,13 @@ tdoc('settings', 'store').onSnapshot(snap => {
   applyTenantStoreConfig();
 });
 // Apply tenant-specific store info + service settings to the UI
-// Phase D: Free-tier branding footer toggle. See storefront index.html
-// for the source-of-truth comment.
+// PabiliMart branding footer toggle. Shown on Free + Growth, hidden only
+// on Pro. See storefront index.html for source-of-truth comment.
 function applyPoweredByFooter() {
   const el = document.getElementById('powered-by-footer');
   if (!el) return;
   const tier = (storeSettingsData && storeSettingsData.tier) || 'free';
-  el.classList.toggle('shown', tier === 'free');
+  el.classList.toggle('shown', tier !== 'pro');
 }
 
 function setStorefrontFavicon(href) {

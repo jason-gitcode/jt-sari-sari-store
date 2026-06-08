@@ -630,12 +630,13 @@ tdoc('settings', 'store').onSnapshot(snap => {
   updateWeatherWarning();
   applyTenantStoreConfig();
 });
-// Phase D: Free-tier branding footer toggle.
+// Phase D: PabiliMart branding footer toggle. Shown on Free + Growth,
+// hidden only on Pro.
 function applyPoweredByFooter() {
   const el = document.getElementById('powered-by-footer');
   if (!el) return;
   const tier = (storeSettingsData && storeSettingsData.tier) || 'free';
-  el.classList.toggle('shown', tier === 'free');
+  el.classList.toggle('shown', tier !== 'pro');
 }
 
 function setStorefrontFavicon(href) {
