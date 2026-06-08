@@ -304,6 +304,11 @@ exports.createTenant = onCall(async (request) => {
       name,
       ownerEmails: [email],
       plan: 'starter',
+      // Tier mirror on the root tenant doc — the superadmin tenants table
+      // reads this in the paginated list query so the Plan column doesn't
+      // cost a per-row subscription read. Kept in sync by createTenant,
+      // confirmManualPayment, startFreeTrial, and backfillSubscriptions.
+      tier: initialTier,
       createdAt: FieldValue.serverTimestamp(),
       createdBy: uid,
       createdByEmail: email,
@@ -596,6 +601,9 @@ exports.backfillSubscriptions = onCall(async (request) => {
     }
     // Always sync tier mirror to settings/store (idempotent on merge).
     await settingsRef.set({ tier }, { merge: true });
+    // Also mirror to tenant root doc so the superadmin tenants table can
+    // render the Plan column from the paginated list without per-row reads.
+    await doc.ref.set({ tier }, { merge: true });
     tierSynced++;
   }
   return { seeded, skipped, tierSynced, total: snap.size };
@@ -691,6 +699,8 @@ exports.startFreeTrial = onCall(async (request) => {
     // footer, product cap pill) flips immediately without waiting for
     // confirmManualPayment.
     tx.set(settingsRef, { tier: requestedTier }, { merge: true });
+    // Tier mirror on the tenant root doc (superadmin tenants list).
+    tx.update(tref, { tier: requestedTier });
   });
 
   return {
@@ -987,6 +997,8 @@ exports.confirmManualPayment = onCall(async (request) => {
     // subscription doc read access. Public-read on settings/* already.
     const settingsRef = tref.collection('settings').doc('store');
     tx.set(settingsRef, { tier }, { merge: true });
+    // Tier mirror on the tenant root doc (superadmin tenants list).
+    tx.update(tref, { tier });
   });
 
   return { paymentId, tid, status: 'confirmed' };

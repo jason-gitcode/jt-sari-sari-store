@@ -165,6 +165,70 @@
   .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
   .section-title > span { min-width: 0; }
   .section-title .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .tenants-result-meta { font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 8px; letter-spacing: 0.2px; }
+
+  /* Tenants toolbar (search) */
+  .tenants-toolbar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+  .tenants-search-wrap { position: relative; flex: 1; min-width: 0; }
+  .tenants-search-wrap input {
+    width: 100%; padding: 9px 36px 9px 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--text); font-size: 14px; font-family: inherit;
+    outline: none; box-sizing: border-box;
+  }
+  .tenants-search-wrap input:focus { border-color: var(--accent); }
+  .tenants-search-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px; border: 0; border-radius: 50%;
+    background: var(--surface-2); color: var(--muted); cursor: pointer;
+    font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .tenants-search-clear:hover { background: var(--line); color: var(--text); }
+
+  /* Tenants pager */
+  .tenants-pager {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin-top: 16px; padding: 4px;
+  }
+  .tenants-page-indicator { font-size: 12px; color: var(--muted); }
+  .tenants-page-indicator strong { color: var(--text); }
+  .tenants-pager .btn-icon[disabled] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  /* Tx history tenant typeahead */
+  .tx-typeahead { position: relative; }
+  .tx-typeahead input {
+    width: 100%; padding: 7px 30px 7px 9px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); font-size: 13px; font-family: inherit;
+    outline: none; box-sizing: border-box;
+  }
+  .tx-typeahead input:focus { border-color: var(--accent); }
+  .tx-typeahead-clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; border: 0; border-radius: 50%;
+    background: var(--surface); color: var(--muted); cursor: pointer;
+    font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .tx-typeahead-clear:hover { background: var(--line); color: var(--text); }
+  .tx-typeahead-results {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    max-height: 280px; overflow-y: auto; z-index: 50;
+  }
+  .tx-typeahead-item {
+    display: block; width: 100%; text-align: left; padding: 9px 12px;
+    background: transparent; border: 0; border-bottom: 1px solid var(--line);
+    color: var(--text); font-family: inherit; cursor: pointer;
+  }
+  .tx-typeahead-item:last-child { border-bottom: 0; }
+  .tx-typeahead-item:hover { background: var(--surface-2); }
+  .tx-typeahead-name { font-size: 13px; font-weight: 500; }
+  .tx-typeahead-slug {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+  }
+  .tx-typeahead-empty { padding: 10px 12px; color: var(--muted); font-size: 12px; }
 
   /* Table */
   .table-wrap {
@@ -564,14 +628,23 @@
     <div class="stats">
       <div class="stat"><div class="stat-label">Total tenants</div><div class="stat-value" id="stat-total">—</div></div>
       <div class="stat"><div class="stat-label">Signed up in last 7 days</div><div class="stat-value" id="stat-recent">—</div></div>
-      <div class="stat"><div class="stat-label">Total products (all tenants)</div><div class="stat-value" id="stat-products">—</div></div>
-      <div class="stat"><div class="stat-label">Total orders (all tenants)</div><div class="stat-value" id="stat-orders">—</div></div>
+      <div class="stat"><div class="stat-label">Paid tenants (Growth + Pro)</div><div class="stat-value" id="stat-products">—</div></div>
+      <div class="stat"><div class="stat-label">Free tenants</div><div class="stat-value" id="stat-orders">—</div></div>
     </div>
 
     <div class="section-title">
-      <span>All tenants</span>
+      <span>All tenants <span id="tenants-result-meta" class="tenants-result-meta"></span></span>
       <div class="actions">
+        <button class="btn btn-icon" onclick="runBackfill()" title="Backfill tier mirror on tenant root docs (idempotent)">⚙ Backfill</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="tenants-toolbar">
+      <div class="tenants-search-wrap">
+        <input id="tenants-search-input" type="text" autocomplete="off"
+          placeholder="🔍 Search by store name or slug…" oninput="onTenantsSearchInput(event)" />
+        <button type="button" id="tenants-search-clear" class="tenants-search-clear" hidden
+          onclick="clearTenantsSearch()" aria-label="Clear search">×</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -579,19 +652,21 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th class="mobile-hide">Slug</th>
             <th>Plan</th>
             <th class="mobile-hide">Owner</th>
             <th class="mobile-hide">Created</th>
-            <th class="numeric mobile-hide">Products</th>
-            <th class="numeric mobile-hide">Orders</th>
             <th class="mobile-hide">Actions</th>
           </tr>
         </thead>
         <tbody id="tenants-tbody">
-          <tr><td colspan="8" class="loading">Loading tenants…</td></tr>
+          <tr><td colspan="5" class="loading">Loading tenants…</td></tr>
         </tbody>
       </table>
+    </div>
+    <div id="tenants-pager" class="tenants-pager" hidden>
+      <button type="button" class="btn btn-icon" id="tenants-prev-btn" onclick="goPrevTenantsPage()">← Prev</button>
+      <span class="tenants-page-indicator">Page <strong id="tenants-page-num">1</strong></span>
+      <button type="button" class="btn btn-icon" id="tenants-next-btn" onclick="goNextTenantsPage()">Next →</button>
     </div>
 
     <!-- ===== PENDING SUBSCRIPTION PAYMENTS ===== -->
@@ -618,11 +693,18 @@
     <div class="section-card">
       <div class="desc">All subscription payments across every tenant, sorted by most recent first. Filter by tenant to view per-store history.</div>
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; align-items:flex-end;">
-        <div style="flex: 1; min-width: 180px;">
+        <div style="flex: 1; min-width: 180px; position: relative;">
           <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;">Tenant</label>
-          <select id="tx-filter-tenant" onchange="loadTransactionHistory()" style="width:100%; padding: 7px 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-size: 13px;">
-            <option value="">All tenants</option>
-          </select>
+          <div class="tx-typeahead">
+            <input id="tx-tenant-search" type="text" autocomplete="off"
+              placeholder="All tenants — type to filter…"
+              oninput="onTxTenantSearchInput()"
+              onfocus="onTxTenantSearchFocus()" />
+            <button type="button" id="tx-tenant-clear" class="tx-typeahead-clear" hidden
+              onclick="clearTxTenant()" aria-label="Clear tenant filter">×</button>
+            <div id="tx-tenant-results" class="tx-typeahead-results" hidden></div>
+          </div>
+          <input type="hidden" id="tx-filter-tenant" value="" />
         </div>
         <div style="flex: 1; min-width: 140px;">
           <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;">Status</label>
@@ -807,6 +889,7 @@ const listPendingPaymentsFn  = functions.httpsCallable('listPendingPayments');
 const listPaymentsAllFn      = functions.httpsCallable('listPaymentsAll');
 const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
 const rejectManualPaymentFn  = functions.httpsCallable('rejectManualPayment');
+const backfillSubscriptionsFn = functions.httpsCallable('backfillSubscriptions');
 
 // Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
 const SUPERADMIN_EMAILS = new Set([
@@ -869,129 +952,165 @@ function shortEmail(e) {
   return e || '—';
 }
 
-let CACHED_TENANTS = [];
+// ============================================================
+// TENANTS TABLE — paginated, search-first, lazy-enriched.
+//
+// Scale design: list view reads ONLY tenant root docs (slug + name +
+// tier + ownerEmails + createdAt). The `tier` field is mirrored on the
+// root doc by createTenant / confirmManualPayment / startFreeTrial /
+// backfillSubscriptions, so the Plan column costs zero extra reads.
+//
+// Pagination uses cursor-based startAfter for O(1) Firestore reads per
+// page (50 docs) regardless of total tenant count. Forward only — Prev
+// rewinds via the cursor stack we maintain in memory.
+//
+// Search is slug-prefix only (Firestore doesn't do full-text); since
+// slugs are derived from names at signup, "tindahan" finds every store
+// with "tindahan" in its slug. Limit 50 results — if you can't find it
+// in 50 prefix matches, refine the query.
+// ============================================================
+const TENANTS_PAGE_SIZE = 50;
+// Firestore prefix-search upper bound: U+F8FF is a very high Unicode
+// private-use code point, so [q, q + PREFIX_UPPER_BOUND) matches every
+// string starting with `q`. Defined as a constant because the literal
+// is fragile to copy through editor encoding.
+const PREFIX_UPPER_BOUND = String.fromCharCode(0xF8FF);
+let CACHED_TENANTS = [];                // current page (rendered tenants)
+let TENANTS_CURSOR_STACK = [];          // lastVisible doc snapshots per page (index = pageNum - 1)
+let TENANTS_PAGE_NUM = 1;
+let TENANTS_HAS_NEXT = false;
+let TENANTS_SEARCH = '';
+let TENANTS_SEARCH_TIMER = null;
+// Legacy back-compat: openTenantModal + renameTenant still read
+// CACHED_COUNTS to surface subscription detail in the modal. We now
+// populate it lazily on row open instead of bulk-fetching at list time.
 let CACHED_COUNTS = [];
 
 async function loadTenants() {
   const tbody = document.getElementById('tenants-tbody');
-  tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading tenants…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading tenants…</td></tr>';
+
   try {
-    const snap = await db.collection('tenants').orderBy('createdAt', 'desc').get();
+    let snap;
+    if (TENANTS_SEARCH) {
+      // Slug-prefix search via document ID range. Cheap, single
+      // composite-index-free query. No pagination during search.
+      const q = TENANTS_SEARCH;
+      snap = await db.collection('tenants')
+        .where(firebase.firestore.FieldPath.documentId(), '>=', q)
+        .where(firebase.firestore.FieldPath.documentId(), '<', q + PREFIX_UPPER_BOUND)
+        .limit(TENANTS_PAGE_SIZE)
+        .get();
+    } else {
+      // Browse mode: paginated by createdAt desc.
+      let query = db.collection('tenants').orderBy('createdAt', 'desc').limit(TENANTS_PAGE_SIZE);
+      // Page 1 has no cursor; pages 2+ start after the cursor stashed
+      // by the previous page's load.
+      if (TENANTS_PAGE_NUM > 1) {
+        const cursor = TENANTS_CURSOR_STACK[TENANTS_PAGE_NUM - 2];
+        if (cursor) query = query.startAfter(cursor);
+      }
+      snap = await query.get();
+    }
+
     const tenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     CACHED_TENANTS = tenants;
+    // Clear CACHED_COUNTS — modal will re-fetch subscription detail on
+    // open. Index alignment with CACHED_TENANTS is preserved via the
+    // ensureTenantDetail() function called by openTenantModal.
+    CACHED_COUNTS = new Array(tenants.length).fill(null);
 
-    // Fetch product/order counts + subscription tier + settings tier in
-    // parallel per tenant.
-    //
-    // The legacy tenant.plan field still says 'starter' (createTenant
-    // sets it but doesn't update on tier changes), so we read tier from
-    // two places:
-    //   1. subscription/current.tier (private; preferred — also has status)
-    //   2. settings/store.tier (public mirror; fallback if (1) fails)
-    //
-    // The mirror is kept in sync by createTenant + confirmManualPayment +
-    // backfillSubscriptions. Either of these two sources reflects the
-    // truth, so we surface whichever is available.
-    //
-    // Errors are logged (no longer silently swallowed) so the next
-    // time something fails the cause is visible in DevTools.
-    const counts = await Promise.all(tenants.map(async (t) => {
-      try {
-        // NOTE: do NOT use collection.count().get() here — the aggregate
-        // count() API isn't exposed on Firestore compat in SDK 10.7.1 and
-        // throws *synchronously* with "count is not a function". That
-        // synchronous throw bypasses .catch() and bubbles up, aborting
-        // the entire Promise.all. snap.size from a normal get() is
-        // version-safe and fine at pilot scale (a few hundred reads per
-        // tenant). Revisit when a tenant crosses ~10K products/orders.
-        const [pCount, oCount, subSnap, settingsSnap] = await Promise.all([
-          db.collection('tenants').doc(t.id).collection('products').get()
-            .then(snap => snap.size)
-            .catch(e => { console.warn('[loadTenants] products read failed for', t.id, ':', e.message); return null; }),
-          db.collection('tenants').doc(t.id).collection('orders').get()
-            .then(snap => snap.size)
-            .catch(e => { console.warn('[loadTenants] orders read failed for', t.id, ':', e.message); return null; }),
-          db.collection('tenants').doc(t.id).collection('subscription').doc('current').get()
-            .catch(e => { console.warn('[loadTenants] subscription read failed for', t.id, ':', e.message); return null; }),
-          db.collection('tenants').doc(t.id).collection('settings').doc('store').get()
-            .catch(e => { console.warn('[loadTenants] settings read failed for', t.id, ':', e.message); return null; })
-        ]);
-        const sub = (subSnap && subSnap.exists) ? subSnap.data() : null;
-        const settingsTier = (settingsSnap && settingsSnap.exists) ? (settingsSnap.data() || {}).tier : null;
-        return { products: pCount, orders: oCount, sub, settingsTier };
-      } catch (e) {
-        console.warn('[loadTenants] unhandled error for', t.id, ':', e.message);
-        return { products: null, orders: null, sub: null, settingsTier: null };
-      }
-    }));
+    // Pagination flags. Heuristic: if we got exactly PAGE_SIZE, assume
+    // there's a next page (one extra empty fetch on perfect-PAGE_SIZE
+    // tail is the worst case — acceptable).
+    TENANTS_HAS_NEXT = !TENANTS_SEARCH && tenants.length === TENANTS_PAGE_SIZE;
+    if (!TENANTS_SEARCH && tenants.length > 0) {
+      TENANTS_CURSOR_STACK[TENANTS_PAGE_NUM - 1] = snap.docs[snap.docs.length - 1];
+    }
 
-    CACHED_COUNTS = counts;
-    renderStats(tenants, counts);
-    renderTable(tenants, counts);
+    renderTable(tenants);
+    renderPagination();
+    renderTenantsMeta(tenants);
   } catch (err) {
-    console.error(err);
-    tbody.innerHTML = `<tr><td colspan="8" class="loading" style="color:var(--error);">Error loading tenants: ${err.message || err}</td></tr>`;
+    console.error('[loadTenants] failed:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="loading" style="color:var(--error);">Error loading tenants: ${escText(err.message || String(err))}</td></tr>`;
+  }
+
+  // Refresh the platform-overview stat cards independently. These use
+  // cheap, single-field queries and don't block the table render.
+  loadTenantStats();
+}
+
+// ----- Lightweight stat cards (separate from list pagination) -----
+async function loadTenantStats() {
+  // Total tenants from public/directory (1 read). Falls back to "—" if
+  // the directory doc is missing.
+  try {
+    const dirSnap = await db.collection('public').doc('directory').get();
+    const stores = (dirSnap.exists ? (dirSnap.data() || {}).stores : null) || [];
+    document.getElementById('stat-total').textContent = stores.length.toLocaleString();
+  } catch (e) {
+    console.warn('[loadTenantStats] directory read failed:', e.message);
+    document.getElementById('stat-total').textContent = '—';
+  }
+  // Signed up in last 7 days — server-side filter, cost = only the
+  // tenants matching (small at any scale).
+  try {
+    const cutoff = firebase.firestore.Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const snap = await db.collection('tenants').where('createdAt', '>', cutoff).get();
+    document.getElementById('stat-recent').textContent = snap.size.toLocaleString();
+  } catch (e) {
+    console.warn('[loadTenantStats] recent read failed:', e.message);
+    document.getElementById('stat-recent').textContent = '—';
+  }
+  // Paid tenants — single-field `in` query, no composite index needed.
+  // Uses the new tier mirror on the tenant root doc.
+  try {
+    const snap = await db.collection('tenants').where('tier', 'in', ['growth', 'pro']).get();
+    document.getElementById('stat-products').textContent = snap.size.toLocaleString();
+  } catch (e) {
+    console.warn('[loadTenantStats] paid read failed:', e.message);
+    document.getElementById('stat-products').textContent = '—';
+  }
+  // Trialing tenants — same shape, filtered on tier mirror. Trialing
+  // tenants have tier != free (subscription.status = 'trialing' set
+  // the tier during startFreeTrial). Distinguishing trialing from
+  // active without per-tenant subscription reads would require another
+  // root-doc mirror; for now we show "Paid + Trialing" combined in the
+  // "Paid" stat and use this slot for "Free tenants".
+  try {
+    const snap = await db.collection('tenants').where('tier', '==', 'free').get();
+    document.getElementById('stat-orders').textContent = snap.size.toLocaleString();
+  } catch (e) {
+    console.warn('[loadTenantStats] free read failed:', e.message);
+    document.getElementById('stat-orders').textContent = '—';
   }
 }
 
-function renderStats(tenants, counts) {
-  document.getElementById('stat-total').textContent = tenants.length;
-  const now = Date.now();
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  const recent = tenants.filter(t => {
-    if (!t.createdAt) return false;
-    const ms = t.createdAt.toMillis ? t.createdAt.toMillis() : new Date(t.createdAt).getTime();
-    return (now - ms) < sevenDays;
-  }).length;
-  document.getElementById('stat-recent').textContent = recent;
-  const totalProducts = counts.reduce((s, c) => s + (c.products || 0), 0);
-  const totalOrders = counts.reduce((s, c) => s + (c.orders || 0), 0);
-  document.getElementById('stat-products').textContent = totalProducts.toLocaleString();
-  document.getElementById('stat-orders').textContent = totalOrders.toLocaleString();
-}
-
-function renderTable(tenants, counts) {
+function renderTable(tenants) {
   const tbody = document.getElementById('tenants-tbody');
   if (tenants.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">No tenants yet. Share <a href="/signup/" style="color:var(--accent);">pabilimart.com/signup/</a> to onboard.</td></tr>';
+    const msg = TENANTS_SEARCH
+      ? `No tenants match "${escText(TENANTS_SEARCH)}". Try a different prefix.`
+      : 'No tenants yet. Share <a href="/signup/" style="color:var(--accent);">pabilimart.com/signup/</a> to onboard.';
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">${msg}</td></tr>`;
     return;
   }
   tbody.innerHTML = tenants.map((t, i) => {
-    const c = counts[i] || {};
-    // Read the real subscription tier/status (Free / Growth / Pro /
-    // Trialing / Past Due / ...). Three-tier fallback:
-    //   1. subscription/current — has tier AND status (private doc)
-    //   2. settings/store.tier  — public mirror; covers the case where
-    //      the private read fails for any reason
-    //   3. 'free' default       — for tenants with neither
-    let pillClass = 'free';
-    let pillLabel = 'free';
-    if (c.sub) {
-      const tier = (c.sub.tier || 'free').toLowerCase();
-      const status = (c.sub.status || 'active').toLowerCase();
-      if (status === 'trialing') { pillClass = 'trialing'; pillLabel = 'Trialing'; }
-      else if (status === 'past_due' || status === 'grace' || status === 'suspended') {
-        pillClass = status; pillLabel = status.replace('_', ' ');
-      }
-      else { pillClass = tier; pillLabel = tier; }
-    } else if (c.settingsTier) {
-      // Subscription read returned nothing (or failed), but the public
-      // tier mirror is available — use it.
-      const tier = c.settingsTier.toLowerCase();
-      pillClass = tier;
-      pillLabel = tier;
-    }
+    const tier = (t.tier || 'free').toLowerCase();
+    const pillClass = ['free', 'growth', 'pro'].includes(tier) ? tier : 'free';
+    const pillLabel = pillClass.charAt(0).toUpperCase() + pillClass.slice(1);
     const owner = Array.isArray(t.ownerEmails) && t.ownerEmails.length > 0 ? t.ownerEmails[0] : (t.createdByEmail || '—');
     const ownerSuffix = (Array.isArray(t.ownerEmails) && t.ownerEmails.length > 1) ? ` +${t.ownerEmails.length - 1}` : '';
     return `
       <tr>
-        <td class="name"><button class="row-open-btn" onclick="openTenantModal(${i})" title="${escText(t.name || t.id)}">${escText(t.name || '—')}</button></td>
-        <td class="slug mobile-hide">${t.id}</td>
+        <td class="name">
+          <button class="row-open-btn" onclick="openTenantModal(${i})" title="${escText(t.name || t.id)}">${escText(t.name || '—')}</button>
+          <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--muted);margin-top:2px;">/${escText(t.id)}/</div>
+        </td>
         <td class="plan"><span class="pill ${pillClass}">${pillLabel}</span></td>
         <td class="owner mobile-hide" title="${escText(owner)}">${escText(owner)}${ownerSuffix}</td>
         <td class="created mobile-hide">${formatDate(t.createdAt)}</td>
-        <td class="numeric mobile-hide">${c.products == null ? '—' : c.products}</td>
-        <td class="numeric mobile-hide">${c.orders == null ? '—' : c.orders}</td>
         <td class="actions mobile-hide">
           <a class="btn btn-icon" href="/${t.id}/" target="_blank" title="Open storefront">🌐</a>
           <a class="btn btn-icon" href="/${t.id}/admin/" target="_blank" title="Open admin">⚙️</a>
@@ -1002,7 +1121,106 @@ function renderTable(tenants, counts) {
   }).join('');
 }
 
-function refresh() { loadTenants(); }
+function renderPagination() {
+  const pager = document.getElementById('tenants-pager');
+  if (!pager) return;
+  if (TENANTS_SEARCH) { pager.hidden = true; return; }
+  pager.hidden = false;
+  document.getElementById('tenants-page-num').textContent = String(TENANTS_PAGE_NUM);
+  document.getElementById('tenants-prev-btn').disabled = TENANTS_PAGE_NUM <= 1;
+  document.getElementById('tenants-next-btn').disabled = !TENANTS_HAS_NEXT;
+}
+
+function renderTenantsMeta(tenants) {
+  const meta = document.getElementById('tenants-result-meta');
+  if (!meta) return;
+  if (TENANTS_SEARCH) {
+    meta.textContent = `· ${tenants.length} match${tenants.length === 1 ? '' : 'es'} for "${TENANTS_SEARCH}"`;
+  } else {
+    const start = (TENANTS_PAGE_NUM - 1) * TENANTS_PAGE_SIZE + 1;
+    const end = start + tenants.length - 1;
+    meta.textContent = tenants.length > 0 ? `· showing ${start}–${end}` : '';
+  }
+}
+
+function refresh() {
+  TENANTS_PAGE_NUM = 1;
+  TENANTS_CURSOR_STACK = [];
+  loadTenants();
+}
+
+// One-click migration: writes tier mirror to every tenant root doc.
+// Idempotent (merge:true), safe to run multiple times. Required once
+// after the v211 deploy that introduced the root-doc tier mirror.
+async function runBackfill() {
+  if (!confirm('Run subscription/tier backfill across all tenants? Idempotent — safe to run multiple times.')) return;
+  try {
+    const res = await backfillSubscriptionsFn({});
+    const d = (res && res.data) || {};
+    alert(`Backfill complete:\nseeded: ${d.seeded || 0}\nskipped: ${d.skipped || 0}\ntier synced: ${d.tierSynced || 0}\ntotal: ${d.total || 0}`);
+    refresh();
+  } catch (err) {
+    console.error('backfill failed:', err);
+    alert('Backfill failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+function goNextTenantsPage() {
+  if (!TENANTS_HAS_NEXT) return;
+  TENANTS_PAGE_NUM += 1;
+  loadTenants();
+}
+function goPrevTenantsPage() {
+  if (TENANTS_PAGE_NUM <= 1) return;
+  TENANTS_PAGE_NUM -= 1;
+  // Trim future cursors so re-Next refetches cleanly.
+  TENANTS_CURSOR_STACK = TENANTS_CURSOR_STACK.slice(0, TENANTS_PAGE_NUM);
+  loadTenants();
+}
+
+function onTenantsSearchInput(e) {
+  const v = (e.target.value || '').trim().toLowerCase();
+  clearTimeout(TENANTS_SEARCH_TIMER);
+  TENANTS_SEARCH_TIMER = setTimeout(() => {
+    TENANTS_SEARCH = v;
+    TENANTS_PAGE_NUM = 1;
+    TENANTS_CURSOR_STACK = [];
+    document.getElementById('tenants-search-clear').hidden = !v;
+    loadTenants();
+  }, 250);
+}
+function clearTenantsSearch() {
+  const input = document.getElementById('tenants-search-input');
+  input.value = '';
+  TENANTS_SEARCH = '';
+  TENANTS_PAGE_NUM = 1;
+  TENANTS_CURSOR_STACK = [];
+  document.getElementById('tenants-search-clear').hidden = true;
+  loadTenants();
+  input.focus();
+}
+
+// ----- Lazy detail fetch (subscription + counts) for the tenant modal -----
+async function ensureTenantDetail(idx) {
+  if (CACHED_COUNTS[idx]) return CACHED_COUNTS[idx];
+  const t = CACHED_TENANTS[idx];
+  if (!t) return null;
+  try {
+    const [subSnap, settingsSnap] = await Promise.all([
+      db.collection('tenants').doc(t.id).collection('subscription').doc('current').get()
+        .catch(e => { console.warn('[ensureTenantDetail] sub read failed for', t.id, ':', e.message); return null; }),
+      db.collection('tenants').doc(t.id).collection('settings').doc('store').get()
+        .catch(e => { console.warn('[ensureTenantDetail] settings read failed for', t.id, ':', e.message); return null; })
+    ]);
+    const sub = (subSnap && subSnap.exists) ? subSnap.data() : null;
+    const settingsTier = (settingsSnap && settingsSnap.exists) ? (settingsSnap.data() || {}).tier : null;
+    CACHED_COUNTS[idx] = { sub, settingsTier };
+    return CACHED_COUNTS[idx];
+  } catch (e) {
+    console.warn('[ensureTenantDetail] unhandled error for', t.id, ':', e.message);
+    return null;
+  }
+}
 
 // ----- Tenant detail modal (opened by clicking Name in the table) -----
 function modalRow(label, valueHtml) {
@@ -1023,31 +1241,19 @@ function openTenantModal(idx) {
   CURRENT_TENANT_IDX = idx;
   const owners = Array.isArray(t.ownerEmails) ? t.ownerEmails : [];
   const ownerHtml = owners.length === 0 ? '—' : owners.map(e => escText(e)).join('<br>');
-  // Pull the cached subscription from the parallel counts array so we can
-  // surface the real tier/status the same way the Plan pill in the table
-  // does — useful diagnostic when the table looks out of date.
-  const cIdx = (typeof idx === 'number') ? idx : -1;
-  const c = (cIdx >= 0 && Array.isArray(CACHED_COUNTS)) ? CACHED_COUNTS[cIdx] : null;
-  const sub = c && c.sub ? c.sub : null;
-  // Use subscription if available, fall back to settings.tier mirror.
-  const resolvedTier = sub ? sub.tier : (c && c.settingsTier ? c.settingsTier : null);
-  const tierLabel = resolvedTier
-    ? (({ free: 'Free', growth: 'Growth', pro: 'Pro' })[resolvedTier] || resolvedTier)
-    : 'Free (no subscription doc)';
-  const tierSource = sub ? '' : (c && c.settingsTier ? ' (from settings mirror — subscription read unavailable)' : '');
-  const statusLabel = sub
-    ? (({ trialing: 'Trialing', active: 'Active', past_due: 'Past due', grace: 'Grace', suspended: 'Suspended', cancelled: 'Cancelled' })[sub.status] || sub.status || 'Active')
-    : '—';
-  const lastConfirmed = (sub && sub.lastConfirmedAt)
-    ? (sub.lastConfirmedAt.toDate ? formatDate(sub.lastConfirmedAt) : formatDate(new Date(sub.lastConfirmedAt)))
-    : '—';
+  // Fast path: render immediately from the tenant root doc (no extra
+  // reads). Plan comes from the root-doc tier mirror. Subscription
+  // status + last confirmed payment are filled in once the lazy detail
+  // fetch resolves below.
+  const rootTier = (t.tier || 'free').toLowerCase();
+  const tierLabel = ({ free: 'Free', growth: 'Growth', pro: 'Pro' })[rootTier] || rootTier;
 
   document.getElementById('tm-title').textContent = t.name || t.id;
   document.getElementById('tm-body').innerHTML = [
     modalRow('Store name', escText(t.name || '—')),
     modalRowMono('Slug', '/' + escText(t.id) + '/'),
-    modalRow('Plan', `${escText(tierLabel)}${escText(tierSource)} <span class="v sub" style="display:inline; margin-left:6px;">· status: ${escText(statusLabel)}</span>`),
-    modalRow('Last confirmed payment', escText(lastConfirmed)),
+    modalRow('Plan', `${escText(tierLabel)} <span class="v sub" id="tm-status-line" style="display:inline; margin-left:6px;">· loading status…</span>`),
+    modalRow('Last confirmed payment', '<span id="tm-last-confirmed">loading…</span>'),
     modalRow('Owner' + (owners.length > 1 ? 's' : ''), ownerHtml),
     modalRow('Created', t.createdAt ? formatDate(t.createdAt) : '—')
   ].join('');
@@ -1059,6 +1265,24 @@ function openTenantModal(idx) {
     <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete</button>
   `;
   document.getElementById('tenant-modal').classList.add('show');
+
+  // Lazy fetch the subscription detail to fill in status + last
+  // confirmed payment. If the modal is closed before the fetch returns,
+  // the elements are simply gone and the writes no-op.
+  ensureTenantDetail(idx).then(detail => {
+    if (CURRENT_TENANT_IDX !== idx) return;
+    const sub = detail && detail.sub ? detail.sub : null;
+    const statusLabel = sub
+      ? (({ trialing: 'Trialing', active: 'Active', past_due: 'Past due', grace: 'Grace', suspended: 'Suspended', cancelled: 'Cancelled' })[sub.status] || sub.status || 'Active')
+      : 'No subscription doc';
+    const lastConfirmed = (sub && sub.lastConfirmedAt)
+      ? (sub.lastConfirmedAt.toDate ? formatDate(sub.lastConfirmedAt) : formatDate(new Date(sub.lastConfirmedAt)))
+      : '—';
+    const statusEl = document.getElementById('tm-status-line');
+    const lastEl = document.getElementById('tm-last-confirmed');
+    if (statusEl) statusEl.textContent = '· status: ' + statusLabel;
+    if (lastEl) lastEl.textContent = lastConfirmed;
+  });
 }
 
 // Inline rename flow — replaces tm-actions with an input + Save/Cancel.
@@ -1251,9 +1475,9 @@ auth.onAuthStateChanged(user => {
   loadInviteCodes();
   loadPendingPayments();
   subscribePlatformBilling();
-  // Populate the tx history tenant filter when tenants finish loading.
-  setTimeout(populateTxTenantFilter, 800);
-  // Auto-load the tx history table on first sign-in.
+  // Auto-load the tx history table on first sign-in. The tenant filter
+  // is now a typeahead (queries Firestore on input), so no pre-population
+  // is needed.
   loadTransactionHistory();
 });
 
@@ -1262,25 +1486,90 @@ auth.onAuthStateChanged(user => {
 // ============================================================
 let __lastTxHistory = [];
 
-function populateTxTenantFilter() {
-  const sel = document.getElementById('tx-filter-tenant');
-  if (!sel) return;
-  if (!CACHED_TENANTS || CACHED_TENANTS.length === 0) {
-    setTimeout(populateTxTenantFilter, 800);
+// ----- Tenant-filter typeahead (replaces the old all-tenants <select>) -----
+// At pilot scale a dropdown was fine; at 5K+ tenants it isn't. This
+// typeahead does a slug-prefix Firestore query per keystroke (debounced
+// 250ms), max 10 results. The hidden #tx-filter-tenant input holds the
+// resolved slug that loadTransactionHistory reads.
+let TX_TENANT_TIMER = null;
+function onTxTenantSearchInput() {
+  const input = document.getElementById('tx-tenant-search');
+  const q = (input.value || '').trim().toLowerCase();
+  document.getElementById('tx-tenant-clear').hidden = !input.value;
+  clearTimeout(TX_TENANT_TIMER);
+  TX_TENANT_TIMER = setTimeout(async () => {
+    // Cleared input → revert to "All tenants" and reload.
+    if (!q) {
+      document.getElementById('tx-tenant-results').hidden = true;
+      const hidden = document.getElementById('tx-filter-tenant');
+      if (hidden.value !== '') { hidden.value = ''; loadTransactionHistory(); }
+      return;
+    }
+    try {
+      const snap = await db.collection('tenants')
+        .where(firebase.firestore.FieldPath.documentId(), '>=', q)
+        .where(firebase.firestore.FieldPath.documentId(), '<', q + PREFIX_UPPER_BOUND)
+        .limit(10).get();
+      const matches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderTxTenantResults(matches);
+    } catch (err) {
+      console.warn('[onTxTenantSearchInput] failed:', err.message);
+      const wrap = document.getElementById('tx-tenant-results');
+      wrap.innerHTML = '<div class="tx-typeahead-empty">Search error — try again.</div>';
+      wrap.hidden = false;
+    }
+  }, 250);
+}
+function onTxTenantSearchFocus() {
+  const input = document.getElementById('tx-tenant-search');
+  if (input.value) onTxTenantSearchInput();
+}
+function renderTxTenantResults(matches) {
+  const wrap = document.getElementById('tx-tenant-results');
+  if (!matches || matches.length === 0) {
+    wrap.innerHTML = '<div class="tx-typeahead-empty">No tenants match.</div>';
+    wrap.hidden = false;
     return;
   }
-  const current = sel.value;
-  const options = ['<option value="">All tenants</option>'].concat(
-    CACHED_TENANTS.map(t => `<option value="${escTextSA(t.id)}">${escTextSA(t.name || t.id)}</option>`)
-  );
-  sel.innerHTML = options.join('');
-  sel.value = current;
+  wrap.innerHTML = matches.map(t => {
+    const tid = escTextSA(t.id);
+    const name = escTextSA(t.name || t.id);
+    // onclick uses JSON-escaped args so quotes in names don't break the
+    // attribute. JSON.stringify gives us '"…"' which we keep as-is.
+    return `<button type="button" class="tx-typeahead-item" onclick='selectTxTenant(${JSON.stringify(t.id)}, ${JSON.stringify(t.name || t.id)})'>
+      <div class="tx-typeahead-name">${name}</div>
+      <div class="tx-typeahead-slug">/${tid}/</div>
+    </button>`;
+  }).join('');
+  wrap.hidden = false;
 }
+function selectTxTenant(tid, name) {
+  document.getElementById('tx-tenant-search').value = name;
+  document.getElementById('tx-filter-tenant').value = tid;
+  document.getElementById('tx-tenant-results').hidden = true;
+  document.getElementById('tx-tenant-clear').hidden = false;
+  loadTransactionHistory();
+}
+function clearTxTenant() {
+  document.getElementById('tx-tenant-search').value = '';
+  document.getElementById('tx-filter-tenant').value = '';
+  document.getElementById('tx-tenant-clear').hidden = true;
+  document.getElementById('tx-tenant-results').hidden = true;
+  loadTransactionHistory();
+}
+// Click outside the typeahead → close the results dropdown.
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.tx-typeahead');
+  if (!wrap) return;
+  if (!wrap.contains(e.target)) {
+    const results = document.getElementById('tx-tenant-results');
+    if (results) results.hidden = true;
+  }
+});
 
 async function loadTransactionHistory() {
   const tbody = document.getElementById('tx-tbody');
   if (!tbody) return;
-  populateTxTenantFilter();
   const tid = (document.getElementById('tx-filter-tenant').value || '').trim();
   const status = (document.getElementById('tx-filter-status').value || '').trim();
   tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading transactions…</td></tr>';
