@@ -729,10 +729,13 @@
 
     /* Logo cropper — circular spotlight over the canvas with dark corners
        indicating the area customers won't see. touch-action:none stops
-       the page from scrolling while the user drags inside the stage. */
+       the page from scrolling while the user drags inside the stage.
+       Width is responsive so the stage shrinks cleanly on narrow phones
+       instead of overflowing the modal. */
     .logo-crop-stage {
       position: relative;
-      width: 280px; height: 280px;
+      width: 100%; max-width: 280px;
+      aspect-ratio: 1 / 1;
       margin: 0 auto;
       border-radius: 10px;
       overflow: hidden;
@@ -742,14 +745,14 @@
     }
     .logo-crop-stage canvas {
       display: block;
-      width: 280px; height: 280px;
+      width: 100%; height: 100%;
       cursor: grab;
     }
     .logo-crop-stage canvas:active { cursor: grabbing; }
     .logo-crop-mask {
       position: absolute;
       top: 0; left: 0;
-      width: 280px; height: 280px;
+      width: 100%; height: 100%;
       border-radius: 50%;
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
       pointer-events: none;
@@ -3573,7 +3576,7 @@
       </div>
       <div style="margin-top: 14px;">
         <label for="logo-zoom-slider" style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px;">Zoom</label>
-        <input type="range" id="logo-zoom-slider" min="0.5" max="3" step="0.01" value="1" style="width: 100%;" />
+        <input type="range" id="logo-zoom-slider" min="1" max="5" step="0.01" value="1" style="width: 100%;" />
       </div>
       <div style="font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.4;">
         Drag to reposition. Use the slider (or scroll on desktop) to zoom. The circle shows what your customers will see in the storefront header.
@@ -4883,28 +4886,40 @@ async function applyLogoCrop() {
   out.width = LOGO_STAGE;
   out.height = LOGO_STAGE;
   const ctx = out.getContext('2d');
-  if (logoCrop.srcMime !== 'image/png') {
-    // JPEG can't carry transparency — paint white behind so the corners
-    // (which the storefront circle will mask away anyway) aren't black.
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, LOGO_STAGE, LOGO_STAGE);
-  }
+  // Apply a circular clip so the saved logo has transparent corners.
+  // The storefront's round container then shows the logo edge-to-edge
+  // with no whitespace, regardless of source aspect or how the user
+  // zoomed in the cropper.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(LOGO_STAGE / 2, LOGO_STAGE / 2, LOGO_STAGE / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  // Fill the inside of the circle with white so any uncovered area
+  // (if the user zoomed below the cover-fit baseline) reads as clean
+  // white instead of transparent-through-to-page-background.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, LOGO_STAGE, LOGO_STAGE);
   const s = logoCrop.coverScale * logoCrop.scale;
   const w = logoCrop.img.width * s;
   const h = logoCrop.img.height * s;
   const x = (LOGO_STAGE - w) / 2 + logoCrop.tx;
   const y = (LOGO_STAGE - h) / 2 + logoCrop.ty;
   ctx.drawImage(logoCrop.img, x, y, w, h);
+  ctx.restore();
 
+  // Always output PNG to preserve the transparent corners outside the
+  // clip. Photos round-trip a bit larger than JPEG, so the size cap
+  // is bumped accordingly.
   let dataUrl;
   try {
-    dataUrl = out.toDataURL(logoCrop.srcMime, logoCrop.srcMime === 'image/jpeg' ? 0.88 : 1);
+    dataUrl = out.toDataURL('image/png');
   } catch (err) {
     alert('Failed to render logo: ' + (err && err.message ? err.message : err));
     return;
   }
-  if (dataUrl.length > 220000) {
-    alert('That image is too detailed even after cropping. Please try a simpler logo or a JPEG.');
+  if (dataUrl.length > 350000) {
+    alert('That image is too detailed even after cropping. Please try a simpler or smaller logo.');
     return;
   }
   try {
@@ -4937,8 +4952,14 @@ async function applyLogoCrop() {
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!dragging) return;
-      logoCrop.tx += e.clientX - lastX;
-      logoCrop.ty += e.clientY - lastY;
+      // Scale CSS-pixel finger movement into canvas-pixel coords so the
+      // image tracks 1:1 with the finger, even when the stage is shrunk
+      // on narrow phones (canvas internal res stays LOGO_STAGE, CSS res
+      // is smaller).
+      const cssW = canvas.clientWidth || LOGO_STAGE;
+      const k = LOGO_STAGE / cssW;
+      logoCrop.tx += (e.clientX - lastX) * k;
+      logoCrop.ty += (e.clientY - lastY) * k;
       lastX = e.clientX;
       lastY = e.clientY;
       drawLogoCropPreview();
@@ -4954,7 +4975,7 @@ async function applyLogoCrop() {
       if (!logoCrop.img) return;
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-      logoCrop.scale = Math.max(0.5, Math.min(3, logoCrop.scale * factor));
+      logoCrop.scale = Math.max(1, Math.min(5, logoCrop.scale * factor));
       slider.value = String(logoCrop.scale);
       drawLogoCropPreview();
     }, { passive: false });

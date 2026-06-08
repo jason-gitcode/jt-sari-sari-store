@@ -163,10 +163,12 @@
     border-radius: 50%; overflow: hidden;
     background: #fff;
     display: flex; align-items: center; justify-content: center;
-    padding: 3px;
     position: relative;
   }
-  #brand-logo img { height: 100%; width: 100%; object-fit: contain; }
+  /* object-fit: cover so the image fills the circle edge-to-edge.
+     The admin cropper saves a circle-masked PNG so the corners are
+     already transparent — cover just keeps the centered crop tight. */
+  #brand-logo img { height: 100%; width: 100%; object-fit: cover; }
   /* Initials placeholder — auto-shown for non-seed tenants who haven't
      uploaded a custom logo yet. Two-letter abbreviation of the store
      name, e.g. "Tindahan ni Jacob" → "TJ". JS computes the value. */
