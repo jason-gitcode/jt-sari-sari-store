@@ -374,8 +374,13 @@
     flex: 1; min-width: 0; text-align: center;
   }
   .mock-header-real .mock-store-name {
-    font-size: 13px; font-weight: 700; color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 12px; font-weight: 700; color: var(--ink);
+    line-height: 1.2;
+    /* Allow wrap so longer real-world store names — "Carinderia ni
+       Sabrina", "Tindahan ni Lola Mercedes" — render fully instead of
+       getting cut off with an ellipsis. */
+    white-space: normal; word-break: break-word;
+    text-align: center;
   }
   .mock-header-real .mock-cart { margin-left: 0; }
 
@@ -1352,6 +1357,7 @@
       Pabili Mart
     </a>
     <div class="nav-actions">
+      <a href="#home"     class="nav-link" data-page-link="home">Home</a>
       <a href="#features" class="nav-link" data-page-link="features">Features</a>
       <a href="#plans"    class="nav-link" data-page-link="plans">Plans</a>
       <a href="#faq"      class="nav-link" data-page-link="faq">FAQ</a>
@@ -1385,7 +1391,7 @@
               <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
               <div class="mock-header mock-header-real">
                 <div class="mock-logo">🏪</div>
-                <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Maria</div></div>
+                <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Jacob</div></div>
                 <div class="mock-cart">🛒<span class="mock-cart-badge">2</span></div>
               </div>
               <div class="mock-ticker">
@@ -1461,7 +1467,7 @@
               <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
               <div class="mock-header mock-header-real">
                 <div class="mock-logo">🍳</div>
-                <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Maria</div></div>
+                <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Sabrina</div></div>
                 <div class="mock-cart">🛒<span class="mock-cart-badge">3</span></div>
               </div>
               <div class="mock-ticker">
@@ -1613,7 +1619,7 @@
             <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
             <div class="mock-header mock-header-real">
               <div class="mock-logo">🏪</div>
-              <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Maria</div></div>
+              <div class="mock-store-text"><div class="mock-store-name">Tindahan ni Jacob</div></div>
               <div class="mock-cart">🛒<span class="mock-cart-badge">2</span></div>
             </div>
             <div class="mock-ticker">
@@ -1674,7 +1680,7 @@
             <div class="phone-statusbar"><span>9:41</span><span class="phone-statusbar-icons">📶 100%</span></div>
             <div class="mock-header mock-header-real">
               <div class="mock-logo">🍳</div>
-              <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Maria</div></div>
+              <div class="mock-store-text"><div class="mock-store-name">Carinderia ni Sabrina</div></div>
               <div class="mock-cart">🛒<span class="mock-cart-badge">3</span></div>
             </div>
             <div class="mock-ticker">
@@ -2342,12 +2348,14 @@ function clearStatus() {
 // ============================================================
 // The landing page presents Home / Features / Plans / FAQ / Sign in as
 // separate "pages" — sections with [data-page] only show when their
-// page is active. URL hash drives the state so refresh + back-button
-// behave like a real multi-page site.
+// page is active. URL hash drives state so refresh + back-button work
+// like a real multi-page site. All in-page links go through
+// navigateToPage so we can scroll to the TOP of each page instead of
+// letting the browser's default anchor-jump land mid-section.
 const PAGE_LIST = ['home', 'features', 'plans', 'faq', 'signup'];
 function getPageFromHash() {
   const raw = (location.hash || '').replace(/^#/, '').toLowerCase();
-  // Allow #pricing (legacy CTA target) to alias into Plans for back-compat.
+  // Legacy #pricing CTA target aliases into Plans for back-compat.
   if (raw === 'pricing') return 'plans';
   return PAGE_LIST.includes(raw) ? raw : 'home';
 }
@@ -2359,16 +2367,48 @@ function showPage(name, opts = {}) {
   document.querySelectorAll('[data-page-link]').forEach(a => {
     a.classList.toggle('active', a.getAttribute('data-page-link') === target);
   });
-  // Scroll back to the top whenever the page changes (mimics a normal
-  // multi-page navigation).
   if (opts.scroll !== false) {
-    window.scrollTo({ top: 0, behavior: opts.smooth === false ? 'auto' : 'smooth' });
+    // 'auto' (instant) avoids a smooth-scroll bounce between the browser's
+    // default anchor jump and our reset — and matches the multi-page
+    // feel where each "navigation" lands at the very top of the page.
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
   document.body.setAttribute('data-current-page', target);
 }
+function navigateToPage(target) {
+  const safe = PAGE_LIST.includes(target) ? target : 'home';
+  // Push the hash via History API so it doesn't fire hashchange and
+  // doesn't trigger the browser's default anchor-jump scroll.
+  if (location.hash !== '#' + safe) {
+    history.pushState(null, '', '#' + safe);
+  }
+  showPage(safe);
+}
+// Single delegated click handler — intercepts every nav link, plan-card
+// CTA, and hero "Start your store" anchor that targets a known page,
+// preventDefault so the browser doesn't try to scroll to the element
+// (which would land mid-section under the sticky topbar), then routes
+// through navigateToPage.
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('a[href^="#"], [data-page-link]');
+  if (!link) return;
+  let target;
+  if (link.hasAttribute('data-page-link')) {
+    target = link.getAttribute('data-page-link');
+  } else {
+    target = (link.getAttribute('href') || '').replace(/^#/, '').toLowerCase();
+    if (target === 'pricing') target = 'plans';
+    if (target === '') target = 'home';
+  }
+  if (!PAGE_LIST.includes(target)) return; // unknown anchor — let default fire
+  e.preventDefault();
+  navigateToPage(target);
+});
+// Browser back/forward + any external hash mutation.
+window.addEventListener('popstate', () => showPage(getPageFromHash()));
 window.addEventListener('hashchange', () => showPage(getPageFromHash()));
-// Initial render — no smooth scroll on first paint (jumpy on slow phones).
-showPage(getPageFromHash(), { smooth: false });
+// Initial render on load.
+showPage(getPageFromHash(), { scroll: false });
 
 // ============================================================
 // Plans page — tab switcher
@@ -2443,14 +2483,13 @@ function selectTier(tier) {
     banner.classList.toggle('tier-free', tier === 'free');
     banner.classList.remove('hidden');
   }
-  // Navigate to the signup "page" via the router. Updating location.hash
-  // fires the hashchange listener which shows the signup section and
-  // scrolls to top.
-  location.hash = '#signup';
+  // Navigate to the Signup page through the router so we land at the
+  // very top instead of mid-section under the sticky topbar.
+  navigateToPage('signup');
 }
 function scrollToPricing() {
   // Legacy callsite — Plans page now hosts the pricing UI.
-  location.hash = '#plans';
+  navigateToPage('plans');
 }
 
 // First showStep call comes from the initial onAuthStateChanged hookup
