@@ -1572,7 +1572,8 @@ tdoc('settings', 'store').onSnapshot(snap => {
   if (customLogoOn) {
     if (brandLogoEl) brandLogoEl.classList.remove('initials-mode');
     if (brandLogoImg) brandLogoImg.src = storeSettingsData.logoDataUrl;
-    if (nameEl) nameEl.style.display = 'none';
+    // Keep the store name visible — logo sits beside it, doesn't replace it.
+    if (nameEl) nameEl.style.display = '';
   } else if (TENANT_ID === 'jsminimart') {
     if (brandLogoEl) brandLogoEl.classList.remove('initials-mode');
     if (brandLogoImg) brandLogoImg.src = '/newlogo.jpeg';
