@@ -150,21 +150,38 @@
   }
   .nav {
     max-width: 1100px; margin: 0 auto;
-    padding: 12px 16px;
+    padding: 8px 12px;
     display: flex; align-items: center; gap: 12px;
     position: relative; z-index: 1;
   }
-  /* Round brand logo — sits at the left of the header when enabled.
-     html.no-default-logo hides it for non-jsminimart tenants until the
-     settings/store snapshot replaces it (handled in JS below). */
+  /* Round brand logo — sits at the left of the header. Equal width with
+     the cart button on the right so the centered store name lands at the
+     true visual center of the header row. Shows either the uploaded
+     custom logo, the seed-tenant default, or auto-generated initials. */
   #brand-logo {
-    height: 54px; width: 54px; flex-shrink: 0;
+    height: 44px; width: 44px; flex-shrink: 0;
     border-radius: 50%; overflow: hidden;
     background: #fff;
     display: flex; align-items: center; justify-content: center;
-    padding: 4px;
+    padding: 3px;
+    position: relative;
   }
   #brand-logo img { height: 100%; width: 100%; object-fit: contain; }
+  /* Initials placeholder — auto-shown for non-seed tenants who haven't
+     uploaded a custom logo yet. Two-letter abbreviation of the store
+     name, e.g. "Tindahan ni Jacob" → "TJ". JS computes the value. */
+  .brand-initials {
+    display: none;
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fef3c7, #fdba74);
+    color: var(--ink);
+    font-size: 16px; font-weight: 700;
+    align-items: center; justify-content: center;
+    letter-spacing: 0.02em;
+  }
+  #brand-logo.initials-mode img { display: none; }
+  #brand-logo.initials-mode .brand-initials { display: flex; }
   /* Store name + optional subtitle take the center of the header row.
      flex:1 fills the space between logo and cart; text-align centers
      the actual text inside that column. min-width:0 lets long names
@@ -191,15 +208,17 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     max-width: 100%;
   }
-  /* Search row now sits below the ticker and holds the categories
-     dropdown on the LEFT + the search input on the right. */
+  /* Search row sits below the ticker — categories dropdown on the LEFT,
+     search input on the right. Both share an equal share of the row
+     (50/50) so they read as a matched pair of pills. Bottom padding
+     adds a clean gap before the first product row. */
   .search-row {
     max-width: 1100px; margin: 0 auto;
-    padding: 10px 16px 0;
+    padding: 10px 12px 16px;
     display: flex; gap: 10px; align-items: stretch;
   }
   .search {
-    flex: 1 1 auto; min-width: 0;
+    flex: 1 1 0; min-width: 0;
     position: relative;
     display: flex; align-items: center; gap: 8px;
     background: var(--soft); border: 1px solid var(--line);
@@ -208,9 +227,10 @@
   /* Categories dropdown — "All ▾" by default; opens a vertical menu
      of category buttons that filter (Grid mode) or scroll-jump
      (List mode) the product list. */
-  .cat-dropdown { position: relative; flex-shrink: 0; }
+  .cat-dropdown { position: relative; flex: 1 1 0; min-width: 0; }
   .cat-dropdown-btn {
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%;
     background: var(--soft); border: 1px solid var(--line);
     border-radius: 999px; padding: 9px 16px;
     font-size: 14px; font-weight: 500;
@@ -263,18 +283,27 @@
     position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
     font-size: 18px; color: var(--muted); line-height: 1; padding: 0;
   }
+  /* Cart is a 44px round button so it matches #brand-logo's width on
+     both sides of the centered store name. Icon-only on all screens —
+     the "Cart" text label is hidden. Badge stays a red overlay. */
   .cart-btn {
-    position: relative;
-    padding: 8px 14px;
+    position: relative; flex-shrink: 0;
+    width: 44px; height: 44px;
+    padding: 0;
     background: transparent; color: var(--ink);
-    border-radius: var(--radius);
-    font-weight: 500; font-size: 14px;
-    display: flex; align-items: center; gap: 6px;
+    border-radius: 50%;
+    font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
   }
+  .cart-btn .label { display: none; }
   .cart-btn .badge {
+    position: absolute; top: 1px; right: 1px;
+    min-width: 18px; height: 18px; padding: 0 4px;
     background: #e53e3e; color: #fff;
-    border-radius: 999px; padding: 1px 7px;
-    font-size: 12px; font-weight: 600;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
   }
 
   /* ---------- INFO BAR / TICKER ---------- */
@@ -651,17 +680,11 @@
     #store-name.scale-sm,
     #store-name.scale-xs { font-size: 13px; }
     #store-tag { font-size: 11px; }
-    .search-row { padding: 8px 12px 0; gap: 8px; }
+    .search-row { padding: 8px 12px 12px; gap: 8px; }
     .search { padding: 7px 14px; }
     .cat-dropdown-btn { padding: 7px 12px; font-size: 13px; }
     .cat-dropdown-menu { min-width: 160px; }
-    .cart-btn {
-      margin-top: 0; flex-shrink: 0;
-      width: 44px; height: 44px; padding: 0;
-      border-radius: 50%; background: transparent; color: var(--ink);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px; position: relative;
-    }
+    .brand-initials { font-size: 15px; }
     .cart-btn .badge {
       position: absolute; top: 1px; right: 1px;
       min-width: 18px; height: 18px; padding: 0 4px;
@@ -669,7 +692,6 @@
       display: flex; align-items: center; justify-content: center;
       line-height: 1;
     }
-    .cart-btn span.label { display: none; }
     header.rain-mode .cart-btn {
       background: rgba(255,255,255,0.85); color: #1e3a8a; border-radius: 50%;
     }
@@ -885,7 +907,10 @@
 
 <header>
   <div class="nav">
-    <a href="#" data-tenant-href="" class="logo" id="brand-logo"><img src="/newlogo.jpeg" alt="" /></a>
+    <a href="#" data-tenant-href="" class="logo" id="brand-logo">
+      <img src="/newlogo.jpeg" alt="" />
+      <span class="brand-initials" id="brand-initials" aria-hidden="true"></span>
+    </a>
     <div class="brand-text">
       <h1 id="store-name">JS Mini Mart</h1>
       <small id="store-tag" style="display:none;"></small>
@@ -1504,34 +1529,34 @@ tdoc('settings', 'store').onSnapshot(snap => {
   if (nameEl) nameEl.style.visibility = 'visible';
   if (tagEl)  tagEl.style.visibility  = 'visible';
 
-  // Custom logo: when enabled + uploaded, the logo image replaces the
-  // store-name text. We have to defeat two things that hide the brand
-  // image slot on non-jsminimart tenants:
-  //   1. CSS rule `html.no-default-logo .logo { display: none !important }`
-  //      added in <head> to prevent the JS Mini Mart logo flash.
-  //   2. boot() inline `style.display = 'none'` on #brand-logo for any
-  //      tenant != jsminimart (legacy single-tenant assumption).
-  // For a custom logo, drop the no-default-logo class and clear the
-  // inline display so the slot renders the uploaded image.
+  // Brand logo branches:
+  //   - custom logo enabled + uploaded → swap <img> src to the data URL
+  //   - seed tenant (jsminimart) → keep the /newlogo.jpeg default
+  //   - any other tenant → "initials mode" shows a two-letter abbreviation
+  //     of the store name in a warm gradient circle (e.g. "Tindahan ni
+  //     Jacob" → "TJ") until the owner uploads a real logo
+  // The logo slot is ALWAYS visible — keeps the header symmetric with the
+  // 44px cart button so the centered store name stays page-centered.
   const customLogoOn = (storeSettingsData.logoEnabled === true) && !!storeSettingsData.logoDataUrl;
-  const brandLogoEl  = document.getElementById('brand-logo');
-  const brandLogoImg = brandLogoEl && brandLogoEl.querySelector('img');
+  const brandLogoEl   = document.getElementById('brand-logo');
+  const brandLogoImg  = brandLogoEl && brandLogoEl.querySelector('img');
+  const brandInitials = document.getElementById('brand-initials');
+  // Always reveal the logo slot now that the initials placeholder fills
+  // the space for non-seed tenants. Drop the head-script anti-flash class.
+  document.documentElement.classList.remove('no-default-logo');
+  if (brandLogoEl) brandLogoEl.style.display = '';
   if (customLogoOn) {
-    document.documentElement.classList.remove('no-default-logo');
-    if (brandLogoEl) brandLogoEl.style.display = '';
+    if (brandLogoEl) brandLogoEl.classList.remove('initials-mode');
     if (brandLogoImg) brandLogoImg.src = storeSettingsData.logoDataUrl;
     if (nameEl) nameEl.style.display = 'none';
-  } else {
+  } else if (TENANT_ID === 'jsminimart') {
+    if (brandLogoEl) brandLogoEl.classList.remove('initials-mode');
+    if (brandLogoImg) brandLogoImg.src = '/newlogo.jpeg';
     if (nameEl) nameEl.style.display = '';
-    if (TENANT_ID && TENANT_ID !== 'jsminimart') {
-      // Re-apply the same guards the customLogoOn branch clears so
-      // toggling the custom logo off doesn't briefly expose the seed
-      // tenant's /newlogo.jpeg before the next page load.
-      document.documentElement.classList.add('no-default-logo');
-      if (brandLogoEl) brandLogoEl.style.display = 'none';
-    } else if (brandLogoImg) {
-      brandLogoImg.src = '/newlogo.jpeg';
-    }
+  } else {
+    if (brandLogoEl) brandLogoEl.classList.add('initials-mode');
+    if (brandInitials) brandInitials.textContent = getStoreInitials(shownName);
+    if (nameEl) nameEl.style.display = '';
   }
   // Tab favicon: use the custom logo when uploaded, otherwise the seed
   // tenant keeps the JS Mini Mart icon and every other tenant gets no
@@ -1541,6 +1566,20 @@ tdoc('settings', 'store').onSnapshot(snap => {
       : (TENANT_ID === 'jsminimart' ? '/newlogo.jpeg' : null)
   );
 });
+
+// Derive a 2-letter abbreviation for the brand-logo initials placeholder.
+//   "Tindahan ni Jacob"     → "TJ"  (filler word "ni" skipped)
+//   "JS Mini Mart"          → "JM"  (first letters of first + last words)
+//   "Carinderia ni Maria"   → "CM"
+//   "Pabili"                → "PA"  (single word — first two letters)
+function getStoreInitials(name) {
+  if (!name || !String(name).trim()) return '?';
+  const skip = new Set(['ni', 'ng', 'sa', 'at', 'kay', 'mga', 'and', 'of', 'the', 'a']);
+  const words = String(name).trim().split(/\s+/).filter(w => !skip.has(w.toLowerCase()) && /[a-z0-9]/i.test(w));
+  if (words.length === 0) return String(name).trim().charAt(0).toUpperCase() || '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+}
 
 function setStorefrontFavicon(href) {
   document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"], link[rel="shortcut icon"]')
