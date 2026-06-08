@@ -315,6 +315,79 @@
   .mock-card-price {
     font-size: 11px; font-weight: 700; color: var(--accent);
   }
+  /* List-layout mockup variant for restaurants / carinderias. Stacked
+     rows with image, name + description, and price. */
+  .mock-list {
+    padding: 4px 14px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .mock-list-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .mock-list-img {
+    width: 38px; height: 38px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .mock-list-img.a { background: linear-gradient(135deg, #fee2e2, #fecaca); }
+  .mock-list-img.b { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+  .mock-list-img.c { background: linear-gradient(135deg, #dbeafe, #bfdbfe); }
+  .mock-list-img.d { background: linear-gradient(135deg, #dcfce7, #bbf7d0); }
+  .mock-list-info { flex: 1; min-width: 0; }
+  .mock-list-name {
+    font-size: 10px; font-weight: 700; color: var(--ink);
+    line-height: 1.2; margin-bottom: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mock-list-desc {
+    font-size: 8.5px; color: var(--muted); line-height: 1.2;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .mock-list-price {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  /* ============================================================
+     Layouts demo section — two phone mockups side by side
+     ============================================================ */
+  .layouts {
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .layout-demo {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+    max-width: 900px; margin: 0 auto;
+    align-items: start;
+  }
+  .layout-col {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+  }
+  .phone-frame.phone-frame-sm {
+    width: 240px; height: 486px;
+    border-radius: 32px; padding: 7px;
+  }
+  .phone-frame.phone-frame-sm::before {
+    width: 74px; height: 18px; top: 11px;
+  }
+  .phone-frame.phone-frame-sm .phone-screen { border-radius: 26px; }
+  .layout-name {
+    margin-top: 22px; margin-bottom: 6px;
+    font-size: 20px; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .layout-desc {
+    font-size: 14px; color: var(--muted); line-height: 1.5;
+    max-width: 280px;
+  }
 
   /* ============================================================
      Trust strip
@@ -825,6 +898,7 @@
     .feature-grid { grid-template-columns: repeat(2, 1fr); }
     .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
     .plan-card.featured { transform: none; }
+    .layout-demo { grid-template-columns: 1fr; gap: 56px; max-width: 360px; }
   }
   @media (max-width: 600px) {
     section { padding: 48px 0; }
@@ -846,6 +920,11 @@
     .feature-card { padding: 22px 20px; }
     .signup-card { padding: 28px 22px; }
     .footer-inner { flex-direction: column; text-align: center; }
+    .phone-frame.phone-frame-sm { width: 220px; height: 446px; padding: 6px; border-radius: 30px; }
+    .phone-frame.phone-frame-sm::before { width: 68px; height: 16px; top: 9px; }
+    .phone-frame.phone-frame-sm .phone-screen { border-radius: 24px; }
+    .layout-name { font-size: 18px; margin-top: 16px; }
+    .layout-desc { font-size: 13px; }
   }
 
   /* iOS auto-zoom prevention */
@@ -958,6 +1037,131 @@
     <div class="trust-item"><span class="trust-icon">🛡️</span> Cancel anytime</div>
   </div>
 </div>
+
+<!-- ============================================================
+     Two layouts demo
+     ============================================================ -->
+<section class="layouts">
+  <div class="container">
+    <div class="section-head">
+      <h2>Two layouts. One platform.</h2>
+      <p>Pick the one that fits your shop. Switch any time from Settings.</p>
+    </div>
+    <div class="layout-demo">
+      <div class="layout-col">
+        <div class="phone-frame phone-frame-sm">
+          <div class="phone-screen">
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <span class="phone-statusbar-icons">●●●● 📶 100%</span>
+            </div>
+            <div class="mock-header">
+              <div class="mock-logo">🏪</div>
+              <div>
+                <div class="mock-store-name">Tindahan ni Maria</div>
+                <div class="mock-store-tag">Delivery · Pickup</div>
+              </div>
+              <div class="mock-cart">🛒</div>
+            </div>
+            <div class="mock-cats">
+              <span class="mock-cat active">All</span>
+              <span class="mock-cat">Drinks</span>
+              <span class="mock-cat">Snacks</span>
+            </div>
+            <div class="mock-grid">
+              <div class="mock-card">
+                <div class="mock-card-img a">🥤</div>
+                <div class="mock-card-name">Coke Mismo</div>
+                <div class="mock-card-meta">per bottle</div>
+                <div class="mock-card-price">₱15</div>
+              </div>
+              <div class="mock-card">
+                <div class="mock-card-img b">🍞</div>
+                <div class="mock-card-name">Tasty Loaf</div>
+                <div class="mock-card-meta">per pack</div>
+                <div class="mock-card-price">₱40</div>
+              </div>
+              <div class="mock-card">
+                <div class="mock-card-img c">🧴</div>
+                <div class="mock-card-name">Shampoo Sachet</div>
+                <div class="mock-card-meta">per piece</div>
+                <div class="mock-card-price">₱5</div>
+              </div>
+              <div class="mock-card">
+                <div class="mock-card-img d">🍫</div>
+                <div class="mock-card-name">Cloud 9</div>
+                <div class="mock-card-meta">per piece</div>
+                <div class="mock-card-price">₱8</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3 class="layout-name">Grid</h3>
+        <p class="layout-desc">Visual cards in columns — works when the image carries the sell. Best for product-focused stores.</p>
+      </div>
+
+      <div class="layout-col">
+        <div class="phone-frame phone-frame-sm">
+          <div class="phone-screen">
+            <div class="phone-statusbar">
+              <span>9:41</span>
+              <span class="phone-statusbar-icons">●●●● 📶 100%</span>
+            </div>
+            <div class="mock-header">
+              <div class="mock-logo">🍳</div>
+              <div>
+                <div class="mock-store-name">Carinderia ni Maria</div>
+                <div class="mock-store-tag">Lutong bahay daily</div>
+              </div>
+              <div class="mock-cart">🛒</div>
+            </div>
+            <div class="mock-cats">
+              <span class="mock-cat active">All</span>
+              <span class="mock-cat">Ulam</span>
+              <span class="mock-cat">Sabaw</span>
+            </div>
+            <div class="mock-list">
+              <div class="mock-list-row">
+                <div class="mock-list-img a">🍜</div>
+                <div class="mock-list-info">
+                  <div class="mock-list-name">Bulalo</div>
+                  <div class="mock-list-desc">Beef shank slow-simmered in clear broth with cabbage and corn</div>
+                </div>
+                <div class="mock-list-price">₱180</div>
+              </div>
+              <div class="mock-list-row">
+                <div class="mock-list-img b">🍛</div>
+                <div class="mock-list-info">
+                  <div class="mock-list-name">Adobo Rice Bowl</div>
+                  <div class="mock-list-desc">Pork adobo over garlic rice, with a sunny-side egg</div>
+                </div>
+                <div class="mock-list-price">₱120</div>
+              </div>
+              <div class="mock-list-row">
+                <div class="mock-list-img c">🥘</div>
+                <div class="mock-list-info">
+                  <div class="mock-list-name">Pancit Canton</div>
+                  <div class="mock-list-desc">Stir-fried wheat noodles with shrimp and veggies</div>
+                </div>
+                <div class="mock-list-price">₱95</div>
+              </div>
+              <div class="mock-list-row">
+                <div class="mock-list-img d">🍗</div>
+                <div class="mock-list-info">
+                  <div class="mock-list-name">Lechon Manok</div>
+                  <div class="mock-list-desc">Slow-roasted chicken, quarter piece</div>
+                </div>
+                <div class="mock-list-price">₱130</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3 class="layout-name">List</h3>
+        <p class="layout-desc">Full-width rows with descriptions — better for restaurants and carinderias where customers read what's on offer.</p>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ============================================================
      Features
@@ -1536,19 +1740,24 @@ function scrollToPricing() {
   }
 }
 
+// First showStep call comes from the initial onAuthStateChanged hookup
+// — that fires on page load before the user has touched anything, and
+// auto-scrolling it would drop fresh visitors straight onto the form
+// instead of letting them see the hero / pricing / FAQ. Subsequent
+// calls (signin → details, submit → success, etc.) are user-initiated
+// and SHOULD snap the now-collapsed card back into view.
+let _showStepFiredOnce = false;
 function showStep(id) {
   ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
-  // After a long form, the form's submit button sits far below the page's
-  // signup section start. When it collapses into the much shorter success
-  // (or already-owner) state, the user is left scrolled past it — onto
-  // the FAQ section — and never sees the admin link. Snap back to the
-  // signup section any time the visible step changes.
-  const sect = document.getElementById('signup');
-  if (sect && typeof sect.scrollIntoView === 'function') {
-    sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (_showStepFiredOnce) {
+    const sect = document.getElementById('signup');
+    if (sect && typeof sect.scrollIntoView === 'function') {
+      sect.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
+  _showStepFiredOnce = true;
 }
 
 document.getElementById('signin-btn').addEventListener('click', async () => {
