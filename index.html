@@ -208,51 +208,68 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     max-width: 100%;
   }
-  /* Search row sits below the ticker — categories dropdown on the LEFT,
-     search input on the right. Both share an equal 50/50 split of the
-     row so they read as a matched pair of pills the same width.
-     Horizontal padding (20px) is intentionally larger than .container's
-     16px so the row's pill edges land flush with the rounded product
-     card edges below (cards effectively start ~4px inset from the
-     container's padding edge due to their corner radius). */
+  /* Search row sits below the ticker. Single full-width search pill
+     with the category filter living inside on the right (funnel icon).
+     Horizontal padding lines up with the product card edges below. */
   .search-row {
     max-width: 1100px; margin: 0 auto;
     padding: 10px 20px 16px;
-    display: flex; gap: 10px; align-items: stretch;
   }
   .search {
-    flex: 1 1 0; min-width: 0;
-    position: relative;
+    width: 100%; position: relative;
     display: flex; align-items: center; gap: 8px;
     background: var(--soft); border: 1px solid var(--line);
-    border-radius: 999px; padding: 9px 14px;
+    border-radius: 999px; padding: 6px 8px 6px 14px;
   }
-  /* Categories dropdown — "All ▾" by default; opens a vertical menu
-     of category buttons that filter (Grid mode) or scroll-jump
-     (List mode) the product list. */
-  .cat-dropdown { position: relative; flex: 1 1 0; min-width: 0; }
-  .cat-dropdown-btn {
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    width: 100%;
-    background: var(--soft); border: 1px solid var(--line);
-    border-radius: 999px; padding: 9px 16px;
-    font-size: 14px; font-weight: 500;
-    color: var(--ink); cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.12s, border-color 0.12s;
+  .search-icon { font-size: 14px; line-height: 1; flex-shrink: 0; opacity: 0.7; }
+  .search input {
+    flex: 1; min-width: 0;
+    border: 0; outline: 0; background: transparent;
+    color: var(--ink); font-size: 16px;
+    padding: 4px 0;
   }
-  .cat-dropdown-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
-  .cat-dropdown-btn:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 2px;
+  #search-clear {
+    flex-shrink: 0;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: transparent; border: 0;
+    font-size: 16px; color: var(--muted); line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    /* Override the legacy position:absolute styling so it sits inline. */
+    position: static !important;
+    top: auto !important; right: auto !important; transform: none !important;
   }
-  .cat-caret {
-    font-size: 11px; line-height: 1;
-    transition: transform 0.18s;
+  #search-clear:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+  /* Thin vertical separator between the search input + the filter icon. */
+  .search-divider {
+    width: 1px; height: 20px;
+    background: var(--line);
+    flex-shrink: 0; margin: 0 2px;
   }
-  .cat-dropdown.open .cat-caret { transform: rotate(180deg); }
+  /* Compact filter trigger — icon-only funnel that opens the category
+     dropdown. Goes accent-colored when a non-All filter is active so the
+     owner knows there's a filter applied. */
+  .cat-filter-btn {
+    flex-shrink: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: transparent; border: 0;
+    color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s;
+  }
+  .cat-filter-btn:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+  .cat-filter-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cat-filter-btn svg { width: 16px; height: 16px; }
+  .cat-filter-btn.has-filter {
+    background: var(--accent, #2563eb); color: #fff;
+  }
+  .cat-filter-btn.has-filter:hover { background: var(--accent-dark, #1d4ed8); color: #fff; }
+
+  /* Categories popover — anchored to the right edge of the search pill,
+     drops down under the funnel button. */
   .cat-dropdown-menu {
-    position: absolute; top: calc(100% + 6px); left: 0;
-    min-width: 180px; max-height: 320px;
+    position: absolute; top: calc(100% + 6px); right: 0; left: auto;
+    min-width: 200px; max-height: 320px;
     background: #fff; border: 1px solid var(--line);
     border-radius: 12px;
     box-shadow: 0 12px 32px rgba(15,23,42,0.14);
@@ -683,10 +700,12 @@
     #store-name.scale-sm,
     #store-name.scale-xs { font-size: 13px; }
     #store-tag { font-size: 11px; }
-    .search-row { padding: 8px 20px 12px; gap: 8px; }
-    .search { padding: 7px 14px; }
-    .cat-dropdown-btn { padding: 7px 10px; font-size: 13px; }
-    .cat-dropdown-menu { min-width: 160px; }
+    .search-row { padding: 8px 20px 12px; }
+    .search { padding: 5px 8px 5px 12px; gap: 6px; }
+    .search input { font-size: 16px; padding: 4px 0; }
+    .cat-filter-btn { width: 30px; height: 30px; }
+    .cat-filter-btn svg { width: 15px; height: 15px; }
+    .cat-dropdown-menu { min-width: 180px; }
     .brand-initials { font-size: 15px; }
     .cart-btn .badge {
       position: absolute; top: 1px; right: 1px;
@@ -930,17 +949,19 @@
 </div>
 
 <div class="search-row">
-  <div class="cat-dropdown" id="cat-dropdown">
-    <button type="button" class="cat-dropdown-btn" onclick="toggleCatDropdown(event)">
-      <span id="cat-current-label">All</span>
-      <span class="cat-caret">▾</span>
+  <div class="search">
+    <span class="search-icon" aria-hidden="true">🔍</span>
+    <input type="text" id="search-input" placeholder="Search products..." />
+    <button id="search-clear" onclick="clearSearch()" style="display:none;" aria-label="Clear search">×</button>
+    <span class="search-divider" aria-hidden="true"></span>
+    <button type="button" class="cat-filter-btn" id="cat-filter-btn" onclick="toggleCatDropdown(event)" aria-label="Filter by category" title="Filter by category">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="6" x2="20" y2="6" />
+        <line x1="7" y1="12" x2="17" y2="12" />
+        <line x1="10" y1="18" x2="14" y2="18" />
+      </svg>
     </button>
     <div class="cat-dropdown-menu hidden" id="categories"></div>
-  </div>
-  <div class="search">
-    <span>🔍</span>
-    <input type="text" id="search-input" placeholder="Search products..." />
-    <button id="search-clear" onclick="clearSearch()" style="display:none;">×</button>
   </div>
 </div>
 
@@ -1858,34 +1879,33 @@ function renderCategories() {
 }
 function pickCategory(cat) {
   activeCategory = cat;
-  const label = document.getElementById('cat-current-label');
-  if (label) label.textContent = cat;
+  const filterBtn = document.getElementById('cat-filter-btn');
+  if (filterBtn) filterBtn.classList.toggle('has-filter', cat && cat !== 'All');
   closeCatDropdown();
   renderCategories();
   renderProducts();
 }
 
-// Categories now live inside a dropdown to the left of the search bar.
-// Toggle on button tap; close on outside tap, Escape, or category pick.
+// Category filter is a funnel button inside the search pill. The dropdown
+// is the menu (#categories) anchored under the funnel. Toggle on tap,
+// close on outside tap / Escape / pick.
 function toggleCatDropdown(e) {
   if (e) e.stopPropagation();
-  const dd   = document.getElementById('cat-dropdown');
   const menu = document.getElementById('categories');
-  if (!dd || !menu) return;
-  const open = !dd.classList.contains('open');
-  dd.classList.toggle('open', open);
-  menu.classList.toggle('hidden', !open);
+  if (!menu) return;
+  menu.classList.toggle('hidden');
 }
 function closeCatDropdown() {
-  const dd   = document.getElementById('cat-dropdown');
   const menu = document.getElementById('categories');
-  if (dd)   dd.classList.remove('open');
   if (menu) menu.classList.add('hidden');
 }
 document.addEventListener('click', (e) => {
-  const dd = document.getElementById('cat-dropdown');
-  if (!dd || !dd.classList.contains('open')) return;
-  if (!dd.contains(e.target)) closeCatDropdown();
+  const menu = document.getElementById('categories');
+  if (!menu || menu.classList.contains('hidden')) return;
+  // Click on the search pill (which contains menu + funnel) keeps it open.
+  const search = document.querySelector('.search');
+  if (search && search.contains(e.target)) return;
+  closeCatDropdown();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeCatDropdown();
@@ -1901,8 +1921,8 @@ function jumpToCategory(cat) {
   // doesn't flicker through every category the animation crosses.
   _listSpyLockUntil = Date.now() + 700;
   jumpActiveCategory = cat;
-  const label = document.getElementById('cat-current-label');
-  if (label) label.textContent = cat;
+  const filterBtn = document.getElementById('cat-filter-btn');
+  if (filterBtn) filterBtn.classList.toggle('has-filter', cat && cat !== 'All');
   closeCatDropdown();
   document.querySelectorAll('#categories .chip').forEach(b => {
     b.classList.toggle('active', b.textContent === cat);
