@@ -1,7 +1,7 @@
 {
   "name": "Pabili Mart",
   "short_name": "Pabili Mart",
-  "description": "Order from your neighborhood sari-sari store, carinderia, or café — delivered or for pickup.",
+  "description": "Order from your neighborhood store, carinderia, or café — delivered or for pickup.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -3365,7 +3365,7 @@
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">Storefront layout</div>
-                <div class="setting-desc">How customers see your products. <strong>Grid</strong> works for sari-sari stores — visual cards in columns. <strong>List</strong> is for restaurants and carinderias — full-width rows with the item description visible so people can read what's on offer. Switch any time.</div>
+                <div class="setting-desc">How customers see your products. <strong>Grid</strong> lays products out as visual cards in columns — good when the image carries the sell. <strong>List</strong> shows full-width rows with the item description visible — better for restaurants and carinderias where people need to read what's on offer. Switch any time.</div>
               </div>
               <div class="setting-control">
                 <div class="theme-picker" id="layout-picker">
@@ -4725,7 +4725,7 @@ async function setStorefrontLayout(layout) {
   });
   try {
     await tdoc('settings', 'store').set({ storefrontLayout: next }, { merge: true });
-    showToast(`Storefront layout set to ${next === 'list' ? 'List (restaurant)' : 'Grid (sari-sari)'}.`, 'success');
+    showToast(`Storefront layout set to ${next === 'list' ? 'List' : 'Grid'}.`, 'success');
   } catch (err) {
     console.error(err);
     alert('Failed to update: ' + (err && err.message ? err.message : err));
@@ -6034,7 +6034,7 @@ function renderProductCapStatus() {
   // or a full page reload so tenants near the cap don't lose the nudge.
   const dismissed = sessionStorage.getItem('productCapBannerDismissed') === '1';
 
-  // The Pro tier's 10K is effectively unlimited for any sari-sari shop;
+  // The Pro tier's 10K is effectively unlimited at small-shop scale;
   // skip the cap warnings and Add disabled state at this scale.
   if (cap >= 10000) {
     pill.textContent = `${count.toLocaleString()} products`;
@@ -6090,7 +6090,7 @@ function dismissProductCapBanner() {
 }
 
 // Suppliers cap — Free starts capped at 1 to nudge upgrades on a feature
-// most sari-sari shops outgrow within a week (snacks, drinks, bread,
+// most small shops outgrow within a week (snacks, drinks, bread,
 // toiletries, frozen are usually different vendors). Growth + Pro raise
 // the cap so high it's effectively unlimited.
 function renderSupplierCapStatus() {

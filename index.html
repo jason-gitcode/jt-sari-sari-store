@@ -1350,7 +1350,7 @@ tdoc('settings', 'store').onSnapshot(snap => {
   // any tenant whose tier field is missing or 'free'. Paid tiers hide it.
   applyPoweredByFooter();
   // Storefront layout — 'list' for restaurants/carinderias, 'grid'
-  // (default) for sari-sari stores. Switches via a data attribute on the
+  // (default) for product-focused stores. Switches via a data attribute on the
   // root so CSS picks up the right layout without re-mounting.
   const layout = (storeSettingsData.storefrontLayout === 'list') ? 'list' : 'grid';
   const layoutChanged = document.documentElement.getAttribute('data-layout') !== layout;
@@ -2191,7 +2191,7 @@ tcol('products').onSnapshot(snapshot => {
 <!-- Phase D: Free-tier branding footer. JS toggles .shown class based on
      storeSettingsData.tier read from the settings/store snapshot. -->
 <footer class="powered-by-footer" id="powered-by-footer">
-  Powered by <a href="https://pabilimart.com/signup/" target="_blank" rel="noopener"><strong>Pabili Mart</strong></a> · Sell online with your own sari-sari storefront
+  Powered by <a href="https://pabilimart.com/signup/" target="_blank" rel="noopener"><strong>Pabili Mart</strong></a> · Sell online with your own storefront
 </footer>
 </body>
 </html>

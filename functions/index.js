@@ -266,7 +266,7 @@ exports.createTenant = onCall(async (request) => {
 
   // ---------- PER-EMAIL TENANT CAP ----------
   // Note: this check is racy under high-concurrency parallel calls from the
-  // same user; acceptable for pilot scale (sari-sari store SaaS).
+  // same user; acceptable for pilot scale.
   if (!isSuperadmin) {
     const existing = await db.collection('tenants')
       .where('createdByEmail', '==', email)
@@ -323,7 +323,7 @@ exports.createTenant = onCall(async (request) => {
     pickupAddress,
     gcashAccountName,
     gcashNumber,
-    // Storefront layout — 'grid' (default, sari-sari style) or 'list'
+    // Storefront layout — 'grid' (default, retail style) or 'list'
     // (FoodPanda-style stacked rows with description, for restaurants /
     // carinderias / cafés). Editable later in admin → Appearance.
     storefrontLayout: 'grid',

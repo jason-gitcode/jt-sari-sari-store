@@ -1,10 +1,10 @@
 # Pabili Mart — Project Notes
 
-Static HTML/JS multi-tenant e-commerce SaaS deployed to Firebase Hosting. Firebase Firestore backend with Cloud Functions (`createTenant` / `deleteTenant` / `getMyTenant` / `generateInviteCode` / `listInviteCodes` / `revokeInviteCode`) in `asia-southeast1`. Filipino sari-sari / carinderia / café storefronts as a per-tenant service.
+Static HTML/JS multi-tenant e-commerce SaaS deployed to Firebase Hosting. Firebase Firestore backend with Cloud Functions (`createTenant` / `deleteTenant` / `getMyTenant` / `generateInviteCode` / `listInviteCodes` / `revokeInviteCode`) in `asia-southeast1`. Filipino neighborhood store / carinderia / café storefronts as a per-tenant service.
 
 Repo: `jason-gitcode/jt-sari-sari-store` · Live URL: `pabilimart.com` (new — replacing `jsminimart.com` during 2026-06-04 cutover; old still serves until the 301 redirect lands) · Branch: `main` (no PRs — push directly).
 
-**Seed tenant note:** The seed tenant slug is `jsminimart` and its store is named "JS Mini Mart" (Jason's actual sari-sari store). Platform-level rebrand from "JS Mini Mart" → "Pabili Mart" only touched platform pages (signup, superadmin, manifest); the seed tenant's storefront branding stayed because that IS his real shop. See [[Domain Swap Checklist - pabilimart.com]] in Obsidian.
+**Seed tenant note:** The seed tenant slug is `jsminimart` and its store is named "JS Mini Mart" (Jason's actual neighborhood store). Platform-level rebrand from "JS Mini Mart" → "Pabili Mart" only touched platform pages (signup, superadmin, manifest); the seed tenant's storefront branding stayed because that IS his real shop. See [[Domain Swap Checklist - pabilimart.com]] in Obsidian.
 
 ## File Map
 
