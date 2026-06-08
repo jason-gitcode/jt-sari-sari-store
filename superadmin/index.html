@@ -799,6 +799,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const functions = firebase.app().functions('asia-southeast1');
 const deleteTenantFn         = functions.httpsCallable('deleteTenant');
+const renameTenantFn         = functions.httpsCallable('renameTenant');
 const generateInviteCodeFn   = functions.httpsCallable('generateInviteCode');
 const listInviteCodesFn      = functions.httpsCallable('listInviteCodes');
 const revokeInviteCodeFn     = functions.httpsCallable('revokeInviteCode');
@@ -1012,9 +1013,14 @@ function modalRowMono(label, valueText, sub) {
   return `<div class="modal-detail-row"><div class="k">${label}</div><div class="v mono">${valueText}</div>${subHtml}</div>`;
 }
 
+// Idx of the tenant whose detail modal is currently open. Set by
+// openTenantModal, read by renameTenantStart / renameTenantSave so the
+// rename flow knows which row is being edited.
+let CURRENT_TENANT_IDX = -1;
 function openTenantModal(idx) {
   const t = CACHED_TENANTS && CACHED_TENANTS[idx];
   if (!t) return;
+  CURRENT_TENANT_IDX = idx;
   const owners = Array.isArray(t.ownerEmails) ? t.ownerEmails : [];
   const ownerHtml = owners.length === 0 ? '—' : owners.map(e => escText(e)).join('<br>');
   // Pull the cached subscription from the parallel counts array so we can
@@ -1049,9 +1055,75 @@ function openTenantModal(idx) {
   document.getElementById('tm-actions').innerHTML = `
     <a class="btn" href="/${t.id}/" target="_blank" rel="noopener" style="text-decoration:none;">🌐 Storefront</a>
     <a class="btn" href="/${t.id}/admin/" target="_blank" rel="noopener" style="text-decoration:none;">⚙️ Admin</a>
+    <button type="button" class="btn" onclick="renameTenantStart()">✏️ Rename</button>
     <button type="button" class="btn btn-danger" onclick="closeTenantModal(); openDeleteModal('${escText(t.id)}');">🗑️ Delete</button>
   `;
   document.getElementById('tenant-modal').classList.add('show');
+}
+
+// Inline rename flow — replaces tm-actions with an input + Save/Cancel.
+// Tenant-side admin shows the store name as read-only, so this is the
+// ONLY path to change it. Slug is never renamed (see renameTenant
+// function for why).
+function renameTenantStart() {
+  const t = CACHED_TENANTS && CACHED_TENANTS[CURRENT_TENANT_IDX];
+  if (!t) return;
+  const actions = document.getElementById('tm-actions');
+  actions.innerHTML = `
+    <input type="text" id="rename-input" maxlength="100"
+      style="flex:1; min-width:0; padding:8px 12px; border:1px solid var(--line); border-radius:6px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--ink);" />
+    <button type="button" class="btn btn-primary" id="rename-save-btn" onclick="renameTenantSave()">Save</button>
+    <button type="button" class="btn" onclick="renameTenantCancel()">Cancel</button>
+  `;
+  const input = document.getElementById('rename-input');
+  // Setting value via DOM (not interpolated into the HTML string)
+  // sidesteps attribute-escaping concerns for store names with quotes.
+  input.value = t.name || '';
+  input.focus();
+  input.select();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') renameTenantSave();
+    else if (e.key === 'Escape') renameTenantCancel();
+  });
+}
+function renameTenantCancel() {
+  // Re-render the modal from the cached row to restore the action buttons.
+  openTenantModal(CURRENT_TENANT_IDX);
+}
+async function renameTenantSave() {
+  const t = CACHED_TENANTS && CACHED_TENANTS[CURRENT_TENANT_IDX];
+  if (!t) return;
+  const input = document.getElementById('rename-input');
+  const newName = (input.value || '').trim();
+  if (newName.length < 2) {
+    input.style.borderColor = 'var(--danger, #dc2626)';
+    input.focus();
+    return;
+  }
+  if (newName === (t.name || '').trim()) {
+    // No change — just close the form back to actions.
+    renameTenantCancel();
+    return;
+  }
+  const saveBtn = document.getElementById('rename-save-btn');
+  input.disabled = true;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    await renameTenantFn({ tid: t.id, newName });
+    // Update the cached row so the modal doesn't snap back to the old
+    // name on cancel-after-save. Full table refresh happens on next load.
+    t.name = newName;
+    closeTenantModal();
+    // Re-fetch tenants so the table reflects the new name.
+    if (typeof refresh === 'function') refresh();
+  } catch (err) {
+    console.error('renameTenant failed:', err);
+    input.disabled = false;
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+    alert('Rename failed: ' + (err && err.message ? err.message : err));
+  }
 }
 function closeTenantModal(e) {
   if (e && e.target !== e.currentTarget) return;

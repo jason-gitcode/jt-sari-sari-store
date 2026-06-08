@@ -424,6 +424,84 @@ exports.createTenant = onCall(async (request) => {
 // deleteTenant — superadmin-only, recursive delete of a tenant doc
 // and all its subcollections (products / orders / settings / etc.)
 // ============================================================
+// ============================================================
+// renameTenant — superadmin-only. Changes a tenant's display name
+// across all three places it lives:
+//   1. tenants/{tid}.name            (root tenant doc)
+//   2. tenants/{tid}/settings/store.storeName (storefront header)
+//   3. public/directory.stores[]     (signup-page store-finder)
+//
+// Slug is NEVER renamed — it's the Firestore doc ID, the URL path,
+// and the join key in payments / public/directory. A slug change is
+// effectively a delete-and-recreate (not exposed here).
+//
+// Tenant-side admin UI shows storeName as read-only (locked at signup);
+// this function is the only path to update it. Surfaces in
+// /superadmin/ as a Rename button on the tenant detail modal.
+// ============================================================
+exports.renameTenant = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) {
+    throw new HttpsError('failed-precondition', 'Email must be verified.');
+  }
+  if (!SUPERADMIN_EMAILS.has(token.email)) {
+    throw new HttpsError('permission-denied', 'Superadmin only.');
+  }
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  // validateName trims, length-checks (2..100), and rejects non-printable
+  // characters — same validation used at signup time.
+  const newName = validateName(data.newName);
+
+  const tref = db.collection('tenants').doc(tid);
+  const settingsRef = tref.collection('settings').doc('store');
+
+  // Tenant root doc + settings/store mirror updated atomically so the
+  // storefront header (driven by settings/store snapshot) never lags
+  // behind the directory or admin display name.
+  await db.runTransaction(async (tx) => {
+    const tsnap = await tx.get(tref);
+    if (!tsnap.exists) {
+      throw new HttpsError('not-found', `Tenant "${tid}" not found.`);
+    }
+    tx.update(tref, {
+      name: newName,
+      renamedAt: FieldValue.serverTimestamp(),
+      renamedBy: token.email
+    });
+    // settings/store may not exist yet for legacy tenants — set merge
+    // is safe either way.
+    tx.set(settingsRef, { storeName: newName }, { merge: true });
+  });
+
+  // Public directory entry stores objects {slug, name}; arrayUnion can't
+  // match by slug, so do a read-filter-rewrite. Non-fatal: if this fails
+  // the tenant + settings rename still succeeded, and superadmin can run
+  // rebuildPublicDirectory to recover.
+  try {
+    const dsnap = await PUBLIC_DIRECTORY_REF().get();
+    if (dsnap.exists) {
+      const stores = (dsnap.data() || {}).stores || [];
+      const updated = stores.map(s =>
+        s && s.slug === tid ? { slug: tid, name: newName } : s
+      );
+      await PUBLIC_DIRECTORY_REF().set({
+        stores: updated,
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (err) {
+    console.error('public directory rename failed for tenant', tid, err);
+  }
+
+  return { tid, newName, ok: true };
+});
+
 exports.deleteTenant = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
