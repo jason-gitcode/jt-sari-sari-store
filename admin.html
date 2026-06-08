@@ -822,11 +822,10 @@
     }
     .cat-chip-input::placeholder { font-style: italic; color: var(--muted); opacity: 1; }
     .cat-suggestions {
-      position: absolute; top: 100%; left: 0; right: 0;
+      position: fixed;
       background: var(--surface); border: 1px solid var(--line);
-      border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      z-index: 50; max-height: 220px; overflow-y: auto;
-      margin-top: 2px;
+      border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      z-index: 200; max-height: 220px; overflow-y: auto;
     }
     .cat-sug-item {
       padding: 7px 12px; font-size: 13px; cursor: pointer;
@@ -6291,10 +6290,15 @@ function setupChipAutocomplete(input) {
   input._catAcReady = true;
   const wrap = input.closest('.cat-chip-wrap');
   if (!wrap) return;
+  // Portal the dropdown to <body> with position:fixed so it isn't clipped
+  // by .supp-modal-body's overflow:auto when the categories field sits near
+  // the bottom of a tall form. positionDropdown() places + flips it on
+  // every update + on window resize.
   const dropdown = document.createElement('div');
   dropdown.className = 'cat-suggestions';
   dropdown.style.display = 'none';
-  wrap.appendChild(dropdown);
+  document.body.appendChild(dropdown);
+  input._catAcDropdown = dropdown;
   let activeIdx = -1;
   let currentMatches = [];
 
@@ -6303,6 +6307,26 @@ function setupChipAutocomplete(input) {
     const i = text.toLowerCase().indexOf(query.toLowerCase());
     if (i === -1) return escText(text);
     return escText(text.slice(0, i)) + '<span class="match">' + escText(text.slice(i, i + query.length)) + '</span>' + escText(text.slice(i + query.length));
+  }
+
+  function positionDropdown() {
+    const rect = wrap.getBoundingClientRect();
+    const itemH = 36;
+    const wanted = Math.min(220, currentMatches.length * itemH + 2);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.width = rect.width + 'px';
+    // Prefer rendering below the field unless there's clearly more room
+    // above (e.g. the field is near the bottom of the modal).
+    if (spaceBelow >= wanted || spaceBelow >= spaceAbove) {
+      dropdown.style.top = (rect.bottom + 2) + 'px';
+      dropdown.style.maxHeight = Math.max(80, Math.min(220, spaceBelow)) + 'px';
+    } else {
+      const h = Math.max(80, Math.min(220, spaceAbove));
+      dropdown.style.top = (rect.top - h - 2) + 'px';
+      dropdown.style.maxHeight = h + 'px';
+    }
   }
 
   function update() {
@@ -6322,7 +6346,14 @@ function setupChipAutocomplete(input) {
       `<div class="cat-sug-item" data-idx="${i}">${highlight(c, query)}</div>`
     ).join('');
     dropdown.style.display = 'block';
+    positionDropdown();
   }
+
+  // Reposition while the dropdown is open if the viewport or modal scrolls
+  // (e.g. user changes orientation, on-screen keyboard expands).
+  const reposIfOpen = () => { if (dropdown.style.display !== 'none') positionDropdown(); };
+  window.addEventListener('resize', reposIfOpen);
+  window.addEventListener('scroll', reposIfOpen, true);
 
   function setActive(idx) {
     activeIdx = idx;
@@ -6528,6 +6559,10 @@ function closeSupplierEdit(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('supplier-edit-modal').classList.remove('show');
   currentEditSupplierId = null;
+  // setupChipAutocomplete portals each dropdown to <body> so it can render
+  // past the modal's overflow:auto clip; remove those orphans on close so
+  // body doesn't accumulate one per Add/Edit cycle.
+  document.querySelectorAll('body > .cat-suggestions').forEach(d => d.remove());
 }
 async function saveSupplierFromEdit() {
   const body = document.getElementById('edit-modal-body');
