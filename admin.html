@@ -2661,6 +2661,7 @@
         </div>
         <div class="supp-modal-body" id="view-modal-body"></div>
         <div class="supp-modal-footer">
+          <button type="button" class="supp-del-btn" onclick="deleteFromSupplierView()">Delete</button>
           <button type="button" class="btn-secondary" onclick="closeSupplierView()">Close</button>
           <button type="button" class="btn-primary" onclick="editFromView()">Edit</button>
         </div>
@@ -6426,8 +6427,9 @@ function renderSupplierFormBody(s) {
       </div>
       <div class="supp-row">
         <div class="supp-cell">
-          <label class="supp-label">Contact number</label>
-          <input type="text" class="supp-input" data-field="contactNumber" value="${escAttr(s.contactNumber)}" placeholder="e.g. 09171234567" />
+          <label class="supp-label">Contact numbers</label>
+          <input type="text" class="supp-input" data-field="contactNumber" value="${escAttr(s.contactNumber)}" placeholder="Primary, e.g. 09171234567" />
+          <input type="text" class="supp-input" data-field="contactNumber2" value="${escAttr(s.contactNumber2 || '')}" placeholder="Secondary (optional)" style="margin-top:6px;" />
         </div>
         <div class="supp-cell">
           <label class="supp-label">Next delivery / schedule</label>
@@ -6498,6 +6500,7 @@ function renderSupplierViewBody(s) {
       ${row('Business name', escText(s.businessName), !s.businessName)}
       ${row('Contact person', escText(s.contactPerson), !s.contactPerson)}
       ${row('Contact number', escText(s.contactNumber), !s.contactNumber)}
+      ${s.contactNumber2 ? row('Contact number 2', escText(s.contactNumber2), false) : ''}
       ${row('Email address', emailHtml, !s.email)}
       ${row('Website', websiteHtml, !s.website)}
       ${row('Address', escText(s.address).replace(/\n/g, '<br>'), !s.address)}
@@ -6525,6 +6528,21 @@ function closeSupplierView(e) {
   document.getElementById('supplier-view-modal').classList.remove('show');
   currentViewSupplierId = null;
 }
+async function deleteFromSupplierView() {
+  const id = currentViewSupplierId;
+  if (!id) return;
+  const sup = suppliers.find(x => x.id === id);
+  const name = (sup && sup.businessName) || 'this supplier';
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  try {
+    await tdoc('suppliers', id).delete();
+    closeSupplierView();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to delete: ' + (err && err.message ? err.message : err));
+  }
+}
+
 function editFromView() {
   const id = currentViewSupplierId;
   closeSupplierView();
@@ -6535,7 +6553,7 @@ function editFromView() {
 let currentEditSupplierId = null; // null when adding a new supplier
 function openSupplierAdd() {
   currentEditSupplierId = null;
-  const blank = { businessName: '', contactPerson: '', contactNumber: '', email: '', website: '', address: '', schedule: '', categories: [] };
+  const blank = { businessName: '', contactPerson: '', contactNumber: '', contactNumber2: '', email: '', website: '', address: '', schedule: '', categories: [] };
   document.getElementById('edit-modal-title').textContent = 'Add Supplier';
   document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(blank);
   document.getElementById('edit-modal-delete-btn').style.display = 'none';
