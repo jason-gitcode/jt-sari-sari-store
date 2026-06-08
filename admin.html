@@ -1586,13 +1586,30 @@
     }
     .dash-preset-btn:hover:not(.active) { border-color: var(--line-strong); color: var(--ink); }
     .dash-preset-btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-    .dash-date-range { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
-    .dash-date-range input {
-      padding: 6px 10px; border: 1px solid var(--line);
-      border-radius: var(--radius-sm); font-size: var(--fs-sm);
-      outline: none; background: var(--surface); color: var(--ink);
+    .dash-date-range {
+      display: flex; align-items: center; gap: 8px;
+      margin-left: auto; flex-wrap: wrap;
+      font-size: var(--fs-sm); color: var(--muted);
     }
-    .dash-date-range input:focus { border-color: var(--accent); }
+    /* Native <input type="date"> doesn't inherit font-family / -weight, so
+       Safari renders the displayed date in its system font at a heavier
+       weight than the preset buttons next to it. Normalize all five
+       typography properties so the dates match the .dash-preset-btn
+       look exactly. */
+    .dash-date-range input {
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--ink-soft);
+      font-family: inherit;
+      font-size: var(--fs-sm);
+      font-weight: 500;
+      line-height: 1.4;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .dash-date-range input:focus { border-color: var(--accent); color: var(--ink); }
 
     .dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
     .dash-card {
