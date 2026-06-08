@@ -61,6 +61,55 @@
     min-height: 100vh;
   }
   footer { margin-top: auto; }
+
+  /* ============================================================
+     Themed notice modal — replaces native window.alert() so error
+     dialogs stay on-brand. Backdrop + centered card with a soft
+     amber icon, title, message, and a primary OK button using the
+     same .btn-hero style as the rest of the landing.
+     ============================================================ */
+  .notice-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; z-index: 1000;
+    animation: noticeFadeIn 0.18s ease;
+  }
+  .notice-overlay[hidden] { display: none; }
+  .notice-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 36px 32px 32px;
+    width: 100%; max-width: 400px;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+    animation: noticeCardIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .notice-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fef3c7, #fed7aa);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    margin-bottom: 20px;
+  }
+  .notice-title {
+    font-size: 22px; font-weight: 700; color: var(--ink);
+    margin-bottom: 10px; letter-spacing: -0.01em;
+  }
+  .notice-message {
+    font-size: 15px; color: var(--muted); line-height: 1.55;
+    margin-bottom: 28px;
+  }
+  .notice-ok {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 160px; padding: 12px 32px;
+  }
+  @keyframes noticeFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes noticeCardIn {
+    from { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
   a { color: inherit; }
   button { font: inherit; cursor: pointer; }
 
@@ -2128,6 +2177,17 @@
   </div>
 </footer>
 
+<!-- Themed notice modal — replaces window.alert() so error / info dialogs
+     stay visually consistent with the rest of the landing. -->
+<div class="notice-overlay" id="notice-overlay" hidden onclick="closeNoticeBackdrop(event)">
+  <div class="notice-card" role="alertdialog" aria-labelledby="notice-title" onclick="event.stopPropagation()">
+    <div class="notice-icon" id="notice-icon">⚠️</div>
+    <div class="notice-title" id="notice-title">Heads up</div>
+    <div class="notice-message" id="notice-message"></div>
+    <button type="button" class="btn-hero notice-ok" onclick="closeNotice()">OK</button>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -2522,7 +2582,34 @@ document.getElementById('signin-btn').addEventListener('click', async () => {
     await auth.signInWithPopup(provider);
   } catch (err) {
     console.error(err);
-    alert('Sign-in failed: ' + (err && err.message ? err.message : err));
+    // User-cancelled popup isn't really an error — the popup-closed-by-user
+    // code fires every time someone hits "Cancel" or closes the OAuth tab.
+    // Swallow it silently. Everything else gets the simple themed notice.
+    const code = (err && err.code) || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+    showNotice('Sign-in failed', 'Please try again.');
+  }
+});
+
+// ============================================================
+// Themed notice modal — replaces native window.alert()
+// ============================================================
+function showNotice(title, message) {
+  document.getElementById('notice-title').textContent   = title   || 'Heads up';
+  document.getElementById('notice-message').textContent = message || '';
+  document.getElementById('notice-overlay').hidden = false;
+}
+function closeNotice() {
+  document.getElementById('notice-overlay').hidden = true;
+}
+function closeNoticeBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeNotice();
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const o = document.getElementById('notice-overlay');
+    if (o && !o.hidden) closeNotice();
   }
 });
 
