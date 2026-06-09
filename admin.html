@@ -568,7 +568,8 @@
     [data-theme="dark"] .tier-badge.tier-pro    { background: rgba(245,158,11,0.16); color: #fcd34d; border-color: rgba(245,158,11,0.4); }
     .brand-sub { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
 
-    .header-actions { display: flex; align-items: center; gap: 8px; flex: 1 1 0; justify-content: flex-end; min-width: 0; }
+    .header-actions { display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0; }
+    .header-actions .btn-ghost { white-space: nowrap; }
     /* Multi-branch filter (Pro + ≥1 branch only). Hidden via inline style
        until the branches subscription fires; shown by syncBranchFilter(). */
     .branch-filter-wrap { display: flex; align-items: center; }
@@ -594,9 +595,10 @@
     @media (max-width: 480px) {
       .branch-filter-wrap select { max-width: 110px; font-size: 11px; }
     }
-    /* Storefront link sits in the normal flow between brand (flex:1) and
-       header-actions (flex:1), which keeps it visually centered WITHOUT
-       overlapping the branch picker the way absolute centering used to. */
+    /* Storefront link is a normal-flow flex child. brand has flex:1 and eats
+       the slack, so the Storefront button + header-actions sit together as
+       one right-aligned cluster. No absolute positioning => it can never
+       overlap the branch picker, at any screen width. */
     .storefront-btn {
       flex-shrink: 0;
       display: inline-flex; align-items: center; gap: 8px;
