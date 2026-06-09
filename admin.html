@@ -4216,11 +4216,11 @@ const TIER_INFO = {
   free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,    supplierCap: 1,
             features: ['5 products', '1 supplier', 'Storefront on pabilimart.com/<em>[store-name]</em>/',
                        'Pabili Mart branding', 'No custom domain'] },
-  growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 500,
-            features: ['500 products', 'Unlimited suppliers', 'Sales reports + analytics',
+  growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 100,
+            features: ['500 products', '100 suppliers', 'Sales reports + analytics',
                        'Pabili Mart branding', 'No custom domain'] },
-  pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000, supplierCap: 10000,
-            features: ['10,000 products', 'Unlimited suppliers', 'Multi-branch support',
+  pro:    { name: 'PabiliMart Pro',    amount: 399, productCap: 10000, supplierCap: 5000,
+            features: ['10,000 products', '5,000 suppliers', 'Multi-branch support',
                        'Priority support', 'Custom domain'] }
 };
 
@@ -6299,7 +6299,7 @@ function renderSupplierCapStatus() {
     if (banner) {
       banner.style.display = dismissed ? 'none' : '';
       if (bannerTitle) bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} supplier${cap === 1 ? '' : 's'})`;
-      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for unlimited suppliers.';
+      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for up to 100 suppliers, or Pro (₱399/mo) for 5,000.';
       if (bannerCompact) bannerCompact.textContent = 'Limit reached.';
     }
   } else {
