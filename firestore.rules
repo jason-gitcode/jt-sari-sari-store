@@ -134,6 +134,16 @@ service cloud.firestore {
         allow read: if isOwnerOrSuper(tid);
         allow write: if false;
       }
+
+      // ---------- Custom Domain (Pro feature) — schema lives at
+      //            `tenants/{tid}.customDomain` (on the tenant root doc,
+      //            not a subcollection). No new rules needed: the tenant
+      //            root rules above already allow owner READ + block client
+      //            writes; the submitCustomDomain / verifyCustomDomain /
+      //            removeCustomDomain Cloud Functions update via admin SDK,
+      //            bypassing rules. The public/customDomains lookup map
+      //            used by the storefront head IIFE is covered by the
+      //            existing `public/{doc}` rule below (anon-readable).
     }
 
     // ============================================================

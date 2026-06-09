@@ -1330,3 +1330,454 @@ exports.submitSupportTicket = onCall(async (request) => {
 
   return { ticketId };
 });
+
+// ============================================================
+// CUSTOM DOMAIN (Pro-only, self-serve)
+//
+// Pro tenants point their own domain (e.g. tindahanjacob.com) at their
+// Pabili Mart storefront. Flow:
+//   1. Tenant submits domain → submitCustomDomain creates the resource
+//      via Firebase Hosting REST API + returns DNS records to display
+//   2. Tenant updates DNS at their registrar
+//   3. Tenant polls verifyCustomDomain until ownership + cert are active
+//   4. Once live, public/customDomains map is updated → storefront head
+//      IIFE resolves hostname → tenant slug on first paint
+//
+// Security posture (see Custom Domain - Self-Serve vs Manual Decision):
+//   - These callables run as a DEDICATED runtime SA (see CUSTOM_DOMAIN_SA
+//     below) — NOT the default Cloud Functions SA. So a bug in any other
+//     callable (e.g. submitSupportTicket) cannot reach Firebase Hosting.
+//   - That SA holds a CUSTOM IAM role granting only firebasehosting.sites.*
+//     permissions — not full firebasehosting.admin.
+//   - Every mutation validates Pro tier + tenant ownership BEFORE the API
+//     call, with rate limiting via a 30-min cooldown window per tenant.
+// ============================================================
+
+const { GoogleAuth } = require('google-auth-library');
+
+// Dedicated runtime service account for custom-domain callables. Granted
+// the "Pabili Mart Custom Domain Manager" custom IAM role + datastore.user
+// + logs.writer. Set via Console — see Obsidian custom-domain decision doc.
+const CUSTOM_DOMAIN_SA = 'pabilimart-customdomain-sa@jt-sari-sari-store.iam.gserviceaccount.com';
+
+// Firebase Hosting site to attach custom domains to. Default site = project ID.
+const FIREBASE_HOSTING_SITE_ID = 'jt-sari-sari-store';
+const FIREBASE_PROJECT_ID = 'jt-sari-sari-store';
+
+// Domain validation. Lowercased, RFC 1035-ish (no underscore, no leading
+// hyphen, 1–253 chars total, labels 1–63). We also reject pabilimart.com
+// itself + obvious abuse vectors (localhost, IPs).
+const DOMAIN_REGEX = /^(?=.{1,253}$)(?!:\/\/)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const BLOCKED_DOMAINS = new Set([
+  'pabilimart.com', 'www.pabilimart.com',
+  'jsminimart.com', 'www.jsminimart.com',
+  'jt-sari-sari-store.web.app', 'jt-sari-sari-store.firebaseapp.com',
+  'localhost'
+]);
+
+function validateCustomDomain(raw) {
+  const d = String(raw || '').trim().toLowerCase();
+  if (!d) throw new HttpsError('invalid-argument', 'Domain is required.');
+  if (d.length > 253) throw new HttpsError('invalid-argument', 'Domain is too long.');
+  if (!DOMAIN_REGEX.test(d)) {
+    throw new HttpsError('invalid-argument', 'That doesn\'t look like a valid domain. Use the form yourstore.com or shop.yourstore.com (no http://, no path).');
+  }
+  if (BLOCKED_DOMAINS.has(d)) {
+    throw new HttpsError('invalid-argument', 'That domain is reserved.');
+  }
+  // Reject IPs (the regex above mostly catches them but defense-in-depth).
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(d)) {
+    throw new HttpsError('invalid-argument', 'IP addresses aren\'t supported. Use a registered domain.');
+  }
+  return d;
+}
+
+// ------ Firebase Hosting REST API helpers ------
+//
+// Auth: ADC inside Cloud Functions uses the function's runtime SA. We
+// scope the token to firebase.hosting so it can call the customDomains
+// subresource.
+//
+// All API responses are logged (truncated) so future field-name drift is
+// debuggable without redeploying. If a parse fails, the raw response is
+// still in Cloud Logging.
+let __hostingAuthClient = null;
+async function getHostingAuthClient() {
+  if (__hostingAuthClient) return __hostingAuthClient;
+  const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/firebase', 'https://www.googleapis.com/auth/cloud-platform']
+  });
+  __hostingAuthClient = await auth.getClient();
+  return __hostingAuthClient;
+}
+
+async function callHostingApi(method, path, body) {
+  const client = await getHostingAuthClient();
+  const url = `https://firebasehosting.googleapis.com${path}`;
+  const headers = { 'Content-Type': 'application/json' };
+  const tokenRes = await client.getAccessToken();
+  if (tokenRes && tokenRes.token) headers.Authorization = `Bearer ${tokenRes.token}`;
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const text = await res.text();
+  let parsed = null;
+  try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* non-JSON */ }
+  if (!res.ok) {
+    console.warn('[customDomain] Hosting API', method, path, '→', res.status, text.slice(0, 500));
+    throw new HttpsError('internal', (parsed && parsed.error && parsed.error.message) || `Firebase Hosting API returned ${res.status}.`);
+  }
+  return parsed;
+}
+
+// Map Firebase Hosting API response into our compact internal status.
+// Field names per v1beta1 docs: hostState, ownershipState, certState.
+// We keep the raw fields too so the admin UI can show finer detail.
+function deriveCustomDomainStatus(apiResp) {
+  if (!apiResp) return { status: 'unknown' };
+  const hostState = apiResp.hostState || 'HOST_STATE_UNSPECIFIED';
+  const ownershipState = apiResp.ownershipState || 'OWNERSHIP_STATE_UNSPECIFIED';
+  const certState = (apiResp.cert && apiResp.cert.state) || apiResp.certState || 'CERT_STATE_UNSPECIFIED';
+  // Health: a domain is "live" when host is HOST_ACTIVE + cert is CERT_ACTIVE.
+  if (hostState === 'HOST_ACTIVE' && (certState === 'CERT_ACTIVE' || certState === 'CERT_EXPIRING_SOON')) {
+    return { status: 'live', hostState, ownershipState, certState };
+  }
+  if (certState === 'CERT_EXPIRED') {
+    return { status: 'failed', reason: 'SSL certificate expired.', hostState, ownershipState, certState };
+  }
+  if (hostState === 'HOST_ACTIVE' || certState === 'CERT_PROPAGATING' || certState === 'CERT_VALIDATING' || certState === 'CERT_PREPARING') {
+    return { status: 'ssl_pending', hostState, ownershipState, certState };
+  }
+  if (ownershipState === 'OWNERSHIP_PENDING' || ownershipState === 'OWNERSHIP_MISSING' || hostState === 'HOST_UNREACHABLE' || hostState === 'HOST_UNHOSTED') {
+    return { status: 'dns_pending', hostState, ownershipState, certState };
+  }
+  if (ownershipState === 'OWNERSHIP_CONFLICT' || hostState === 'HOST_CONFLICT') {
+    return { status: 'failed', reason: 'This domain is already claimed by another Firebase project.', hostState, ownershipState, certState };
+  }
+  if (ownershipState === 'OWNERSHIP_MISMATCH' || hostState === 'HOST_MISMATCH') {
+    return { status: 'failed', reason: 'DNS records don\'t match what Firebase expects.', hostState, ownershipState, certState };
+  }
+  return { status: 'unknown', hostState, ownershipState, certState };
+}
+
+// Pull the DNS records the tenant needs to add at their registrar from
+// the API response. Shape is { discovered, desired, checkTime } —
+// `desired` is what we display.
+function extractDnsRecords(apiResp) {
+  if (!apiResp || !apiResp.requiredDnsUpdates) return [];
+  const desired = apiResp.requiredDnsUpdates.desired || [];
+  const records = [];
+  desired.forEach(entry => {
+    const name = entry.domainName || entry.name || '@';
+    (entry.records || []).forEach(rec => {
+      records.push({
+        type: rec.type || rec.recordType || 'A',
+        name,
+        value: rec.rdata || rec.value || rec.target || ''
+      });
+    });
+  });
+  return records;
+}
+
+// Mirror live custom-domain → slug mappings into public/customDomains so
+// storefront pages can resolve `location.hostname` to a tenant on first
+// paint without privileged reads.
+const CUSTOM_DOMAINS_PUBLIC_REF = () => db.collection('public').doc('customDomains');
+
+async function setPublicCustomDomain(domain, slug) {
+  await CUSTOM_DOMAINS_PUBLIC_REF().set({
+    [`domains.${domain}`]: slug,
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+async function unsetPublicCustomDomain(domain) {
+  await CUSTOM_DOMAINS_PUBLIC_REF().set({
+    [`domains.${domain}`]: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+}
+
+// Rate limiting: per-tenant 30-min cooldown between submit attempts.
+// Prevents a buggy admin UI loop or malicious caller from burning the
+// 20-domain Firebase Hosting quota.
+const CUSTOM_DOMAIN_SUBMIT_COOLDOWN_MS = 30 * 60 * 1000;
+
+// Pre-flight ownership + tier check shared across all three callables.
+async function assertProTenantOwner(tid, email, isSuperadmin) {
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can manage its custom domain.');
+  }
+  const tier = (tenant.tier || 'free').toLowerCase();
+  if (tier !== 'pro' && !isSuperadmin) {
+    throw new HttpsError('failed-precondition', 'Custom domain is a Pro feature. Upgrade your plan first.');
+  }
+  return { tref, tenant };
+}
+
+// ============================================================
+// submitCustomDomain — Pro-only. Creates the customDomain resource at
+// Firebase Hosting and seeds tenants/{tid}.customDomain with the DNS
+// records the tenant needs to add at their registrar.
+// ============================================================
+exports.submitCustomDomain = onCall({ serviceAccount: CUSTOM_DOMAIN_SA }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  const domain = validateCustomDomain(data.domain);
+
+  const { tref, tenant } = await assertProTenantOwner(tid, email, isSuperadmin);
+
+  // Reject if this tenant already has a customDomain in any non-terminal
+  // state. They must removeCustomDomain first.
+  const existing = tenant.customDomain || null;
+  if (existing && existing.domain && existing.status !== 'failed') {
+    throw new HttpsError('failed-precondition', `You already have a custom domain (${existing.domain}, status: ${existing.status}). Remove it before adding another.`);
+  }
+  // Rate limit submits per tenant.
+  if (existing && existing.submittedAt) {
+    const lastMs = existing.submittedAt.toMillis ? existing.submittedAt.toMillis() : new Date(existing.submittedAt).getTime();
+    if (Date.now() - lastMs < CUSTOM_DOMAIN_SUBMIT_COOLDOWN_MS) {
+      throw new HttpsError('resource-exhausted', 'Please wait at least 30 minutes between custom domain submissions.');
+    }
+  }
+
+  // Create the customDomain at Firebase Hosting. The customDomainId is
+  // the actual domain name; per Google docs, the resource name format is
+  // projects/{project}/sites/{site}/customDomains/{domain}.
+  const createPath = `/v1beta1/projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains?customDomainId=${encodeURIComponent(domain)}`;
+  const createResp = await callHostingApi('POST', createPath, {});
+  console.log('[submitCustomDomain] create response:', JSON.stringify(createResp).slice(0, 800));
+
+  // The create call returns a Long Running Operation. We immediately GET
+  // the resource to pull the DNS records — Firebase populates
+  // requiredDnsUpdates synchronously after the create.
+  const getPath = `/v1beta1/projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains/${encodeURIComponent(domain)}`;
+  let getResp = null;
+  try {
+    getResp = await callHostingApi('GET', getPath);
+    console.log('[submitCustomDomain] get response:', JSON.stringify(getResp).slice(0, 800));
+  } catch (err) {
+    // If GET fails right after CREATE, the resource may not be ready yet —
+    // tenant can re-poll via verifyCustomDomain.
+    console.warn('[submitCustomDomain] post-create GET failed (will rely on verify):', err.message);
+  }
+
+  const status = getResp ? deriveCustomDomainStatus(getResp) : { status: 'dns_pending' };
+  const dnsRecords = getResp ? extractDnsRecords(getResp) : [];
+
+  const customDomain = {
+    domain,
+    status: status.status,
+    statusReason: status.reason || null,
+    hostState: status.hostState || null,
+    ownershipState: status.ownershipState || null,
+    certState: status.certState || null,
+    dnsRecords,
+    firebaseResourceName: (getResp && getResp.name) || `projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains/${domain}`,
+    submittedAt: FieldValue.serverTimestamp(),
+    lastCheckedAt: FieldValue.serverTimestamp(),
+    liveAt: null
+  };
+  await tref.update({ customDomain });
+
+  return { ok: true, domain, status: customDomain.status, dnsRecords };
+});
+
+// ============================================================
+// verifyCustomDomain — Pro-only. Re-polls Firebase Hosting for the latest
+// status of the tenant's pending custom domain. Updates Firestore +
+// public/customDomains when the domain transitions to live.
+// ============================================================
+exports.verifyCustomDomain = onCall({ serviceAccount: CUSTOM_DOMAIN_SA }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  const { tref, tenant } = await assertProTenantOwner(tid, email, isSuperadmin);
+  const existing = tenant.customDomain || null;
+  if (!existing || !existing.domain) {
+    throw new HttpsError('failed-precondition', 'No custom domain submitted yet.');
+  }
+  const domain = existing.domain;
+
+  const getPath = `/v1beta1/projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains/${encodeURIComponent(domain)}`;
+  const getResp = await callHostingApi('GET', getPath);
+  console.log('[verifyCustomDomain]', domain, 'response:', JSON.stringify(getResp).slice(0, 800));
+
+  const status = deriveCustomDomainStatus(getResp);
+  const dnsRecords = extractDnsRecords(getResp);
+
+  const patch = {
+    'customDomain.status': status.status,
+    'customDomain.statusReason': status.reason || null,
+    'customDomain.hostState': status.hostState || null,
+    'customDomain.ownershipState': status.ownershipState || null,
+    'customDomain.certState': status.certState || null,
+    'customDomain.dnsRecords': dnsRecords,
+    'customDomain.lastCheckedAt': FieldValue.serverTimestamp()
+  };
+  // Transition to live: stamp liveAt + add to public lookup map.
+  if (status.status === 'live' && existing.status !== 'live') {
+    patch['customDomain.liveAt'] = FieldValue.serverTimestamp();
+    await setPublicCustomDomain(domain, tid);
+  }
+  // Transition away from live (failed, removed externally): unlist from public map.
+  if (status.status !== 'live' && existing.status === 'live') {
+    await unsetPublicCustomDomain(domain);
+  }
+  await tref.update(patch);
+
+  return { ok: true, domain, status: status.status, dnsRecords };
+});
+
+// ============================================================
+// removeCustomDomain — Pro tenant owner (or superadmin) tears down the
+// custom domain. Deletes the customDomain at Firebase Hosting, clears the
+// tenants/{tid}.customDomain field, and removes the public/customDomains entry.
+// ============================================================
+exports.removeCustomDomain = onCall({ serviceAccount: CUSTOM_DOMAIN_SA }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  // Skip Pro check on removal — even downgraded tenants must be able to
+  // tear down their custom domain to free up the quota slot. So we only
+  // do ownership validation here.
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can manage its custom domain.');
+  }
+  const existing = tenant.customDomain || null;
+  if (!existing || !existing.domain) {
+    return { ok: true, alreadyRemoved: true };
+  }
+  const domain = existing.domain;
+
+  // Delete from Firebase Hosting. Tolerate 404 (already gone) so we can
+  // always clean up local state without a stuck record.
+  try {
+    const delPath = `/v1beta1/projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains/${encodeURIComponent(domain)}`;
+    await callHostingApi('DELETE', delPath);
+  } catch (err) {
+    if (err && err.message && /not found|404/i.test(err.message)) {
+      console.warn('[removeCustomDomain] Firebase resource already gone for', domain);
+    } else {
+      throw err;
+    }
+  }
+
+  // Clear local state + public lookup.
+  await tref.update({ customDomain: FieldValue.delete() });
+  await unsetPublicCustomDomain(domain);
+
+  return { ok: true, domain };
+});
+
+// ============================================================
+// checkCustomDomainsHealth — runs daily. Polls Firebase Hosting for every
+// tenant currently holding a live custom domain. Detects:
+//   - SSL cert expired/expiring → updates status to failed + alerts via Discord
+//   - Ownership/DNS reverted (tenant changed registrar) → updates status
+//   - Domain still healthy → updates lastCheckedAt
+//
+// Non-live domains (dns_pending, ssl_pending) are NOT polled here — the
+// tenant pulls them from verifyCustomDomain on demand.
+// ============================================================
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+
+exports.checkCustomDomainsHealth = onSchedule({
+  schedule: 'every day 02:00',
+  timeZone: 'Asia/Manila',
+  serviceAccount: CUSTOM_DOMAIN_SA
+}, async () => {
+  console.log('[checkCustomDomainsHealth] starting daily run');
+  const snap = await db.collection('tenants')
+    .where('customDomain.status', '==', 'live')
+    .get();
+  console.log('[checkCustomDomainsHealth] live domains to check:', snap.size);
+
+  let healthy = 0, degraded = 0, errored = 0;
+  const alerts = [];
+
+  for (const doc of snap.docs) {
+    const tenant = doc.data() || {};
+    const cd = tenant.customDomain || {};
+    const domain = cd.domain;
+    if (!domain) continue;
+    try {
+      const getPath = `/v1beta1/projects/${FIREBASE_PROJECT_ID}/sites/${FIREBASE_HOSTING_SITE_ID}/customDomains/${encodeURIComponent(domain)}`;
+      const resp = await callHostingApi('GET', getPath);
+      const status = deriveCustomDomainStatus(resp);
+      const patch = {
+        'customDomain.status': status.status,
+        'customDomain.statusReason': status.reason || null,
+        'customDomain.hostState': status.hostState || null,
+        'customDomain.ownershipState': status.ownershipState || null,
+        'customDomain.certState': status.certState || null,
+        'customDomain.lastCheckedAt': FieldValue.serverTimestamp()
+      };
+      await doc.ref.update(patch);
+      if (status.status === 'live') {
+        healthy++;
+      } else {
+        degraded++;
+        await unsetPublicCustomDomain(domain);
+        alerts.push(`⚠️ ${tenant.name || doc.id} · \`${domain}\` → status now **${status.status}** (cert: ${status.certState}). ${status.reason || ''}`);
+      }
+    } catch (err) {
+      errored++;
+      console.warn('[checkCustomDomainsHealth] failed for', domain, ':', err.message);
+    }
+  }
+
+  console.log(`[checkCustomDomainsHealth] done: healthy=${healthy}, degraded=${degraded}, errored=${errored}`);
+
+  // Send a Discord summary if anything degraded today.
+  if (alerts.length > 0) {
+    try {
+      const billingSnap = await db.collection('platform').doc('billing').get();
+      const billing = billingSnap.exists ? (billingSnap.data() || {}) : {};
+      const webhook = billing.prioritySupportWebhook || billing.subscriptionDiscordWebhook || null;
+      if (webhook) {
+        const content = `🌐 **Custom Domain Health Check — ${alerts.length} issue${alerts.length === 1 ? '' : 's'}**\n\n${alerts.join('\n')}`;
+        await fetch(webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        });
+      }
+    } catch (err) {
+      console.warn('[checkCustomDomainsHealth] Discord post failed:', err.message);
+    }
+  }
+});
