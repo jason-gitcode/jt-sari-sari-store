@@ -581,9 +581,12 @@
       border-radius: var(--radius-sm);
       background: var(--surface);
       /* Match the Sign Out button (.btn-ghost) exactly so the header
-         controls read as one uniform set. */
+         controls read as one uniform set. !important is required to beat
+         the site-wide "selects -> 16px on touch" iOS-zoom rule below; a
+         <select> opens a wheel picker (no keyboard) so it never triggers
+         the auto-zoom that rule guards against. */
       color: var(--ink-soft);
-      font-size: var(--fs-sm);
+      font-size: var(--fs-sm) !important;
       font-family: inherit;
       font-weight: 500;
       cursor: pointer;
