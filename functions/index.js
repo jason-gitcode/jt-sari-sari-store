@@ -1187,7 +1187,7 @@ exports.getMyTenant = onCall(async (request) => {
 // `PRIORITY_SUPPORT_ROLE_ID` below — set this to the Discord role ID
 // before going live (see Discord setup docs).
 // ============================================================
-const PRIORITY_SUPPORT_ROLE_ID = 'YOUR_ROLE_ID'; // TODO: replace with real Discord role ID
+const PRIORITY_SUPPORT_ROLE_ID = '1513702654042308608'; // TODO: replace with real Discord role ID
 const SUPPORT_SUBJECTS = new Set(['general', 'billing', 'bug', 'feature', 'how-to']);
 
 exports.submitSupportTicket = onCall(async (request) => {
@@ -1299,16 +1299,25 @@ exports.submitSupportTicket = onCall(async (request) => {
     ].join('\n');
 
     try {
+      // NOTE: Discord's API treats `allowed_mentions.parse: ['roles']`
+      // and `allowed_mentions.roles: [...]` as mutually exclusive — using
+      // BOTH returns HTTP 400. We use the explicit roles array form so
+      // only this specific role ID can be pinged from the content (defense
+      // against accidental @everyone if the content ever has it).
       const res = await fetch(webhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content,
-          allowed_mentions: { parse: ['roles'], roles: [PRIORITY_SUPPORT_ROLE_ID] }
+          allowed_mentions: { roles: [PRIORITY_SUPPORT_ROLE_ID] }
         })
       });
       if (!res.ok) {
-        console.warn('[submitSupportTicket] Discord webhook returned', res.status);
+        // Log the response body for diagnosis — Discord 400s usually
+        // explain what's wrong in the body, otherwise we're flying blind.
+        let body = '';
+        try { body = await res.text(); } catch (_) {}
+        console.warn('[submitSupportTicket] Discord webhook returned', res.status, body.slice(0, 500));
       }
     } catch (err) {
       console.warn('[submitSupportTicket] Discord post failed:', err.message);
