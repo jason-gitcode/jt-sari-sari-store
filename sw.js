@@ -1,4 +1,4 @@
-const CACHE = 'sari-sari-v247';
+const CACHE = 'sari-sari-v248';
 const PRECACHE = [
   '/logo.PNG',
   '/newlogo.jpeg',
@@ -27,6 +27,25 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.startsWith(self.location.origin)) return;
 
+  const accept = e.request.headers.get('accept') || '';
+  const isHTML = e.request.mode === 'navigate' || accept.includes('text/html');
+
+  if (isHTML) {
+    // Network-first for pages so a deploy shows up immediately instead of
+    // being shadowed by a stale cached copy. Falls back to cache offline.
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (images, etc.).
   e.respondWith(
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(res => {
