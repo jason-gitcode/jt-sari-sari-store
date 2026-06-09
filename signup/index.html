@@ -2774,7 +2774,7 @@ async function emailAuthSubmit() {
   try {
     if (authMode === 'signup') {
       const cred = await auth.createUserWithEmailAndPassword(email, pw);
-      await cred.user.sendEmailVerification({ url: window.location.origin + window.location.pathname });
+      await cred.user.sendEmailVerification({ url: window.location.origin + window.location.pathname + '#signup' });
       // onAuthStateChanged routes the (unverified) user to step-verify.
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
@@ -2792,7 +2792,7 @@ async function sendReset() {
   const email = (document.getElementById('auth-email').value || '').trim();
   if (!email) { showNotice('Reset password', 'Type your email above first, then tap "Forgot password?".'); return; }
   try {
-    await auth.sendPasswordResetEmail(email, { url: window.location.origin + window.location.pathname });
+    await auth.sendPasswordResetEmail(email, { url: window.location.origin + window.location.pathname + '#signup' });
     showNotice('Check your email', `We sent a password-reset link to ${email}.`);
   } catch (err) {
     showNotice('Reset failed', authError(err));
@@ -2853,7 +2853,7 @@ async function resendVerification() {
   const u = auth.currentUser;
   if (!u) { showStep('step-signin'); return; }
   try {
-    await u.sendEmailVerification({ url: window.location.origin + window.location.pathname });
+    await u.sendEmailVerification({ url: window.location.origin + window.location.pathname + '#signup' });
     showNotice('Sent', `We re-sent the verification link to ${u.email}.`);
   } catch (err) {
     showNotice('Could not resend', authError(err));
