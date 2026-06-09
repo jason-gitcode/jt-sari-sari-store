@@ -161,6 +161,14 @@
   function showCta(text, href) { elCta.textContent = text; elCta.href = href; elCta.hidden = false; }
 
   async function run() {
+    // Post-verification landing (the email's Continue button points here).
+    // Firebase already verified the address server-side; we just give a
+    // clear, non-confusing next step instead of bouncing into the app.
+    if (params.get('verified') === '1') {
+      showResult('success', 'Email verified', 'Your account is verified! Go back to the <strong>Pabili Mart sign-up tab</strong> you started in and tap “I’ve verified — continue” to finish creating your store. You can safely close this tab.');
+      showCta('Go to sign-up', '/signup/?go=signup');
+      return;
+    }
     if (!mode || !oobCode) {
       showResult('error', 'Invalid link', 'This link is missing information. Please open the most recent email we sent you.');
       return;

@@ -2780,7 +2780,7 @@ async function emailAuthSubmit() {
   try {
     if (authMode === 'signup') {
       const cred = await auth.createUserWithEmailAndPassword(email, pw);
-      await cred.user.sendEmailVerification({ url: window.location.origin + '/signup/?go=signup' });
+      await cred.user.sendEmailVerification({ url: window.location.origin + '/auth/?verified=1' });
       // onAuthStateChanged routes the (unverified) user to step-verify.
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
@@ -2859,7 +2859,7 @@ async function resendVerification() {
   const u = auth.currentUser;
   if (!u) { showStep('step-signin'); return; }
   try {
-    await u.sendEmailVerification({ url: window.location.origin + '/signup/?go=signup' });
+    await u.sendEmailVerification({ url: window.location.origin + '/auth/?verified=1' });
     showNotice('Sent', `We re-sent the verification link to ${u.email}.`);
   } catch (err) {
     showNotice('Could not resend', authError(err));
