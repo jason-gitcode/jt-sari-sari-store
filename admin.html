@@ -569,6 +569,31 @@
     .brand-sub { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
 
     .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    /* Multi-branch filter (Pro + ≥1 branch only). Hidden via inline style
+       until the branches subscription fires; shown by syncBranchFilter(). */
+    .branch-filter-wrap { display: flex; align-items: center; }
+    .branch-filter-wrap select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 6px 28px 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      max-width: 160px;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 10px 6px;
+    }
+    .branch-filter-wrap select:focus { outline: none; border-color: var(--accent); }
+    @media (max-width: 480px) {
+      .branch-filter-wrap select { max-width: 110px; font-size: 11px; }
+    }
     /* Storefront link: absolutely centered relative to the header, so it
        sits in the middle regardless of how wide brand/actions become. */
     header { position: relative; }
@@ -2634,6 +2659,11 @@
       <span>Storefront</span>
     </a>
     <div class="header-actions">
+      <div class="branch-filter-wrap" id="branch-filter-wrap" style="display:none;">
+        <select id="branch-filter-select" onchange="onBranchFilterChange(this.value)" aria-label="Filter by branch" title="Filter by branch">
+          <option value="">All branches</option>
+        </select>
+      </div>
       <button class="icon-btn" id="theme-toggle" onclick="cycleTheme()" title="Toggle theme" aria-label="Toggle theme">
         <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
       </button>
@@ -4351,6 +4381,7 @@ firebase.auth().onAuthStateChanged(user => {
     if (typeof applyReportsTabLock === 'function') applyReportsTabLock();
     if (typeof renderCustomDomainSection === 'function') renderCustomDomainSection();
     if (typeof renderBranchesSection === 'function') renderBranchesSection();
+    if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
@@ -7008,11 +7039,94 @@ let __branchesUnsub = null;
 let branchFormMode = 'add'; // 'add' | 'edit'
 let branchFormEditId = null;
 
+// Phase 2b — admin-side branch filter. null = "All branches" (no filter).
+// Persisted per-tenant in localStorage so a multi-branch operator who works
+// out of one branch most of the time doesn't re-pick on every visit.
+let SELECTED_BRANCH_FILTER = null;
+const BRANCH_FILTER_STORAGE_KEY = 'pabilimart-admin-branch-filter-';
+
+function readSavedBranchFilter() {
+  try {
+    if (!TENANT_ID) return null;
+    return localStorage.getItem(BRANCH_FILTER_STORAGE_KEY + TENANT_ID) || null;
+  } catch (_) { return null; }
+}
+function writeSavedBranchFilter(val) {
+  try {
+    if (!TENANT_ID) return;
+    if (val) localStorage.setItem(BRANCH_FILTER_STORAGE_KEY + TENANT_ID, val);
+    else     localStorage.removeItem(BRANCH_FILTER_STORAGE_KEY + TENANT_ID);
+  } catch (_) {}
+}
+
+// Rebuild the header dropdown options from the current branches list and
+// show/hide the whole wrap based on tier + branch count.
+function syncBranchFilterUI() {
+  const wrap = document.getElementById('branch-filter-wrap');
+  const sel  = document.getElementById('branch-filter-select');
+  if (!wrap || !sel) return;
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const isPro = tier === 'pro';
+  // Show only when Pro AND tenant has at least one branch. Single-branch
+  // tenants would have no real reason to switch.
+  if (!isPro || !branchesData || branchesData.length === 0) {
+    wrap.style.display = 'none';
+    if (SELECTED_BRANCH_FILTER !== null) {
+      SELECTED_BRANCH_FILTER = null;
+      onBranchFilterChange(''); // re-render any open tab with no filter
+    }
+    return;
+  }
+  wrap.style.display = '';
+  // Hydrate dropdown options. Active selection from SELECTED_BRANCH_FILTER
+  // (falls back to localStorage on the first run).
+  if (SELECTED_BRANCH_FILTER === null) {
+    const saved = readSavedBranchFilter();
+    if (saved && branchesData.find(b => b.id === saved)) {
+      SELECTED_BRANCH_FILTER = saved;
+    }
+  } else if (!branchesData.find(b => b.id === SELECTED_BRANCH_FILTER)) {
+    // The previously selected branch was deleted — fall back to All.
+    SELECTED_BRANCH_FILTER = null;
+    writeSavedBranchFilter(null);
+  }
+  const opts = ['<option value="">All branches</option>'].concat(
+    branchesData.map(b => `<option value="${escSupportText(b.id)}">${escSupportText(b.name || b.id)}</option>`)
+  );
+  sel.innerHTML = opts.join('');
+  sel.value = SELECTED_BRANCH_FILTER || '';
+}
+
+function onBranchFilterChange(value) {
+  SELECTED_BRANCH_FILTER = value || null;
+  writeSavedBranchFilter(SELECTED_BRANCH_FILTER);
+  // Re-render whatever depends on the filter. Cheap to over-call — each
+  // render function early-returns when its tab DOM isn't mounted.
+  if (typeof renderOrders === 'function') renderOrders();
+  if (typeof updateOrderBadge === 'function') updateOrderBadge();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderSalesReport === 'function') renderSalesReport();
+  if (typeof renderRestockingReport === 'function') renderRestockingReport();
+}
+
+// Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
+// filter is null ("All branches"), returns the original array unchanged.
+function ordersForActiveBranch() {
+  if (!SELECTED_BRANCH_FILTER) return orders;
+  return (orders || []).filter(o => o && o.branchId === SELECTED_BRANCH_FILTER);
+}
+
 function subscribeToBranches() {
   if (__branchesUnsub) { __branchesUnsub(); __branchesUnsub = null; }
   __branchesUnsub = tcol('branches').orderBy('createdAt', 'asc').onSnapshot(snap => {
     branchesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (typeof renderBranchesSection === 'function') renderBranchesSection();
+    // Phase 2b: refresh the header filter dropdown options + re-render
+    // the active tab. Cheap; renderOrders/renderDashboard short-circuit
+    // when their tab isn't visible.
+    if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
+    if (typeof renderOrders === 'function') renderOrders();
+    if (typeof updateOrderBadge === 'function') updateOrderBadge();
   }, err => {
     console.warn('[branches] listener:', err);
   });
@@ -7826,7 +7940,11 @@ function notifyNewOrder(order, orderId) {
 }
 
 function updateOrderBadge() {
-  const pending = orders.filter(o => o.status === 'pending').length;
+  // Pending count respects the active branch filter so a multi-branch
+  // operator switching to a specific branch sees only that branch's
+  // pending count in the tab badge.
+  const src = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : orders;
+  const pending = src.filter(o => o.status === 'pending').length;
   const badge = document.getElementById('order-badge');
   if (!badge) return;
   badge.style.display = pending > 0 ? 'inline-flex' : 'none';
@@ -7834,7 +7952,11 @@ function updateOrderBadge() {
 }
 
 function renderItemsToBuy(listEl) {
-  const pending = orders.filter(o => o.status === 'pending');
+  // Items-to-buy respects the active branch filter — a multi-branch
+  // operator working at one location needs the shopping list for that
+  // branch only.
+  const src = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : orders;
+  const pending = src.filter(o => o.status === 'pending');
   if (pending.length === 0) {
     listEl.innerHTML = `<div class="empty-state"><div>🛒</div><div>No pending orders</div></div>`;
     return;
@@ -7994,10 +8116,18 @@ function renderOrders() {
     return;
   }
 
-  const filtered = ordersFilter === 'all' ? orders : orders.filter(o => o.status === ordersFilter);
+  // Branch filter (Phase 2b) is applied BEFORE the status filter so a
+  // multi-branch operator switching to a specific branch sees only that
+  // branch's orders, with the existing status tabs working as expected
+  // within that branch.
+  const branchScoped = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : orders;
+  const filtered = ordersFilter === 'all' ? branchScoped : branchScoped.filter(o => o.status === ordersFilter);
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div>📋</div><div>No ${ordersFilter === 'all' ? '' : ordersFilter + ' '}orders yet</div></div>`;
+    const branchHint = SELECTED_BRANCH_FILTER
+      ? ` for ${escSupportText((branchesData.find(b => b.id === SELECTED_BRANCH_FILTER) || {}).name || SELECTED_BRANCH_FILTER)}`
+      : '';
+    list.innerHTML = `<div class="empty-state"><div>📋</div><div>No ${ordersFilter === 'all' ? '' : ordersFilter + ' '}orders${branchHint}</div></div>`;
     return;
   }
 
@@ -9509,7 +9639,11 @@ function reportFmtPeriodLabel() {
 function renderSalesReport() {
   if (!document.getElementById('reports-tab')) return;
 
-  const fil  = filterOrdersForReport(orders || []);
+  // Branch filter (Phase 2b) — scope the report source set to the
+  // selected branch before the period filter runs. "All branches"
+  // (filter null) shows the full rollup.
+  const branchScoped = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : (orders || []);
+  const fil  = filterOrdersForReport(branchScoped);
   const conf = fil.filter(o => o.status === 'confirmed');
   const canc = fil.filter(o => o.status === 'cancelled');
   const refu = fil.filter(o => o.status === 'refunded');
@@ -9852,9 +9986,12 @@ function renderRestockingReport() {
 
   // Build product → units sold map across the window. Variant-level sales
   // collapse to product-level since most owners reorder at the product
-  // level (variants share supplier + reorder cycle).
+  // level (variants share supplier + reorder cycle). Multi-branch (Phase 2b):
+  // scope to the selected branch when one is picked so a branch operator
+  // sees restocking pressure for their own location's sales only.
   const soldByPid = {};
-  (orders || []).forEach(o => {
+  const restockSrc = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : (orders || []);
+  (restockSrc || []).forEach(o => {
     if (o.status !== 'confirmed') return;
     const t = o.createdAt;
     if (!t) return;
@@ -10309,7 +10446,12 @@ function chartColors() {
 
 function renderDashboard() {
   if (!document.getElementById('home-tab')) return;
-  const fil  = filterOrdersByDate(orders);
+  // Branch filter (Phase 2b): scope dashboard KPIs to the selected branch
+  // when one is picked. "All branches" (filter null) shows the full
+  // rollup as before. Applied before the date filter so the date math
+  // and aggregates only see the selected branch's orders.
+  const branchScoped = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : orders;
+  const fil  = filterOrdersByDate(branchScoped);
   const conf = fil.filter(o => o.status === 'confirmed');
   const pend = fil.filter(o => o.status === 'pending');
   const canc = fil.filter(o => o.status === 'cancelled');
