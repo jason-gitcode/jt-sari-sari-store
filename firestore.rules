@@ -124,6 +124,16 @@ service cloud.firestore {
                        && request.resource.data.amount > 0;
         allow update, delete: if false; // only Cloud Functions modify after create
       }
+
+      // ---------- support_tickets: Pro-only ticket audit log. Created
+      //            exclusively by the submitSupportTicket Cloud Function
+      //            (admin SDK bypasses these rules). Owners + superadmins
+      //            can read their own tenant's history; writes are blocked
+      //            so a tenant can't fake a ticket or alter one post-submit.
+      match /support_tickets/{ticketId} {
+        allow read: if isOwnerOrSuper(tid);
+        allow write: if false;
+      }
     }
 
     // ============================================================

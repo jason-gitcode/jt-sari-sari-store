@@ -797,6 +797,10 @@
           <label for="pb-discord-webhook">Discord webhook (optional — fires when a payment is submitted)</label>
           <input type="url" id="pb-discord-webhook" placeholder="https://discord.com/api/webhooks/..." />
         </div>
+        <div class="full">
+          <label for="pb-priority-webhook">Priority Support Discord webhook (optional — fires on Pro-tenant tickets; falls back to the payment webhook if blank)</label>
+          <input type="url" id="pb-priority-webhook" placeholder="https://discord.com/api/webhooks/..." />
+        </div>
       </div>
       <div style="display:flex;justify-content:flex-end;">
         <button class="btn btn-primary" id="pb-save-btn" onclick="savePlatformBilling()">Save</button>
@@ -1909,6 +1913,7 @@ function subscribePlatformBilling() {
     f('pb-maya-name', data.mayaAccountName);
     f('pb-maya-number', data.mayaNumber);
     f('pb-discord-webhook', data.subscriptionDiscordWebhook);
+    f('pb-priority-webhook', data.prioritySupportWebhook);
   }, err => console.warn('[platform/billing] listener:', err));
 }
 
@@ -1920,11 +1925,15 @@ async function savePlatformBilling() {
   const mayaAccountName = document.getElementById('pb-maya-name').value.trim();
   const mayaNumber = document.getElementById('pb-maya-number').value.trim();
   const subscriptionDiscordWebhook = document.getElementById('pb-discord-webhook').value.trim();
+  const prioritySupportWebhook = document.getElementById('pb-priority-webhook').value.trim();
 
   if (gcashAccountName.length < 2) { status.textContent = 'GCash account name is required.'; status.className = 'form-status error'; return; }
   if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.className = 'form-status error'; return; }
   if (subscriptionDiscordWebhook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(subscriptionDiscordWebhook)) {
     status.textContent = 'Discord webhook URL must start with https://discord.com/api/webhooks/'; status.className = 'form-status error'; return;
+  }
+  if (prioritySupportWebhook && !/^https:\/\/discord\.com\/api\/webhooks\//.test(prioritySupportWebhook)) {
+    status.textContent = 'Priority Support webhook URL must start with https://discord.com/api/webhooks/'; status.className = 'form-status error'; return;
   }
   btn.disabled = true; btn.textContent = 'Saving…';
   status.textContent = 'Saving…'; status.className = 'form-status';
@@ -1936,6 +1945,7 @@ async function savePlatformBilling() {
       mayaNumber: mayaNumber || null,
       mayaBankName: firebase.firestore.FieldValue.delete(),
       subscriptionDiscordWebhook: subscriptionDiscordWebhook || null,
+      prioritySupportWebhook: prioritySupportWebhook || null,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: auth.currentUser?.email || null
     }, { merge: true });

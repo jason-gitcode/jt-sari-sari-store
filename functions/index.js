@@ -1173,3 +1173,151 @@ exports.getMyTenant = onCall(async (request) => {
     })
   };
 });
+
+// ============================================================
+// submitSupportTicket — Pro-only callable. Tenant owner submits a
+// support ticket; backend validates Pro tier + non-suspended status,
+// writes an audit record, and notifies the Pabili Mart support team
+// via Discord webhook with an `<@&ROLE_ID>` mention so the on-call
+// rotation gets pinged in real time.
+//
+// Webhook source: `platform/billing.prioritySupportWebhook` if set,
+// otherwise falls back to `subscriptionDiscordWebhook` (the same one
+// used for payment notifications). The role-mention placeholder is
+// `PRIORITY_SUPPORT_ROLE_ID` below — set this to the Discord role ID
+// before going live (see Discord setup docs).
+// ============================================================
+const PRIORITY_SUPPORT_ROLE_ID = 'YOUR_ROLE_ID'; // TODO: replace with real Discord role ID
+const SUPPORT_SUBJECTS = new Set(['general', 'billing', 'bug', 'feature', 'how-to']);
+
+exports.submitSupportTicket = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const subject = String(data.subject || '').trim().toLowerCase();
+  const message = String(data.message || '').trim();
+
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  if (!SUPPORT_SUBJECTS.has(subject)) {
+    throw new HttpsError('invalid-argument', 'Invalid subject. Pick one of: general, billing, bug, feature, how-to.');
+  }
+  if (message.length < 20) {
+    throw new HttpsError('invalid-argument', 'Please describe your issue in at least 20 characters so we can help quickly.');
+  }
+  if (message.length > 2000) {
+    throw new HttpsError('invalid-argument', 'Message is too long. Trim to 2000 characters and try again.');
+  }
+
+  // Ownership + tier check.
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can submit a support ticket.');
+  }
+
+  const subSnap = await tref.collection('subscription').doc('current').get();
+  const sub = subSnap.exists ? (subSnap.data() || {}) : {};
+  const tier = (sub.tier || 'free').toLowerCase();
+  const status = (sub.status || 'active').toLowerCase();
+  if (tier !== 'pro' && !isSuperadmin) {
+    throw new HttpsError('failed-precondition', 'Priority Support is a Pro feature. Upgrade your plan to submit a ticket.');
+  }
+  if (['suspended', 'cancelled'].includes(status) && !isSuperadmin) {
+    throw new HttpsError('failed-precondition', `Your subscription is ${status}. Reactivate it from the Billing tab to contact support.`);
+  }
+
+  // Generate a human-readable ticket ID. Used as the Firestore doc ID
+  // (idempotent on retry within the same minute) and shown back to the
+  // tenant for reference.
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
+  const ticketId = `SUP-${tid}-${stamp}`;
+  const ticketRef = tref.collection('support_tickets').doc(ticketId);
+
+  // Write the audit record first so we have a record even if Discord
+  // delivery fails. setIfMissing-style behavior via create() means a
+  // double-submit within the same second returns ALREADY_EXISTS cleanly.
+  try {
+    await ticketRef.create({
+      ticketId,
+      tid,
+      tenantName: tenant.name || tid,
+      tier,
+      status: 'open',
+      subject,
+      message,
+      submittedBy: email,
+      submittedAt: FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    if (err && err.code === 6 /* ALREADY_EXISTS */) {
+      // Same-second double-submit — treat as a no-op success.
+      return { ticketId, deduplicated: true };
+    }
+    throw err;
+  }
+
+  // Discord delivery. Read webhook from platform/billing; prefer the
+  // dedicated prioritySupportWebhook over the subscription one so Jason
+  // can route tickets to a separate channel from payment notifications.
+  let webhook = null;
+  try {
+    const billingSnap = await db.collection('platform').doc('billing').get();
+    const billing = billingSnap.exists ? (billingSnap.data() || {}) : {};
+    webhook = billing.prioritySupportWebhook || billing.subscriptionDiscordWebhook || null;
+  } catch (err) {
+    console.warn('[submitSupportTicket] platform/billing read failed:', err.message);
+  }
+
+  if (webhook) {
+    const subjectLabel = {
+      general: 'General question',
+      billing: 'Billing',
+      bug: 'Bug report',
+      feature: 'Feature request',
+      'how-to': 'How-to'
+    }[subject] || subject;
+
+    const content = [
+      `<@&${PRIORITY_SUPPORT_ROLE_ID}> 🎧 **PRIORITY TICKET — ${subjectLabel}**`,
+      `**Store:** ${tenant.name || tid}  ·  \`${tid}\``,
+      `**Owner:** ${email}`,
+      `**Tier:** ${tier} · status: ${status}`,
+      `**Ticket:** \`${ticketId}\``,
+      '',
+      '> ' + message.replace(/\n/g, '\n> '),
+      '',
+      `_SLA: 4 business hours. Reply via email to ${email}._`
+    ].join('\n');
+
+    try {
+      const res = await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          allowed_mentions: { parse: ['roles'], roles: [PRIORITY_SUPPORT_ROLE_ID] }
+        })
+      });
+      if (!res.ok) {
+        console.warn('[submitSupportTicket] Discord webhook returned', res.status);
+      }
+    } catch (err) {
+      console.warn('[submitSupportTicket] Discord post failed:', err.message);
+      // Don't fail the call — the audit record is already written and
+      // a superadmin can see the ticket in Firestore.
+    }
+  } else {
+    console.warn('[submitSupportTicket] no support webhook configured; ticket recorded in Firestore only');
+  }
+
+  return { ticketId };
+});

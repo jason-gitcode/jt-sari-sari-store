@@ -3066,6 +3066,18 @@
         </div>
       </div>
 
+      <!-- Priority Support — Pro-only feature. Section is visible to all
+           tiers so Free/Growth tenants see the upsell; the CTA branches
+           between "Contact support" (Pro) and "🔒 Upgrade to unlock" (Free/Growth). -->
+      <div class="billing-section" id="billing-priority-support">
+        <div class="billing-section-head">
+          <h3>Priority support <span id="priority-support-lock-badge" style="display:none;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;">🔒 Pro</span></h3>
+        </div>
+        <div id="priority-support-body">
+          <!-- Populated by renderPrioritySupportSection() -->
+        </div>
+      </div>
+
       <!-- Tier Comparison cards -->
       <div class="billing-section" id="billing-tier-compare">
         <div class="billing-section-head">
@@ -3693,6 +3705,68 @@
   </div>
 </div>
 
+<!-- PRIORITY SUPPORT MODAL — Pro-tenant ticket submission form. Backend
+     enforces the Pro-tier check; this UI is only reachable via the
+     "Contact support" CTA in Billing → Priority Support, which is itself
+     hidden for Free/Growth (they see the locked-feature modal instead). -->
+<div class="supp-modal-overlay" id="support-ticket-modal" onclick="closeSupportTicketBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 520px;">
+    <div class="supp-modal-header">
+      <h2>🎧 Contact Pabili Mart support</h2>
+      <button type="button" class="close-btn" onclick="closeSupportTicketModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 24px;">
+      <div style="font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 18px;">
+        Your ticket goes straight to the Pabili Mart priority queue. We'll reply within <strong style="color: var(--ink);">4 business hours</strong> to <span id="support-ticket-reply-email" style="color: var(--ink); font-weight: 500;">your account email</span>.
+      </div>
+      <div style="margin-bottom: 14px;">
+        <label for="support-ticket-subject" style="display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">Subject</label>
+        <select id="support-ticket-subject" style="width: 100%; padding: 9px 11px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 14px; font-family: inherit; outline: none; box-sizing: border-box;">
+          <option value="general">General question</option>
+          <option value="billing">Billing</option>
+          <option value="bug">Bug report</option>
+          <option value="feature">Feature request</option>
+          <option value="how-to">How-to</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label for="support-ticket-message" style="display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">Message</label>
+        <textarea id="support-ticket-message" maxlength="2000" rows="6" placeholder="Describe what's going on. Include any error messages, what you were doing, and what you expected to happen." style="width: 100%; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 14px; font-family: inherit; line-height: 1.5; resize: vertical; outline: none; box-sizing: border-box;"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+          <div id="support-ticket-status" style="font-size: 12px; color: var(--error); min-height: 16px;"></div>
+          <div style="font-size: 11px; color: var(--muted);"><span id="support-ticket-char-count">0</span> / 2000</div>
+        </div>
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeSupportTicketModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="support-ticket-send-btn" onclick="submitSupportTicketForm()">Send to Pabili Mart</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT TICKET SUCCESS MODAL — simple acknowledgement after a ticket is created. Shows the ticket ID so the tenant has a reference. -->
+<div class="supp-modal-overlay" id="support-ticket-sent-modal" onclick="closeSupportTicketSentBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 460px;">
+    <div class="supp-modal-header">
+      <h2>✅ Ticket submitted</h2>
+      <button type="button" class="close-btn" onclick="closeSupportTicketSentModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 24px;">
+      <div style="font-size: 14px; color: var(--ink); line-height: 1.55; margin-bottom: 16px;">
+        Thanks — your support ticket is in the priority queue. We'll reply within <strong>4 business hours</strong>.
+      </div>
+      <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">Ticket reference</div>
+        <div id="support-ticket-sent-id" style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; color: var(--ink); word-break: break-all;">—</div>
+      </div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-primary" onclick="closeSupportTicketSentModal()">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOGO CROPPER MODAL — drag to reposition + slider/wheel to zoom; circle marks the visible area on the storefront. -->
 <div class="supp-modal-overlay" id="logo-crop-modal" onclick="closeLogoCropperBackdrop(event)">
   <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 360px;">
@@ -4240,6 +4314,9 @@ function renderBillingTab() {
   const planBody = document.getElementById('billing-plan-body');
   const grid = document.getElementById('billing-tier-grid');
   if (!planBody || !grid) return; // tab not mounted yet
+
+  // Priority Support section — visible to all tiers (upsell for Free/Growth).
+  if (typeof renderPrioritySupportSection === 'function') renderPrioritySupportSection();
 
   // ---- Current Plan card ----
   if (!subscriptionData) {
@@ -6349,6 +6426,19 @@ const LOCKED_FEATURES = {
       'Daily breakdown + cancellations & refunds',
       'Download CSV · Print / Save as PDF'
     ]
+  },
+  'priority-support': {
+    title: '🎧 Priority Support — a Pro feature',
+    icon: '🎧',
+    blurb: 'A direct line to Pabili Mart with a 4-business-hour response SLA. Skip the general inbox for billing, bug, or how-to questions.',
+    tier: 'pro',
+    unlocksWith: [
+      'Direct contact form to Pabili Mart support',
+      '4-business-hour response SLA',
+      'Routed to a priority inbox (not the general queue)',
+      'Email reply to your verified account address',
+      'Ticket audit log saved to your store for reference'
+    ]
   }
 };
 let lockedFeatureKey = null;
@@ -6389,6 +6479,141 @@ function lockedFeatureCta() {
     startTenantTrial(def.tier);
   } else {
     switchTab('billing');
+  }
+}
+
+// ============================================================
+// PRIORITY SUPPORT (Pro feature) — Billing tab section + ticket modal.
+//
+// Section visibility: visible to all tiers (so Free/Growth see the
+// upsell). CTA branches:
+//   - Pro tenants → "Contact Pabili Mart support" → submit modal
+//   - Free/Growth → "🔒 Upgrade to Pro" → reuses LOCKED_FEATURES modal
+//
+// Section is re-rendered by renderBillingTab() on every subscription
+// snapshot.
+// ============================================================
+function renderPrioritySupportSection() {
+  const body = document.getElementById('priority-support-body');
+  const lockBadge = document.getElementById('priority-support-lock-badge');
+  if (!body) return;
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const status = (subscriptionData && subscriptionData.status) || 'active';
+  const isPro = tier === 'pro';
+  if (lockBadge) lockBadge.style.display = isPro ? 'none' : '';
+
+  // Suspended / cancelled Pro tenants need to reactivate before submitting.
+  const isBlocked = isPro && ['suspended', 'cancelled'].includes(status);
+
+  if (isPro && !isBlocked) {
+    body.innerHTML = `
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="flex:1 1 240px; min-width:0;">
+          <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:4px;">
+            Direct line to Pabili Mart support. Reply within <strong>4 business hours</strong> to your account email.
+          </div>
+          <div style="font-size:12px; color:var(--muted);">Billing, bug, feature request, or how-to.</div>
+        </div>
+        <button type="button" class="btn-primary" onclick="openSupportTicketModal()" style="flex:0 0 auto;">🎧 Contact support</button>
+      </div>
+    `;
+  } else if (isBlocked) {
+    body.innerHTML = `
+      <div style="font-size:14px; color:var(--ink); line-height:1.55;">
+        Your Pro subscription is <strong>${escSupportText(status)}</strong>. Reactivate it from the Current plan section above to submit a support ticket.
+      </div>
+    `;
+  } else {
+    body.innerHTML = `
+      <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="flex:1 1 240px; min-width:0;">
+          <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:4px;">
+            🔒 Priority support is a <strong>PabiliMart Pro</strong> feature.
+          </div>
+          <div style="font-size:12px; color:var(--muted);">Direct line to Pabili Mart · 4-business-hour SLA · ticket audit log.</div>
+        </div>
+        <button type="button" class="btn-secondary" onclick="openLockedFeatureModal('priority-support')" style="flex:0 0 auto;">Learn more</button>
+      </div>
+    `;
+  }
+}
+
+// Tiny HTML-escape for status string (sub data is admin-controlled but
+// belt-and-suspenders here so any future enum drift can't break the DOM).
+function escSupportText(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+}
+
+// ----- Submit ticket modal -----
+function openSupportTicketModal() {
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  if (tier !== 'pro') {
+    // Defensive — section shouldn't show the button on non-Pro, but if
+    // someone calls this from the console, route them to the locked modal.
+    openLockedFeatureModal('priority-support');
+    return;
+  }
+  document.getElementById('support-ticket-subject').value = 'general';
+  document.getElementById('support-ticket-message').value = '';
+  document.getElementById('support-ticket-char-count').textContent = '0';
+  document.getElementById('support-ticket-status').textContent = '';
+  const email = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'your account email';
+  document.getElementById('support-ticket-reply-email').textContent = email;
+  document.getElementById('support-ticket-modal').classList.add('show');
+  // Live char count
+  const ta = document.getElementById('support-ticket-message');
+  ta.oninput = () => {
+    document.getElementById('support-ticket-char-count').textContent = String(ta.value.length);
+    document.getElementById('support-ticket-status').textContent = '';
+  };
+  setTimeout(() => ta.focus(), 50);
+}
+function closeSupportTicketModal() {
+  document.getElementById('support-ticket-modal').classList.remove('show');
+}
+function closeSupportTicketBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeSupportTicketModal();
+}
+function closeSupportTicketSentModal() {
+  document.getElementById('support-ticket-sent-modal').classList.remove('show');
+}
+function closeSupportTicketSentBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeSupportTicketSentModal();
+}
+
+async function submitSupportTicketForm() {
+  const subject = (document.getElementById('support-ticket-subject').value || '').trim();
+  const message = (document.getElementById('support-ticket-message').value || '').trim();
+  const statusEl = document.getElementById('support-ticket-status');
+  const btn = document.getElementById('support-ticket-send-btn');
+  if (message.length < 20) {
+    statusEl.textContent = 'Please describe your issue in at least 20 characters.';
+    return;
+  }
+  if (message.length > 2000) {
+    statusEl.textContent = 'Message is too long — trim to 2000 characters.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  statusEl.textContent = '';
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('submitSupportTicket');
+    const res = await fn({ tid: TENANT_ID, subject, message });
+    const ticketId = (res && res.data && res.data.ticketId) || '—';
+    closeSupportTicketModal();
+    document.getElementById('support-ticket-sent-id').textContent = ticketId;
+    document.getElementById('support-ticket-sent-modal').classList.add('show');
+  } catch (err) {
+    console.error('submitSupportTicket failed:', err);
+    statusEl.textContent = (err && err.message) ? err.message : 'Failed to send. Try again.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send to Pabili Mart';
   }
 }
 
