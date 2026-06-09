@@ -7237,6 +7237,7 @@ function syncBranchFilterUI() {
   wrap.style.display = '';
   // Hydrate dropdown options. Active selection from SELECTED_BRANCH_FILTER
   // (falls back to localStorage on the first run).
+  const wasNull = SELECTED_BRANCH_FILTER === null;
   if (SELECTED_BRANCH_FILTER === null) {
     const saved = readSavedBranchFilter();
     if (saved && branchesData.find(b => b.id === saved)) {
@@ -7252,11 +7253,54 @@ function syncBranchFilterUI() {
   );
   sel.innerHTML = opts.join('');
   sel.value = SELECTED_BRANCH_FILTER || '';
+  // Phase 3: if we restored a branch selection from localStorage this
+  // run, load the per-branch inventory now so renderProducts has the
+  // right numbers on first paint. onBranchFilterChange handles the
+  // ongoing case.
+  if (wasNull && SELECTED_BRANCH_FILTER && typeof loadAdminBranchInventory === 'function') {
+    loadAdminBranchInventory(SELECTED_BRANCH_FILTER).then(() => {
+      if (typeof renderProducts === 'function') renderProducts();
+    });
+  }
 }
 
-function onBranchFilterChange(value) {
+// Phase 3 admin-side per-branch inventory. Populated by
+// loadAdminBranchInventory() whenever SELECTED_BRANCH_FILTER changes.
+// Keyed by productId → { stock, available }. Used by renderProducts +
+// the detail modal to show branch-specific stock instead of the
+// product's tenant-level (null) stock field.
+let ADMIN_BRANCH_INVENTORY = {};
+
+async function loadAdminBranchInventory(branchId) {
+  ADMIN_BRANCH_INVENTORY = {};
+  if (!branchId || !TENANT_ID) return;
+  try {
+    const snap = await tcol('branches').doc(branchId).collection('inventory').get();
+    snap.docs.forEach(d => { ADMIN_BRANCH_INVENTORY[d.id] = d.data() || {}; });
+  } catch (e) {
+    console.warn('[admin branch inventory] load failed:', e);
+  }
+}
+
+// Helper used by render code: returns the effective stock for a product
+// given the active branch filter. Single-branch tenants + "All branches"
+// fall back to the product-level stock.
+function effectiveAdminStock(p) {
+  if (!SELECTED_BRANCH_FILTER) return p.stock;
+  const branchIds = Array.isArray(p.branchIds) ? p.branchIds : [];
+  if (branchIds.length === 0) return p.stock; // shared product
+  if (!branchIds.includes(SELECTED_BRANCH_FILTER)) return null; // not at this branch
+  const inv = ADMIN_BRANCH_INVENTORY[String(p.id)];
+  if (!inv) return null;
+  return (inv.stock == null) ? null : inv.stock;
+}
+
+async function onBranchFilterChange(value) {
   SELECTED_BRANCH_FILTER = value || null;
   writeSavedBranchFilter(SELECTED_BRANCH_FILTER);
+  // Phase 3: load per-branch inventory for the selected branch BEFORE
+  // re-rendering Products so the stock column has fresh data.
+  await loadAdminBranchInventory(SELECTED_BRANCH_FILTER);
   // Re-render whatever depends on the filter. Cheap to over-call — each
   // render function early-returns when its tab DOM isn't mounted.
   if (typeof renderOrders === 'function') renderOrders();
@@ -7264,7 +7308,7 @@ function onBranchFilterChange(value) {
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderSalesReport === 'function') renderSalesReport();
   if (typeof renderRestockingReport === 'function') renderRestockingReport();
-  // Phase 3: Products tab also scopes to the selected branch.
+  // Phase 3: Products tab scopes to the selected branch.
   if (typeof renderProducts === 'function') renderProducts();
 }
 
@@ -8679,7 +8723,38 @@ async function recordPartialRefund(orderId) {
 
 async function adjustStock(id, delta) {
   const product = products.find(p => p.id === id);
-  if (!product || product.stock === null || product.stock === undefined) return;
+  if (!product) return;
+  // Phase 3: branch-scoped products on a specific-branch view adjust the
+  // per-branch inventory doc instead of the product-level stock.
+  const branchScoped = SELECTED_BRANCH_FILTER
+    && Array.isArray(product.branchIds)
+    && product.branchIds.includes(SELECTED_BRANCH_FILTER)
+    && !(product.variants && product.variants.length > 0);
+  if (branchScoped) {
+    const inv = ADMIN_BRANCH_INVENTORY[String(id)] || {};
+    if (inv.stock === null || inv.stock === undefined) return;
+    const newStock = Math.max(0, inv.stock + delta);
+    const upd = {
+      stock: newStock,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || null
+    };
+    if (newStock === 0) upd.available = false;
+    else if (inv.stock === 0 && newStock > 0) upd.available = true;
+    try {
+      await tcol('branches').doc(SELECTED_BRANCH_FILTER)
+        .collection('inventory').doc(String(id)).update(upd);
+      // Keep the local map in sync so the next render picks it up
+      // without an extra round-trip.
+      ADMIN_BRANCH_INVENTORY[String(id)] = { ...inv, ...upd, updatedAt: new Date() };
+      if (typeof renderProducts === 'function') renderProducts();
+    } catch (err) {
+      console.error('Adjust branch stock error:', err);
+      showToast((err && err.message) ? err.message : 'Error updating branch stock', 'error');
+    }
+    return;
+  }
+  if (product.stock === null || product.stock === undefined) return;
   const newStock = Math.max(0, product.stock + delta);
   const upd = { stock: newStock };
   if (newStock === 0) upd.available = false;
@@ -8688,7 +8763,7 @@ async function adjustStock(id, delta) {
     await tcol('products').doc(String(id)).update(upd);
   } catch (err) {
     console.error('Adjust stock error:', err);
-    showToast('Error updating stock', 'error');
+    showToast((err && err.message) ? err.message : 'Error updating stock', 'error');
   }
 }
 
@@ -8974,9 +9049,22 @@ function renderProducts() {
       const available   = p.available !== false;
       const isHidden    = p.hidden === true;
       const hasVariants = p.variants && p.variants.length > 0;
-      const stockNum    = hasVariants
-        ? p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0)
-        : (p.stock !== null && p.stock !== undefined ? p.stock : null);
+      // Phase 3: when a specific branch is selected, branch-scoped
+      // products read stock from the branch inventory map. Shared
+      // products + variants fall through to the existing logic.
+      const branchScoped = !hasVariants
+        && SELECTED_BRANCH_FILTER
+        && Array.isArray(p.branchIds)
+        && p.branchIds.includes(SELECTED_BRANCH_FILTER);
+      let stockNum;
+      if (hasVariants) {
+        stockNum = p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+      } else if (branchScoped) {
+        const inv = ADMIN_BRANCH_INVENTORY[String(p.id)];
+        stockNum = (inv && inv.stock != null) ? inv.stock : null;
+      } else {
+        stockNum = (p.stock !== null && p.stock !== undefined ? p.stock : null);
+      }
       const isLowStock  = stockNum !== null && stockNum > 0 && stockNum <= lowThresh;
       const isOutOf     = stockNum !== null && stockNum === 0;
       const stockClass  = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
@@ -9172,11 +9260,16 @@ function renderProductViewBody(p) {
     const stockSum = p.variants.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
     stockHtml = `${stockSum} (across ${p.variants.length} variant${p.variants.length === 1 ? '' : 's'})`;
   } else if (isBranchScoped) {
-    // Phase 3: branch-scoped products track stock per-branch in the
-    // inventory subcollection. Show a loading state, then re-render with
-    // the breakdown once the parallel reads resolve.
+    // Phase 3: branch-scoped products track stock per-branch. Two render
+    // modes:
+    //   - When SELECTED_BRANCH_FILTER is set AND the product is sold at
+    //     that branch → show ONLY that branch's stock count
+    //   - When "All branches" is selected → show the full breakdown
+    //     across every tagged branch
+    const scopedBranch = SELECTED_BRANCH_FILTER && p.branchIds.includes(SELECTED_BRANCH_FILTER)
+      ? SELECTED_BRANCH_FILTER : null;
     stockHtml = '<span id="branch-stock-loading" style="color:var(--muted);">Loading per-branch…</span>';
-    setTimeout(() => populateBranchStockBreakdown(p), 0);
+    setTimeout(() => populateBranchStockBreakdown(p, scopedBranch), 0);
   } else if (p.stock === null || p.stock === undefined || p.stock === '') {
     stockHtml = 'Unlimited';
   } else {
@@ -9221,20 +9314,21 @@ function renderProductViewBody(p) {
 }
 
 // Phase 3 — fetch per-branch inventory for a branch-scoped product and
-// rewrite the Stock row in the view modal with a breakdown like
-// "Pasig: 10 · Dasmariñas: 0".
-async function populateBranchStockBreakdown(p) {
+// rewrite the Stock row in the view modal.
+//   scopedBranch=null → show full breakdown across every tagged branch
+//   scopedBranch='pasig' → show only Pasig's stock count
+async function populateBranchStockBreakdown(p, scopedBranch) {
   const target = document.getElementById('branch-stock-loading');
   if (!target) return;
   if (!Array.isArray(p.branchIds) || p.branchIds.length === 0) return;
+  const branchesToShow = scopedBranch ? [scopedBranch] : p.branchIds;
   try {
-    const snaps = await Promise.all(p.branchIds.map(bid =>
-      db.collection('tenants').doc(TENANT_ID)
-        .collection('branches').doc(bid)
+    const snaps = await Promise.all(branchesToShow.map(bid =>
+      tcol('branches').doc(bid)
         .collection('inventory').doc(String(p.id))
         .get()
     ));
-    const parts = p.branchIds.map((bid, idx) => {
+    const parts = branchesToShow.map((bid, idx) => {
       const branch = (branchesData || []).find(b => b.id === bid);
       const label = (branch && branch.name) || bid;
       const snap = snaps[idx];
@@ -9246,6 +9340,9 @@ async function populateBranchStockBreakdown(p) {
       } else {
         stockTxt = '0 (no inventory doc)';
       }
+      // When scoped to a single branch, the header row already says
+      // "STOCK" — no need to repeat the branch name.
+      if (scopedBranch) return `<strong style="color:var(--ink);">${stockTxt}</strong> <span style="color:var(--muted);font-size:12px;">at ${escSupportText(label)}</span>`;
       return `<span style="display:inline-block;margin-right:14px;">${escSupportText(label)}: <strong style="color:var(--ink);">${stockTxt}</strong></span>`;
     });
     target.outerHTML = `<div style="color:var(--ink);">${parts.join('')}</div>`;
