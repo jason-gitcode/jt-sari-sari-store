@@ -3115,6 +3115,7 @@
           <button data-settings-nav="service" onclick="goToSettingsSection('service')">Service &amp; Payment</button>
           <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
           <button data-settings-nav="custom-domain" onclick="goToSettingsSection('custom-domain')">Custom Domain <span id="custom-domain-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
+          <button data-settings-nav="branches" onclick="goToSettingsSection('branches')">Branches <span id="branches-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
           <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
           <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
           <button data-settings-nav="account" onclick="goToSettingsSection('account')">Account</button>
@@ -3557,6 +3558,15 @@
             </div>
           </section>
 
+          <section class="settings-section" id="set-branches">
+            <h3>Branches <span id="branches-lock-badge" style="display:none;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;">🔒 Pro</span></h3>
+            <div class="section-sub">Run a chain with multiple physical locations under one admin. Each branch has its own pickup address and GCash account. Customers pick which branch they're ordering from.</div>
+            <div id="branches-body">
+              <!-- Populated by renderBranchesSection() — body branches on tier. -->
+              <div style="font-size:13px;color:var(--muted);padding:8px 0;">Loading…</div>
+            </div>
+          </section>
+
           <section class="settings-section" id="set-notifications">
             <h3>Notifications</h3>
             <div class="section-sub">Get alerted the moment a new order comes in.</div>
@@ -3773,6 +3783,63 @@
     </div>
     <div class="supp-modal-footer">
       <button type="button" class="btn-primary" onclick="closeSupportTicketSentModal()">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- BRANCH FORM MODAL — used for both add + edit. branchFormMode='add'|'edit'
+     determines which Cloud Function fires on Save. Pro-only; gated upstream
+     by the LOCKED_FEATURES['multi-branch'] modal so this form never opens
+     for Free/Growth tenants. -->
+<div class="supp-modal-overlay" id="branch-form-modal" onclick="closeBranchFormBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 560px;">
+    <div class="supp-modal-header">
+      <h2 id="branch-form-title">Add branch</h2>
+      <button type="button" class="close-btn" onclick="closeBranchFormModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 20px 24px;">
+      <div style="display:grid; gap:14px;">
+        <div>
+          <label for="branch-form-id" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Branch URL ID</label>
+          <input id="branch-form-id" type="text" maxlength="32" placeholder="pasig" autocomplete="off"
+            style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; outline:none; box-sizing:border-box;" />
+          <div style="font-size:11px; color:var(--muted); margin-top:6px;">Lowercase letters / numbers / hyphens. 2–32 chars. <strong id="branch-form-id-hint">Customers see this in the URL: <code id="branch-form-id-preview">?branch=pasig</code></strong>. Can't be changed after saving.</div>
+        </div>
+        <div>
+          <label for="branch-form-name" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Branch name</label>
+          <input id="branch-form-name" type="text" maxlength="60" placeholder="Pasig Branch"
+            style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
+          <div style="font-size:11px; color:var(--muted); margin-top:6px;">Shown to customers in the branch picker.</div>
+        </div>
+        <div>
+          <label for="branch-form-address" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Pickup address</label>
+          <textarea id="branch-form-address" maxlength="300" rows="2" placeholder="Block 123 Lot 4, Pasig City"
+            style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div>
+            <label for="branch-form-gcash-name" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">GCash account name</label>
+            <input id="branch-form-gcash-name" type="text" maxlength="100" placeholder="Juan Dela Cruz"
+              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
+          </div>
+          <div>
+            <label for="branch-form-gcash-number" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">GCash number</label>
+            <input id="branch-form-gcash-number" type="tel" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx"
+              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; outline:none; box-sizing:border-box;" />
+          </div>
+        </div>
+        <div style="border-top:1px dashed var(--line); padding-top:14px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer;">
+            <input type="checkbox" id="branch-form-default" />
+            <span>Make this the default branch (shown first to customers who haven't picked one)</span>
+          </label>
+        </div>
+      </div>
+      <div id="branch-form-status" style="font-size:12px; color:var(--error); min-height:16px; margin-top:12px;"></div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeBranchFormModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="branch-form-save-btn" onclick="saveBranchForm()">Save branch</button>
     </div>
   </div>
 </div>
@@ -4255,6 +4322,7 @@ firebase.auth().onAuthStateChanged(user => {
   if (__subscriptionUnsub) { __subscriptionUnsub(); __subscriptionUnsub = null; }
   if (__paymentsUnsub)     { __paymentsUnsub();     __paymentsUnsub = null; }
   if (__tenantDocUnsub)    { __tenantDocUnsub();    __tenantDocUnsub = null; }
+  if (typeof unsubscribeFromBranches === 'function') unsubscribeFromBranches();
   if (!user) {
     subscriptionData = null;
     paymentsHistory = [];
@@ -4271,9 +4339,15 @@ firebase.auth().onAuthStateChanged(user => {
     if (typeof renderSupplierCapStatus === 'function') renderSupplierCapStatus();
     if (typeof applyReportsTabLock === 'function') applyReportsTabLock();
     if (typeof renderCustomDomainSection === 'function') renderCustomDomainSection();
+    if (typeof renderBranchesSection === 'function') renderBranchesSection();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
+  // Branches subcollection — Pro-only feature; subscription happens
+  // regardless of tier so the render function has data the moment a
+  // tenant upgrades. The list view is gated client-side by
+  // renderBranchesSection on tier === 'pro'.
+  if (typeof subscribeToBranches === 'function') subscribeToBranches();
   // Tenant's own payment history — drives the Billing → Payment history table.
   __paymentsUnsub = tcol('payments').orderBy('submittedAt', 'desc').limit(50).onSnapshot(snap => {
     paymentsHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -6480,6 +6554,19 @@ const LOCKED_FEATURES = {
       'Daily DNS + SSL health monitoring',
       'Self-serve setup — submit your domain, update DNS, you\'re live'
     ]
+  },
+  'multi-branch': {
+    title: '🏢 Multi-Branch — a Pro feature',
+    icon: '🏢',
+    blurb: 'Run a chain with multiple physical locations under one admin. Each branch has its own pickup address, GCash account, and customer-facing storefront entry.',
+    tier: 'pro',
+    unlocksWith: [
+      'Up to 10 branches under one Pabili Mart account',
+      'Per-branch pickup address + pickup pin',
+      'Per-branch GCash account for receiving orders',
+      'Customers pick which branch they\'re ordering from',
+      'One admin dashboard with branch switcher + cross-branch reports'
+    ]
   }
 };
 let lockedFeatureKey = null;
@@ -6885,6 +6972,317 @@ async function removeCustomDomain() {
       } catch (err) {
         console.error('removeCustomDomain failed:', err);
         showToast((err && err.message) ? err.message : 'Remove failed. Try again.', 'error');
+      }
+    }
+  });
+}
+
+// ============================================================
+// MULTI-BRANCH (Pro feature) — Settings → Branches section.
+//
+// Phase 1: CRUD only. Branches subcollection at tenants/{tid}/branches/{branchId}
+// holds per-location pickup address + GCash account + isDefault flag.
+// Storefront branch picker + per-branch product/order filtering is Phase 2.
+//
+// Cap: 10 branches per tenant (client-enforced; client-side enforcement is
+// consistent with the LOCKED_FEATURES pattern we use for tier gating).
+// ============================================================
+
+const MULTI_BRANCH_CAP = 10;
+const BRANCH_ID_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
+const RESERVED_BRANCH_IDS = new Set(['default', 'all', 'new', 'edit', 'admin', 'api', '__']);
+
+let branchesData = [];
+let __branchesUnsub = null;
+let branchFormMode = 'add'; // 'add' | 'edit'
+let branchFormEditId = null;
+
+function subscribeToBranches() {
+  if (__branchesUnsub) { __branchesUnsub(); __branchesUnsub = null; }
+  __branchesUnsub = tcol('branches').orderBy('createdAt', 'asc').onSnapshot(snap => {
+    branchesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (typeof renderBranchesSection === 'function') renderBranchesSection();
+  }, err => {
+    console.warn('[branches] listener:', err);
+  });
+}
+
+function unsubscribeFromBranches() {
+  if (__branchesUnsub) { __branchesUnsub(); __branchesUnsub = null; }
+  branchesData = [];
+}
+
+function renderBranchesSection() {
+  const body = document.getElementById('branches-body');
+  const lockBadge = document.getElementById('branches-lock-badge');
+  const navLock = document.getElementById('branches-nav-lock');
+  if (!body) return;
+
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const isPro = tier === 'pro';
+  if (lockBadge) lockBadge.style.display = isPro ? 'none' : '';
+  if (navLock) navLock.style.display = isPro ? 'none' : '';
+
+  if (!isPro) {
+    body.innerHTML = `
+      <div style="background:var(--surface-2,#f9fafb); border:1px solid var(--line); border-radius:10px; padding:18px;">
+        <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:6px;">
+          🔒 Multi-Branch is a <strong>PabiliMart Pro</strong> feature.
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+          Run a chain with up to 10 physical locations under one admin. Each branch has its own pickup address + GCash account.
+        </div>
+        <button type="button" class="btn-secondary" onclick="openLockedFeatureModal('multi-branch')">Learn more</button>
+      </div>
+    `;
+    return;
+  }
+
+  const count = branchesData.length;
+  const atCap = count >= MULTI_BRANCH_CAP;
+
+  if (count === 0) {
+    body.innerHTML = `
+      <div style="border:1px solid var(--line); border-radius:10px; padding:18px;">
+        <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:14px;">
+          You haven't added any branches yet. Your storefront keeps working as a single-location store until you add one.
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+          Each branch has a short URL ID (like <code>pasig</code>) that customers see in the storefront's branch picker. After adding branches, customers can land on a specific branch via <code>?branch=pasig</code> deep links.
+        </div>
+        <button type="button" class="btn-primary" onclick="openBranchFormModal('add')">+ Add your first branch</button>
+      </div>
+    `;
+    return;
+  }
+
+  const rows = branchesData.map(b => {
+    const safeName = escSupportText(b.name || b.id);
+    const safeAddr = escSupportText(b.address || '—');
+    const safeGcashName = escSupportText(b.gcashAccountName || '—');
+    const safeGcashNum = escSupportText(b.gcashNumber || '—');
+    const safeId = escSupportText(b.id);
+    const defaultBadge = b.isDefault
+      ? '<span style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; background:rgba(22,163,74,0.12); color:#16a34a; margin-left:8px;">DEFAULT</span>'
+      : '';
+    return `
+      <div style="border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:15px; font-weight:600; color:var(--ink); margin-bottom:2px;">
+              ${safeName} ${defaultBadge}
+            </div>
+            <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; color:var(--muted);">?branch=${safeId}</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:12px;" onclick="openBranchFormModal('edit', '${safeId}')">Edit</button>
+            <button type="button" class="btn-danger" style="padding:6px 12px; font-size:12px;" onclick="deleteBranch('${safeId}')">Delete</button>
+          </div>
+        </div>
+        <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; font-size:12px;">
+          <div>
+            <div style="color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:0.04em; margin-bottom:2px;">Pickup address</div>
+            <div style="color:var(--ink);">${safeAddr}</div>
+          </div>
+          <div>
+            <div style="color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:0.04em; margin-bottom:2px;">GCash</div>
+            <div style="color:var(--ink);">${safeGcashName}<br><span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">${safeGcashNum}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  body.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="font-size:13px; color:var(--muted);">${count} of ${MULTI_BRANCH_CAP} branches</div>
+      <button type="button" class="btn-primary" onclick="openBranchFormModal('add')" ${atCap ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>+ Add branch</button>
+    </div>
+    ${atCap ? `<div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:6px; padding:8px 12px; margin-bottom:14px; font-size:12px; color:#92400e;">You've reached the cap of ${MULTI_BRANCH_CAP} branches. Delete an existing branch before adding another.</div>` : ''}
+    ${rows}
+    <div style="font-size:11px; color:var(--muted); margin-top:6px; line-height:1.5;">
+      Phase 1 supports adding and removing branches; the storefront branch picker and per-branch order routing land in Phase 2. Single-branch tenants don't need to add any — the storefront falls back to the tenant defaults from Store Info.
+    </div>
+  `;
+}
+
+// ----- Branch form modal -----
+function openBranchFormModal(mode, branchId) {
+  branchFormMode = mode === 'edit' ? 'edit' : 'add';
+  branchFormEditId = (mode === 'edit') ? (branchId || null) : null;
+
+  const title = document.getElementById('branch-form-title');
+  const idInput = document.getElementById('branch-form-id');
+  const nameInput = document.getElementById('branch-form-name');
+  const addrInput = document.getElementById('branch-form-address');
+  const gcashNameInput = document.getElementById('branch-form-gcash-name');
+  const gcashNumInput = document.getElementById('branch-form-gcash-number');
+  const defaultInput = document.getElementById('branch-form-default');
+  const statusEl = document.getElementById('branch-form-status');
+  const idHint = document.getElementById('branch-form-id-hint');
+
+  statusEl.textContent = '';
+
+  if (branchFormMode === 'add') {
+    title.textContent = 'Add branch';
+    idInput.value = '';
+    idInput.disabled = false;
+    nameInput.value = '';
+    addrInput.value = '';
+    gcashNameInput.value = '';
+    gcashNumInput.value = '';
+    defaultInput.checked = (branchesData.length === 0); // first branch defaults to isDefault
+    if (idHint) idHint.style.display = '';
+  } else {
+    const b = branchesData.find(x => x.id === branchFormEditId);
+    if (!b) { closeBranchFormModal(); return; }
+    title.textContent = 'Edit branch · ' + (b.name || b.id);
+    idInput.value = b.id;
+    idInput.disabled = true; // ID is immutable post-create
+    nameInput.value = b.name || '';
+    addrInput.value = b.address || '';
+    gcashNameInput.value = b.gcashAccountName || '';
+    gcashNumInput.value = b.gcashNumber || '';
+    defaultInput.checked = b.isDefault === true;
+    if (idHint) idHint.style.display = 'none';
+  }
+
+  // Live preview of the URL hint as user types the branch ID.
+  idInput.oninput = () => {
+    const preview = document.getElementById('branch-form-id-preview');
+    const v = (idInput.value || '').trim().toLowerCase();
+    if (preview) preview.textContent = '?branch=' + (v || 'your-branch-id');
+  };
+
+  document.getElementById('branch-form-modal').classList.add('show');
+  setTimeout(() => (branchFormMode === 'add' ? idInput : nameInput).focus(), 50);
+}
+
+function closeBranchFormModal() {
+  document.getElementById('branch-form-modal').classList.remove('show');
+}
+function closeBranchFormBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeBranchFormModal();
+}
+
+async function saveBranchForm() {
+  const idInput = document.getElementById('branch-form-id');
+  const nameInput = document.getElementById('branch-form-name');
+  const addrInput = document.getElementById('branch-form-address');
+  const gcashNameInput = document.getElementById('branch-form-gcash-name');
+  const gcashNumInput = document.getElementById('branch-form-gcash-number');
+  const defaultInput = document.getElementById('branch-form-default');
+  const statusEl = document.getElementById('branch-form-status');
+  const btn = document.getElementById('branch-form-save-btn');
+
+  const branchId = (idInput.value || '').trim().toLowerCase();
+  const name = (nameInput.value || '').trim();
+  const address = (addrInput.value || '').trim();
+  const gcashAccountName = (gcashNameInput.value || '').trim();
+  const gcashNumber = (gcashNumInput.value || '').trim();
+  const isDefault = defaultInput.checked;
+
+  // Validation
+  if (!BRANCH_ID_REGEX.test(branchId)) {
+    statusEl.textContent = 'Branch URL ID: lowercase letters/numbers/hyphens, 2–32 chars, no leading/trailing hyphens.';
+    return;
+  }
+  if (RESERVED_BRANCH_IDS.has(branchId)) {
+    statusEl.textContent = `"${branchId}" is reserved. Pick a different ID.`;
+    return;
+  }
+  if (name.length < 2 || name.length > 60) {
+    statusEl.textContent = 'Branch name must be 2–60 characters.';
+    return;
+  }
+  if (address.length > 0 && (address.length < 5 || address.length > 300)) {
+    statusEl.textContent = 'Pickup address must be 5–300 characters (or blank).';
+    return;
+  }
+  if (gcashNumber && !/^09\d{9}$/.test(gcashNumber)) {
+    statusEl.textContent = 'GCash number must be 11 digits starting with 09.';
+    return;
+  }
+  if (branchFormMode === 'add' && branchesData.some(b => b.id === branchId)) {
+    statusEl.textContent = `A branch with ID "${branchId}" already exists.`;
+    return;
+  }
+  if (branchFormMode === 'add' && branchesData.length >= MULTI_BRANCH_CAP) {
+    statusEl.textContent = `You've reached the cap of ${MULTI_BRANCH_CAP} branches.`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  statusEl.textContent = '';
+
+  try {
+    const ref = tcol('branches').doc(branchId);
+    const baseData = {
+      id: branchId,
+      name,
+      address: address || null,
+      gcashAccountName: gcashAccountName || null,
+      gcashNumber: gcashNumber || null,
+      isDefault,
+      active: true,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || null
+    };
+    if (branchFormMode === 'add') {
+      baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      baseData.createdBy = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
+    }
+
+    // If isDefault was just set, transactionally unset any other default
+    // so we only ever have ONE default branch per tenant.
+    if (isDefault) {
+      await db.runTransaction(async (tx) => {
+        if (branchFormMode === 'add') {
+          tx.set(ref, baseData);
+        } else {
+          tx.update(ref, baseData);
+        }
+        // Clear isDefault on all other branches
+        branchesData.forEach(other => {
+          if (other.id !== branchId && other.isDefault === true) {
+            tx.update(tcol('branches').doc(other.id), { isDefault: false });
+          }
+        });
+      });
+    } else {
+      if (branchFormMode === 'add') {
+        await ref.set(baseData);
+      } else {
+        await ref.update(baseData);
+      }
+    }
+    closeBranchFormModal();
+    showToast(branchFormMode === 'add' ? 'Branch added.' : 'Branch updated.', 'success');
+  } catch (err) {
+    console.error('saveBranchForm failed:', err);
+    statusEl.textContent = (err && err.message) ? err.message : 'Save failed. Try again.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save branch';
+  }
+}
+
+function deleteBranch(branchId) {
+  const b = branchesData.find(x => x.id === branchId);
+  if (!b) return;
+  confirmDestructive({
+    title: 'Delete this branch?',
+    message: `<strong>${escSupportText(b.name || b.id)}</strong> will be removed. Any future orders placed via <code>?branch=${escSupportText(b.id)}</code> will fall back to your default branch. Existing orders are preserved unchanged.`,
+    confirmLabel: 'Delete branch',
+    onConfirm: async () => {
+      try {
+        await tcol('branches').doc(branchId).delete();
+        showToast('Branch deleted.', 'success');
+      } catch (err) {
+        console.error('deleteBranch failed:', err);
+        showToast((err && err.message) ? err.message : 'Delete failed. Try again.', 'error');
       }
     }
   });

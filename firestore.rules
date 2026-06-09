@@ -144,6 +144,18 @@ service cloud.firestore {
       //            bypassing rules. The public/customDomains lookup map
       //            used by the storefront head IIFE is covered by the
       //            existing `public/{doc}` rule below (anon-readable).
+
+      // ---------- Multi-Branch (Pro feature) — per-tenant subcollection
+      //            of branch documents. Public-readable so the storefront
+      //            branch picker works for anonymous customers; owner-write
+      //            so Pro tenants manage their own branches from admin.
+      //            Tier enforcement is client-side via LOCKED_FEATURES
+      //            (Free/Growth see the upsell modal) since rules can't
+      //            efficiently read subscription on every write.
+      match /branches/{branchId} {
+        allow read: if true;
+        allow write: if isOwnerOrSuper(tid);
+      }
     }
 
     // ============================================================
