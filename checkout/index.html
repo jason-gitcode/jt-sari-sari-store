@@ -22,6 +22,21 @@
      /newlogo.jpeg up front. Non-jsminimart tenants either get their
      uploaded custom logo (after settings snapshot) or no icon at all. -->
 <script>
+  // Custom-domain detection — see index.html head IIFE for canonical comment.
+  (function () {
+    var host = location.hostname.toLowerCase();
+    var PLATFORM_HOSTS = ['pabilimart.com', 'www.pabilimart.com', 'jsminimart.com', 'www.jsminimart.com'];
+    var isPlatformHost = PLATFORM_HOSTS.indexOf(host) !== -1
+      || host.endsWith('.web.app')
+      || host.endsWith('.firebaseapp.com')
+      || host === 'localhost'
+      || host === '127.0.0.1';
+    if (!isPlatformHost) {
+      window.__CUSTOM_DOMAIN_HOST__ = host;
+    }
+  })();
+</script>
+<script>
   (function () {
     var parts = window.location.pathname.split('/').filter(Boolean);
     if (parts[0] !== 'jsminimart') return;
@@ -454,7 +469,10 @@ function resolveTenantId() {
   if (RESERVED_TENANT_IDS.has(parts[0])) return null;
   return parts[0];
 }
-const TENANT_ID = resolveTenantId();
+// Path-based first; custom-domain bootstrap below resolves via hostname
+// lookup when path returns null on a non-platform hostname.
+let TENANT_ID = resolveTenantId();
+let IS_CUSTOM_DOMAIN = false;
 function tcol(name) {
   if (!TENANT_ID) throw new Error('Cannot read ' + name + ' — no tenant in URL');
   return db.collection('tenants').doc(TENANT_ID).collection(name);
@@ -462,6 +480,7 @@ function tcol(name) {
 function tdoc(name, id) { return tcol(name).doc(id); }
 function tenantUrl(suffix) {
   const s = suffix.startsWith('/') ? suffix.slice(1) : suffix;
+  if (IS_CUSTOM_DOMAIN) return '/' + s;
   return '/' + (TENANT_ID || 'jsminimart') + '/' + s;
 }
 function resolveTenantHrefs() {
@@ -630,6 +649,7 @@ function updateWeatherWarning() {
   }
 }
 
+function subscribeStoreSettings() {
 tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   rainMode        = storeSettingsData.rainMode === true;
@@ -639,6 +659,7 @@ tdoc('settings', 'store').onSnapshot(snap => {
   updateWeatherWarning();
   applyTenantStoreConfig();
 });
+}
 // Apply tenant-specific store info + service settings to the UI
 // PabiliMart branding footer toggle. Shown on Free + Growth, hidden only
 // on Pro. See storefront index.html for source-of-truth comment.
@@ -1534,6 +1555,7 @@ function showToast(msg) {
 }
 
 // Load products from Firestore, then render
+function loadProductsAndRender() {
 tcol('products').get().then(snapshot => {
   if (!snapshot.empty) {
     PRODUCTS = snapshot.docs.map(doc => doc.data());
@@ -1549,6 +1571,39 @@ tcol('products').get().then(snapshot => {
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   init(); updatePaymentOptions(); updateWeatherWarning();
 });
+}
+
+// Bootstrap — resolve tenant before kicking off Firestore reads.
+async function bootstrap() {
+  if (!TENANT_ID && window.__CUSTOM_DOMAIN_HOST__) {
+    try {
+      const snap = await db.collection('public').doc('customDomains').get();
+      const map = (snap.exists ? (snap.data() || {}).domains : {}) || {};
+      const slug = map[window.__CUSTOM_DOMAIN_HOST__];
+      if (slug) {
+        TENANT_ID = slug;
+        IS_CUSTOM_DOMAIN = true;
+        resolveTenantHrefs();
+      }
+    } catch (e) {
+      console.warn('[bootstrap] customDomain lookup failed:', e);
+    }
+  }
+  if (!TENANT_ID) {
+    // No tenant resolved. On a platform host hitting bare /checkout/,
+    // fall back to the seed-tenant checkout. Custom-domain visitors with
+    // no slug mapping fall back to signup.
+    if (window.__CUSTOM_DOMAIN_HOST__) {
+      location.replace('/signup/');
+    } else {
+      location.replace('/jsminimart/checkout/');
+    }
+    return;
+  }
+  subscribeStoreSettings();
+  loadProductsAndRender();
+}
+bootstrap();
 </script>
 <!-- Location Picker Modal -->
 <div class="loc-overlay" id="loc-overlay">

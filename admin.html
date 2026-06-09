@@ -3114,6 +3114,7 @@
           <button data-settings-nav="store-info" onclick="goToSettingsSection('store-info')">Store Info</button>
           <button data-settings-nav="service" onclick="goToSettingsSection('service')">Service &amp; Payment</button>
           <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
+          <button data-settings-nav="custom-domain" onclick="goToSettingsSection('custom-domain')">Custom Domain <span id="custom-domain-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
           <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
           <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
           <button data-settings-nav="account" onclick="goToSettingsSection('account')">Account</button>
@@ -3544,6 +3545,15 @@
               <div class="setting-control">
                 <button class="btn-logout-settings" id="cat-order-save-btn" onclick="saveCategoryOrder()">Save order</button>
               </div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="set-custom-domain">
+            <h3>Custom Domain <span id="custom-domain-lock-badge" style="display:none;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;">🔒 Pro</span></h3>
+            <div class="section-sub">Point your own domain (like <em>tindahanjacob.com</em>) at your storefront. Customers see a fully-branded URL with no Pabili Mart anywhere.</div>
+            <div id="custom-domain-body">
+              <!-- Populated by renderCustomDomainSection() — body branches on tier + status. -->
+              <div style="font-size:13px;color:var(--muted);padding:8px 0;">Loading…</div>
             </div>
           </section>
 
@@ -4236,12 +4246,19 @@ let subscriptionData = null;
 let __subscriptionUnsub = null;
 let paymentsHistory = [];
 let __paymentsUnsub = null;
+// Tenant root doc — holds tier mirror, customDomain (Pro feature), etc.
+// Subscribed alongside subscription/current so admin reacts in real time
+// to status transitions kicked off by Cloud Functions.
+let tenantDocData = null;
+let __tenantDocUnsub = null;
 firebase.auth().onAuthStateChanged(user => {
   if (__subscriptionUnsub) { __subscriptionUnsub(); __subscriptionUnsub = null; }
   if (__paymentsUnsub)     { __paymentsUnsub();     __paymentsUnsub = null; }
+  if (__tenantDocUnsub)    { __tenantDocUnsub();    __tenantDocUnsub = null; }
   if (!user) {
     subscriptionData = null;
     paymentsHistory = [];
+    tenantDocData = null;
     renderTierBadge();
     return;
   }
@@ -4253,6 +4270,7 @@ firebase.auth().onAuthStateChanged(user => {
     if (typeof renderProductCapStatus === 'function') renderProductCapStatus();
     if (typeof renderSupplierCapStatus === 'function') renderSupplierCapStatus();
     if (typeof applyReportsTabLock === 'function') applyReportsTabLock();
+    if (typeof renderCustomDomainSection === 'function') renderCustomDomainSection();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
@@ -4262,6 +4280,14 @@ firebase.auth().onAuthStateChanged(user => {
     renderBillingTab();
   }, err => {
     console.warn('[payments] listener:', err);
+  });
+  // Tenant root doc — re-render Custom Domain card on every change so
+  // Cloud-Function-driven status transitions land in the UI immediately.
+  __tenantDocUnsub = db.collection('tenants').doc(TENANT_ID).onSnapshot(snap => {
+    tenantDocData = snap.exists ? snap.data() : null;
+    if (typeof renderCustomDomainSection === 'function') renderCustomDomainSection();
+  }, err => {
+    console.warn('[tenantDoc] listener:', err);
   });
 });
 
@@ -6441,6 +6467,19 @@ const LOCKED_FEATURES = {
       'Email reply to your verified account address',
       'Ticket audit log saved to your store for reference'
     ]
+  },
+  'custom-domain': {
+    title: '🌐 Custom Domain — a Pro feature',
+    icon: '🌐',
+    blurb: 'Point your own domain at your storefront. Customers see a fully-branded URL like tindahanjacob.com — no Pabili Mart in the path.',
+    tier: 'pro',
+    unlocksWith: [
+      'Use any domain you own — apex (tindahanjacob.com) or subdomain (shop.example.com)',
+      'Auto-provisioned SSL certificate via Let\'s Encrypt',
+      'Path-based URL (pabilimart.com/your-store/) still works as a fallback',
+      'Daily DNS + SSL health monitoring',
+      'Self-serve setup — submit your domain, update DNS, you\'re live'
+    ]
   }
 };
 let lockedFeatureKey = null;
@@ -6617,6 +6656,238 @@ async function submitSupportTicketForm() {
     btn.disabled = false;
     btn.textContent = 'Send to Pabili Mart';
   }
+}
+
+// ============================================================
+// CUSTOM DOMAIN (Pro feature) — Settings → Custom Domain section.
+//
+// Backend: submitCustomDomain / verifyCustomDomain / removeCustomDomain
+// callables (asia-southeast1). Each runs as a dedicated SA — see
+// functions/index.js and the Obsidian doc Custom Domain - Self-Serve vs
+// Manual Decision for the security rationale.
+//
+// Section is re-rendered on every tenant snapshot (because customDomain
+// lives on the tenant root doc and we need to react to status changes).
+// ============================================================
+function renderCustomDomainSection() {
+  const body = document.getElementById('custom-domain-body');
+  const lockBadge = document.getElementById('custom-domain-lock-badge');
+  const navLock = document.getElementById('custom-domain-nav-lock');
+  if (!body) return;
+
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const isPro = tier === 'pro';
+  if (lockBadge) lockBadge.style.display = isPro ? 'none' : '';
+  if (navLock) navLock.style.display = isPro ? 'none' : '';
+
+  // Free/Growth: locked upsell + Learn more button.
+  if (!isPro) {
+    body.innerHTML = `
+      <div style="background:var(--surface-2,#f9fafb); border:1px solid var(--line); border-radius:10px; padding:18px;">
+        <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:6px;">
+          🔒 Custom Domain is a <strong>PabiliMart Pro</strong> feature.
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+          Point your own domain (e.g. <em>tindahanjacob.com</em>) at your storefront. Customers see a fully-branded URL with no Pabili Mart anywhere.
+        </div>
+        <button type="button" class="btn-secondary" onclick="openLockedFeatureModal('custom-domain')">Learn more</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Pro: branch on customDomain.status.
+  const cd = (tenantDocData && tenantDocData.customDomain) || null;
+  if (!cd || !cd.domain) {
+    // No domain submitted yet — show input form.
+    body.innerHTML = `
+      <div class="setting-row" style="border:1px solid var(--line); border-radius:10px; padding:16px; display:block;">
+        <div style="font-size:13px; color:var(--ink); line-height:1.55; margin-bottom:12px;">
+          Enter the domain you want to use for your storefront. You'll need to update DNS records at your domain registrar (GoDaddy, Namecheap, etc.). SSL certificate provisions automatically once DNS is verified — typically 24–48 hours total.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:stretch;">
+          <input type="text" id="cd-input" placeholder="tindahanjacob.com" autocomplete="off"
+            style="flex:1; min-width:200px; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none;" />
+          <button type="button" class="btn-primary" id="cd-submit-btn" onclick="submitCustomDomain()" style="flex:0 0 auto;">Submit domain</button>
+        </div>
+        <div id="cd-status" style="font-size:12px; color:var(--error); min-height:16px; margin-top:8px;"></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:10px;">
+          Apex domains (yourstore.com) and subdomains (shop.yourstore.com) both work. No wildcards. Once submitted, you can't change the domain — only remove it and submit a new one.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Domain submitted — show status + DNS instructions + actions.
+  const statusInfo = customDomainStatusInfo(cd.status);
+  const isLive = cd.status === 'live';
+  const isFailed = cd.status === 'failed';
+  const dnsRows = (cd.dnsRecords || []).map(r => `
+    <tr>
+      <td style="padding:8px 10px; border-bottom:1px solid var(--line); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; color:var(--ink);">${escSupportText(r.type || '—')}</td>
+      <td style="padding:8px 10px; border-bottom:1px solid var(--line); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; color:var(--ink);">${escSupportText(r.name || '@')}</td>
+      <td style="padding:8px 10px; border-bottom:1px solid var(--line); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; color:var(--ink); word-break:break-all;">
+        <span>${escSupportText(r.value || '')}</span>
+        <button type="button" style="margin-left:6px; padding:2px 8px; font-size:11px; border:1px solid var(--line); border-radius:4px; background:var(--surface-2,#f9fafb); cursor:pointer;" onclick='copyToClipboard(${JSON.stringify(r.value || '')}, this)'>Copy</button>
+      </td>
+    </tr>
+  `).join('');
+
+  const dnsBlock = (cd.dnsRecords && cd.dnsRecords.length > 0) ? `
+    <div style="margin-top:14px;">
+      <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">DNS records to add at your registrar</div>
+      <div style="border:1px solid var(--line); border-radius:8px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr style="background:var(--surface-2,#f9fafb);">
+              <th style="text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;">Type</th>
+              <th style="text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;">Name</th>
+              <th style="text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;">Value</th>
+            </tr>
+          </thead>
+          <tbody>${dnsRows}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+        Add these records at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.) then click "Re-check status" below. DNS changes typically take 5–30 minutes to propagate, but can take up to 24 hours.
+      </div>
+    </div>
+  ` : '';
+
+  const reasonBlock = cd.statusReason ? `
+    <div style="background:rgba(220,38,38,0.08); border:1px solid rgba(220,38,38,0.2); border-radius:6px; padding:8px 12px; margin-top:10px; font-size:12px; color:var(--error,#dc2626);">
+      ⚠️ ${escSupportText(cd.statusReason)}
+    </div>
+  ` : '';
+
+  body.innerHTML = `
+    <div style="border:1px solid var(--line); border-radius:10px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Your domain</div>
+          <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:15px; font-weight:600; color:var(--ink); word-break:break-all;">${escSupportText(cd.domain)}</div>
+        </div>
+        <div style="flex:0 0 auto;">
+          <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:12px; font-weight:600; background:${statusInfo.bg}; color:${statusInfo.color};">
+            ${statusInfo.icon} ${statusInfo.label}
+          </span>
+        </div>
+      </div>
+      <div style="font-size:13px; color:var(--ink); line-height:1.55; margin-top:10px;">${statusInfo.help}</div>
+      ${reasonBlock}
+      ${dnsBlock}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; justify-content:flex-end;">
+        ${!isLive ? '<button type="button" class="btn-secondary" id="cd-verify-btn" onclick="verifyCustomDomain()">Re-check status</button>' : ''}
+        ${isLive ? `<a class="btn-secondary" href="https://${escSupportText(cd.domain)}/" target="_blank" rel="noopener" style="text-decoration:none;">Open storefront ↗</a>` : ''}
+        <button type="button" class="btn-danger" id="cd-remove-btn" onclick="removeCustomDomain()">Remove domain</button>
+      </div>
+    </div>
+  `;
+}
+
+function customDomainStatusInfo(status) {
+  switch (status) {
+    case 'live': return {
+      label: 'Live', icon: '✅',
+      color: '#16a34a', bg: 'rgba(22,163,74,0.12)',
+      help: 'Your storefront is live on this domain. SSL is active and auto-renews.'
+    };
+    case 'dns_pending': return {
+      label: 'Waiting on DNS', icon: '🟡',
+      color: '#92400e', bg: 'rgba(245,158,11,0.12)',
+      help: 'Add the DNS records below at your domain registrar. Once they propagate, click "Re-check status" — Firebase will verify ownership automatically.'
+    };
+    case 'ssl_pending': return {
+      label: 'Getting SSL certificate', icon: '🔵',
+      color: '#0369a1', bg: 'rgba(3,105,161,0.12)',
+      help: 'DNS verified — Firebase is provisioning your SSL certificate. This typically takes 24–48 hours. You don\'t need to do anything; status will flip to Live automatically. Click "Re-check status" to refresh.'
+    };
+    case 'failed': return {
+      label: 'Failed', icon: '🔴',
+      color: '#dc2626', bg: 'rgba(220,38,38,0.12)',
+      help: 'Something went wrong. Check the error message below, then either fix DNS at your registrar and re-check, or remove the domain and submit again.'
+    };
+    default: return {
+      label: status || 'Unknown', icon: '⚪',
+      color: '#6b7280', bg: 'rgba(107,114,128,0.12)',
+      help: 'Status will update on the next check.'
+    };
+  }
+}
+
+function copyToClipboard(text, btnEl) {
+  if (!navigator.clipboard) {
+    // Fallback for older browsers.
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta);
+    ta.select(); try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  } else {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+  if (btnEl) {
+    const prev = btnEl.textContent;
+    btnEl.textContent = 'Copied!';
+    setTimeout(() => { btnEl.textContent = prev; }, 1500);
+  }
+}
+
+async function submitCustomDomain() {
+  const input = document.getElementById('cd-input');
+  const statusEl = document.getElementById('cd-status');
+  const btn = document.getElementById('cd-submit-btn');
+  if (!input) return;
+  const domain = (input.value || '').trim().toLowerCase();
+  statusEl.textContent = '';
+  if (!domain) {
+    statusEl.textContent = 'Enter a domain.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('submitCustomDomain');
+    await fn({ tid: TENANT_ID, domain });
+    // Subscription listener picks up the new customDomain field and re-renders.
+  } catch (err) {
+    console.error('submitCustomDomain failed:', err);
+    statusEl.textContent = (err && err.message) ? err.message : 'Submission failed. Try again.';
+    btn.disabled = false;
+    btn.textContent = 'Submit domain';
+  }
+}
+
+async function verifyCustomDomain() {
+  const btn = document.getElementById('cd-verify-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('verifyCustomDomain');
+    await fn({ tid: TENANT_ID });
+    // Snapshot listener re-renders with new status.
+  } catch (err) {
+    console.error('verifyCustomDomain failed:', err);
+    showToast((err && err.message) ? err.message : 'Check failed. Try again.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Re-check status'; }
+  }
+}
+
+async function removeCustomDomain() {
+  confirmDestructive({
+    title: 'Remove custom domain?',
+    message: 'Your storefront will go back to the default pabilimart.com/<em>your-store</em>/ URL. Customers visiting your custom domain will see a connection error until you remove its DNS records at your registrar. This action takes effect immediately.',
+    confirmLabel: 'Remove',
+    onConfirm: async () => {
+      try {
+        const fn = firebase.app().functions('asia-southeast1').httpsCallable('removeCustomDomain');
+        await fn({ tid: TENANT_ID });
+        showToast('Custom domain removed.', 'success');
+      } catch (err) {
+        console.error('removeCustomDomain failed:', err);
+        showToast((err && err.message) ? err.message : 'Remove failed. Try again.', 'error');
+      }
+    }
+  });
 }
 
 // ---------- ORDERS ----------

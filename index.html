@@ -37,7 +37,29 @@
   // in browser tab switchers. Avoids a "JS Mini Mart" flash when loading
   // e.g. /ggssminimart/.
   (function () {
-    var parts = window.location.pathname.split('/').filter(Boolean);
+    var host = location.hostname.toLowerCase();
+    var path = location.pathname;
+    var parts = path.split('/').filter(Boolean);
+    var PLATFORM_HOSTS = ['pabilimart.com', 'www.pabilimart.com', 'jsminimart.com', 'www.jsminimart.com'];
+    var isPlatformHost = PLATFORM_HOSTS.indexOf(host) !== -1
+      || host.endsWith('.web.app')
+      || host.endsWith('.firebaseapp.com')
+      || host === 'localhost'
+      || host === '127.0.0.1';
+    // Platform host at apex / index.html → redirect to signup. Replaces
+    // the firebase.json redirect that was removed to let custom domains
+    // serve their own root.
+    if (isPlatformHost && (path === '/' || path === '/index.html')) {
+      location.replace('/signup/');
+      return;
+    }
+    // Custom domain: flag for the main script so it knows to resolve
+    // tenant via hostname lookup instead of path. Show a brief loading
+    // splash to mask the async tenant resolution.
+    if (!isPlatformHost) {
+      window.__CUSTOM_DOMAIN_HOST__ = host;
+      document.documentElement.classList.add('custom-domain-loading');
+    }
     var isSeed = parts[0] === 'jsminimart';
     if (!isSeed) {
       document.documentElement.classList.add('no-default-logo');
@@ -58,6 +80,18 @@
 </script>
 <style>
   html.no-default-logo #brand-logo { display: none !important; }
+  /* Custom domain loading splash — masks the brief async tenant lookup
+     that happens before TENANT_ID is set. Removed by bootstrap() once
+     the public/customDomains read resolves (typically <300ms). */
+  html.custom-domain-loading body > *:not(.cd-splash) { visibility: hidden; }
+  .cd-splash {
+    position: fixed; inset: 0; z-index: 9999;
+    display: none; align-items: center; justify-content: center;
+    background: #fff; color: #6b7280;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+  }
+  html.custom-domain-loading .cd-splash { display: flex; }
   /* Also blank the hardcoded "JS Mini Mart" <h1> until settings snapshot
      replaces it with the tenant's real storeName. */
   html.no-default-logo #store-name { visibility: hidden; }
@@ -929,6 +963,8 @@
 </head>
 <body>
 
+<div class="cd-splash" aria-hidden="true">Loading store…</div>
+
 <header>
   <div class="nav">
     <a href="#" data-tenant-href="" class="logo" id="brand-logo">
@@ -1161,7 +1197,12 @@ function resolveTenantId() {
   if (RESERVED_TENANT_IDS.has(parts[0])) return null;
   return parts[0];
 }
-const TENANT_ID = resolveTenantId();
+// TENANT_ID is set sync from the path when present (the common case for
+// path-based pabilimart.com/{slug}/ URLs). On a custom domain (e.g.
+// tindahanjacob.com/), path resolution returns null and bootstrap()
+// below does an async hostname lookup against public/customDomains.
+let TENANT_ID = resolveTenantId();
+let IS_CUSTOM_DOMAIN = false;
 // Tenant-scoped helpers — every query in this file uses these instead of
 // the raw db.collection(...) form.
 function tcol(name) {
@@ -1169,9 +1210,13 @@ function tcol(name) {
   return db.collection('tenants').doc(TENANT_ID).collection(name);
 }
 function tdoc(name, id) { return tcol(name).doc(id); }
-// Build a URL relative to the current tenant. e.g. tenantUrl('checkout/') → '/jsminimart/checkout/'
+// Build a URL relative to the current tenant. On path-based URLs this
+// returns `/{slug}/{suffix}`. On a custom domain (where the hostname IS
+// the tenant identifier) it returns just `/{suffix}` so internal links
+// stay on the custom hostname.
 function tenantUrl(suffix) {
   const s = suffix.startsWith('/') ? suffix.slice(1) : suffix;
+  if (IS_CUSTOM_DOMAIN) return '/' + s;
   return '/' + (TENANT_ID || 'jsminimart') + '/' + s;
 }
 function resolveTenantHrefs() {
@@ -1468,6 +1513,7 @@ function applyRainMode(active) {
   buildTicker(active, storeClosedMode, maintenanceMode);
 }
 
+function subscribeStoreSettings() {
 tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
   const rainMode    = storeSettingsData.rainMode === true;
@@ -1594,6 +1640,7 @@ tdoc('settings', 'store').onSnapshot(snap => {
       : (TENANT_ID === 'jsminimart' ? '/newlogo.jpeg' : null)
   );
 });
+}
 
 // Derive a 2-letter abbreviation for the brand-logo initials placeholder.
 //   "Tindahan ni Jacob"     → "TJ"  (filler word "ni" skipped)
@@ -2323,10 +2370,13 @@ if (window.location.hash === '#cart') {
   openCart();
   history.replaceState(null, '', window.location.pathname);
 }
-init();
+// init() and the products snapshot are kicked off by bootstrap() at
+// the bottom — tenant must be resolved first (sync from path, or async
+// via public/customDomains for custom-domain visitors).
 
 // Load products from Firestore — real-time sync across devices
 let shuffledOrder = null;
+function subscribeProducts() {
 tcol('products').onSnapshot(snapshot => {
   const fresh = snapshot.docs.map(doc => doc.data());
   if (shuffledOrder === null) {
@@ -2358,6 +2408,56 @@ tcol('products').onSnapshot(snapshot => {
   renderProducts();
   renderCart();
 });
+}
+
+// ============================================================
+// BOOTSTRAP — tenant resolution gate, then subscriptions
+//
+// Two paths to TENANT_ID:
+//   (1) Path-based (pabilimart.com/{slug}/...) — TENANT_ID is set sync
+//       from the URL by resolveTenantId() at the top of the script.
+//   (2) Custom domain (tindahanjacob.com/) — TENANT_ID is null after
+//       the sync resolver. Head IIFE has flagged the hostname via
+//       window.__CUSTOM_DOMAIN_HOST__; we look it up in the public
+//       customDomains map below.
+//
+// Once TENANT_ID is settled, kick off the real-time subscriptions.
+// ============================================================
+async function bootstrap() {
+  if (!TENANT_ID && window.__CUSTOM_DOMAIN_HOST__) {
+    try {
+      const snap = await db.collection('public').doc('customDomains').get();
+      const map = (snap.exists ? (snap.data() || {}).domains : {}) || {};
+      const slug = map[window.__CUSTOM_DOMAIN_HOST__];
+      if (slug) {
+        TENANT_ID = slug;
+        IS_CUSTOM_DOMAIN = true;
+        // jsminimart is the only tenant whose seed logo lives at /newlogo.jpeg;
+        // restore the default-logo class so it shows on its custom domain.
+        if (slug === 'jsminimart') {
+          document.documentElement.classList.remove('no-default-logo');
+        }
+        // tenantUrl() now returns absolute paths (no slug prefix) for the
+        // custom-domain case — re-resolve any data-tenant-href anchors.
+        resolveTenantHrefs();
+      }
+    } catch (e) {
+      console.warn('[bootstrap] customDomain lookup failed:', e);
+    }
+  }
+  document.documentElement.classList.remove('custom-domain-loading');
+  if (!TENANT_ID) {
+    // Either a platform host hit a reserved/unknown path, or a custom
+    // domain hostname isn't registered in public/customDomains. Send
+    // them to signup as the safest fallback.
+    location.replace('/signup/');
+    return;
+  }
+  subscribeStoreSettings();
+  init();
+  subscribeProducts();
+}
+bootstrap();
 </script>
 <script>
   if ('serviceWorker' in navigator) {
