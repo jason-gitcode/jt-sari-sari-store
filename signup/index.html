@@ -2068,7 +2068,7 @@
 
       <div class="auth-magic">
         <span class="auth-magic-label">Prefer no password?</span>
-        <button type="button" class="btn" onclick="sendMagicLink()">✉️ Email me a sign-in link</button>
+        <button type="button" class="btn" onclick="openMagicModal()">✉️ Email me a sign-in link</button>
       </div>
     </div>
   </div>
@@ -2267,6 +2267,28 @@
     <div class="notice-title" id="notice-title">Heads up</div>
     <div class="notice-message" id="notice-message"></div>
     <button type="button" class="btn-hero notice-ok" onclick="closeNotice()">OK</button>
+  </div>
+</div>
+
+<!-- Magic-link pop-up — enter email, get a passwordless sign-in link -->
+<div class="notice-overlay" id="magic-overlay" hidden onclick="closeMagicBackdrop(event)">
+  <div class="notice-card" role="dialog" aria-labelledby="magic-title" onclick="event.stopPropagation()">
+    <div id="magic-form-state">
+      <div class="notice-icon">✉️</div>
+      <div class="notice-title" id="magic-title">Email me a sign-in link</div>
+      <div class="notice-message">Enter your email — we'll send a link that signs you in instantly, no password needed.</div>
+      <div class="field" style="text-align:left; margin-bottom:16px;">
+        <input id="magic-email" class="input" type="email" autocomplete="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')submitMagicLink()" />
+      </div>
+      <button type="button" class="btn btn-primary" id="magic-send-btn" onclick="submitMagicLink()">Send link</button>
+      <div style="margin-top:12px;"><button type="button" class="link-btn" onclick="closeMagic()">Cancel</button></div>
+    </div>
+    <div id="magic-success-state" hidden>
+      <div class="notice-icon" style="background:linear-gradient(135deg,#dcfce7,#86efac);">✅</div>
+      <div class="notice-title">Link sent</div>
+      <div class="notice-message">Check your inbox at <strong id="magic-sent-to"></strong> and tap the sign-in link. You can close this window.</div>
+      <button type="button" class="btn btn-primary notice-ok" onclick="closeMagic()">Got it</button>
+    </div>
   </div>
 </div>
 
@@ -2692,6 +2714,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const o = document.getElementById('notice-overlay');
     if (o && !o.hidden) closeNotice();
+    const m = document.getElementById('magic-overlay');
+    if (m && !m.hidden) closeMagic();
   }
 });
 
@@ -2776,18 +2800,37 @@ async function sendReset() {
 }
 
 const MAGIC_LINK_KEY = 'emailForSignIn';
-async function sendMagicLink() {
-  const email = (document.getElementById('auth-email').value || '').trim();
-  if (!email) { showNotice('Email me a link', 'Type your email above first, then tap the link option.'); return; }
+// Magic-link pop-up: collect the email, send the link, then swap the card
+// to a "Link sent ✅" confirmation state.
+function openMagicModal() {
+  document.getElementById('magic-form-state').hidden = false;
+  document.getElementById('magic-success-state').hidden = true;
+  const input = document.getElementById('magic-email');
+  input.value = (document.getElementById('auth-email').value || '').trim(); // prefill if typed
+  document.getElementById('magic-overlay').hidden = false;
+  setTimeout(() => input.focus(), 50);
+}
+function closeMagic() { document.getElementById('magic-overlay').hidden = true; }
+function closeMagicBackdrop(e) { if (e && e.target === e.currentTarget) closeMagic(); }
+
+async function submitMagicLink() {
+  const email = (document.getElementById('magic-email').value || '').trim();
+  if (!email) { document.getElementById('magic-email').focus(); return; }
+  const btn = document.getElementById('magic-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
   try {
     await auth.sendSignInLinkToEmail(email, {
       url: window.location.origin + window.location.pathname,
       handleCodeInApp: true,
     });
     window.localStorage.setItem(MAGIC_LINK_KEY, email);
-    showNotice('Check your email', `Tap the sign-in link we just sent to ${email} — it signs you in, no password needed.`);
+    document.getElementById('magic-sent-to').textContent = email;
+    document.getElementById('magic-form-state').hidden = true;
+    document.getElementById('magic-success-state').hidden = false;
   } catch (err) {
     showNotice('Could not send link', authError(err));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send link';
   }
 }
 
