@@ -232,8 +232,9 @@
   /* ---------- HEADER ---------- */
   header {
     flex-shrink: 0;
-    background: #fff;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fdf9 100%);
     border-bottom: 1px solid var(--line);
+    box-shadow: 0 2px 6px rgba(16,24,16,0.05);
     position: relative;
     overflow: hidden;
     transition: background .6s, border-color .6s;
@@ -305,7 +306,11 @@
     background: #fff;
     display: flex; align-items: center; justify-content: center;
     position: relative;
+    box-shadow: 0 2px 6px rgba(16,24,16,0.10), 0 0 0 1px rgba(16,24,16,0.04);
+    transition: transform .15s ease, box-shadow .15s ease;
   }
+  #brand-logo:hover { transform: scale(1.06); box-shadow: 0 4px 12px rgba(16,24,16,0.16), 0 0 0 1px rgba(16,24,16,0.05); }
+  #brand-logo:active { transform: scale(0.97); }
   /* object-fit: cover so the image fills the circle edge-to-edge.
      The admin cropper saves a circle-masked PNG so the corners are
      already transparent — cover just keeps the centered crop tight. */
@@ -345,6 +350,27 @@
   #store-name.scale-md { font-size: 16px; }
   #store-name.scale-sm { font-size: 14px; }
   #store-name.scale-xs { font-size: 13px; }
+  /* Live Open/Closed status pill under the store name. Pulsing green dot
+     when open; static red when closed. State = getEffectiveStoreClosed()
+     so it can never disagree with the ticker/checkout. */
+  .store-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 4px; padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600; line-height: 1.4;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .store-status[hidden] { display: none; }
+  .store-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .store-status.open   { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
+  .store-status.open .store-status-dot { background: #22c55e; animation: status-pulse 2s ease-out infinite; }
+  .store-status.closed { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+  .store-status.closed .store-status-dot { background: #ef4444; }
+  @keyframes status-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
   #store-tag {
     color: var(--muted); font-size: 12px;
     display: block; line-height: 1.3; margin-top: 2px;
@@ -468,6 +494,14 @@
     display: flex; align-items: center; justify-content: center;
     line-height: 1;
   }
+  /* Bounce the badge when the cart count goes up (item added). */
+  @keyframes cart-bump {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.35); }
+    60%  { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
+  .cart-btn .badge.bump { animation: cart-bump .35s ease; }
 
   /* ---------- INFO BAR / TICKER ---------- */
   .info-bar {
@@ -1093,6 +1127,9 @@
     </a>
     <div class="brand-text">
       <h1 id="store-name">JS Mini Mart</h1>
+      <span class="store-status" id="store-status" hidden>
+        <span class="store-status-dot" aria-hidden="true"></span><span id="store-status-text">Open now</span>
+      </span>
       <small id="store-tag" style="display:none;"></small>
       <button type="button" class="branch-indicator" id="branch-indicator" onclick="reopenBranchPicker()" aria-label="Change branch">
         <span aria-hidden="true">📍</span><span id="branch-indicator-name">Branch</span><span style="opacity:.55;">· change</span>
@@ -1490,6 +1527,19 @@ function getEffectiveStoreClosed() {
   return isStoreHoursClosed();
 }
 
+// Live Open/Closed pill in the header. Reuses getEffectiveStoreClosed so
+// it always agrees with the ticker + checkout store-hours enforcement.
+function updateStatusPill() {
+  const el = document.getElementById('store-status');
+  const txt = document.getElementById('store-status-text');
+  if (!el || !txt) return;
+  const isOpen = !getEffectiveStoreClosed() && !maintenanceMode && !offlineMode;
+  el.hidden = false;
+  el.classList.toggle('open', isOpen);
+  el.classList.toggle('closed', !isOpen);
+  txt.textContent = isOpen ? 'Open now' : 'Closed';
+}
+
 function buildTicker(rainMode, storeClosed, maintenance) {
   // Per-tenant kill switch (admin → Settings → Appearance). When false,
   // hide the entire info-bar — including rain / closed / maintenance
@@ -1646,6 +1696,10 @@ tdoc('settings', 'store').onSnapshot(snap => {
   lastRainMode      = rainMode;
   applyRainMode(rainMode);
   buildTicker(rainMode, storeClosedMode, maintenanceMode);
+  updateStatusPill();
+  // Re-check every minute so the pill flips on its own at open/close time
+  // without needing a settings change to fire.
+  if (!window.__statusPillTimer) window.__statusPillTimer = setInterval(updateStatusPill, 60000);
   // Phase D: Free-tier branding footer. Show "Powered by Pabili Mart" on
   // any tenant whose tier field is missing or 'free'. Paid tiers hide it.
   applyPoweredByFooter();
@@ -2421,8 +2475,15 @@ function cartCount() {
 function renderCart() {
   const _count = cartCount();
   const _badge = document.getElementById('cart-count');
+  const _prev = Number(_badge.dataset.count || 0);
   _badge.textContent = _count;
   _badge.style.display = _count > 0 ? '' : 'none';
+  if (_count > _prev) {
+    _badge.classList.remove('bump');
+    void _badge.offsetWidth; // reflow so the animation restarts on each add
+    _badge.classList.add('bump');
+  }
+  _badge.dataset.count = String(_count);
   const wrap = document.getElementById('cart-items');
   const ids = Object.keys(cart);
   if (ids.length === 0) {
