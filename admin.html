@@ -10234,6 +10234,16 @@ async function handleAdminAuth(user) {
 
 auth.onAuthStateChanged(async user => {
   if (!user) { showLogin(); return; }
+  // Cached token can still report unverified right after the email link;
+  // refresh from the server (+ token) before holding them at the overlay.
+  if (!user.emailVerified) {
+    try {
+      await user.reload();
+      user = auth.currentUser;
+      if (user && user.emailVerified) await user.getIdToken(true);
+    } catch (e) { /* keep cached state */ }
+  }
+  if (!user) { showLogin(); return; }
   // Hold unverified email/password owners at the verify overlay — the backend
   // rejects unverified accounts anyway. Google + magic-link users are verified.
   if (!user.emailVerified) { adminShowVerify(user); return; }

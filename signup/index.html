@@ -2953,6 +2953,7 @@ async function proceedVerifiedUser(user) {
     if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
       renderAlreadyOwner(user.email, tenants);
       showStep('step-already-owner');
+      document.getElementById('signup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
   } catch (err) {
@@ -2962,17 +2963,29 @@ async function proceedVerifiedUser(user) {
     console.warn('getMyTenant failed', err);
   }
   showStep('step-details');
+  // Verified owners (e.g. returning from the verification link's Continue)
+  // should land on the form, not the marketing hero above it.
+  document.getElementById('signup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 auth.onAuthStateChanged(async user => {
+  if (!user) { showStep('step-signin'); return; }
+  // Right after verifying via the email link, this tab's cached token can
+  // still report unverified — refresh from the server before deciding, and
+  // force a token refresh so the email_verified claim reaches the callables.
+  if (!user.emailVerified) {
+    try {
+      await user.reload();
+      user = auth.currentUser;
+      if (user && user.emailVerified) await user.getIdToken(true);
+    } catch (e) { /* keep cached state */ }
+  }
   if (user && user.emailVerified) {
     proceedVerifiedUser(user);
-  } else if (user && !user.emailVerified) {
+  } else {
     // Email/password owner who hasn't clicked their verification link yet.
     document.getElementById('verify-email').textContent = user.email;
     showStep('step-verify');
-  } else {
-    showStep('step-signin');
   }
 });
 
