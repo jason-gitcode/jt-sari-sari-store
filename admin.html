@@ -568,7 +568,7 @@
     [data-theme="dark"] .tier-badge.tier-pro    { background: rgba(245,158,11,0.16); color: #fcd34d; border-color: rgba(245,158,11,0.4); }
     .brand-sub { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
 
-    .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .header-actions { display: flex; align-items: center; gap: 8px; flex: 1 1 0; justify-content: flex-end; min-width: 0; }
     /* Multi-branch filter (Pro + ≥1 branch only). Hidden via inline style
        until the branches subscription fires; shown by syncBranchFilter(). */
     .branch-filter-wrap { display: flex; align-items: center; }
@@ -594,11 +594,11 @@
     @media (max-width: 480px) {
       .branch-filter-wrap select { max-width: 110px; font-size: 11px; }
     }
-    /* Storefront link: absolutely centered relative to the header, so it
-       sits in the middle regardless of how wide brand/actions become. */
-    header { position: relative; }
+    /* Storefront link sits in the normal flow between brand (flex:1) and
+       header-actions (flex:1), which keeps it visually centered WITHOUT
+       overlapping the branch picker the way absolute centering used to. */
     .storefront-btn {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      flex-shrink: 0;
       display: inline-flex; align-items: center; gap: 8px;
       padding: 8px 22px; border: 1px solid var(--ok, #16a34a);
       border-radius: 8px; background: var(--ok, #16a34a);
@@ -609,7 +609,7 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.06);
     }
     .storefront-btn:hover { background: #15803d; border-color: #15803d; color: #ffffff; }
-    .storefront-btn:active { transform: translate(-50%, -50%) scale(0.97); }
+    .storefront-btn:active { transform: scale(0.97); }
     .storefront-btn svg { flex-shrink: 0; }
     @media (max-width: 700px) {
       .storefront-btn { padding: 7px 12px; font-size: 12px; gap: 6px; }
@@ -2155,6 +2155,10 @@
       .brand-title.scale-sm,
       .brand-title.scale-xs { font-size: 11px; }
       .brand-sub { display: none; }
+      /* Icon-only Storefront button on phones — reclaim ~70px so the
+         branch picker (Pro multi-branch) actually fits in the header. */
+      .storefront-btn span { display: none; }
+      .storefront-btn { padding: 7px 11px; }
       .container { padding: 14px 12px 20px; }
       .tabs { width: 100%; overflow-x: auto; }
       .tab-btn { padding: 6px 12px; }
