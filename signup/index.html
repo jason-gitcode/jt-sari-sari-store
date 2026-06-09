@@ -1096,8 +1096,12 @@
   /* Email / magic-link auth controls on the sign-in step */
   .auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--muted); font-size: 13px; }
   .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-  .auth-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-  .auth-magic { margin-top: 14px; text-align: center; }
+  .auth-links { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 14px; }
+  .auth-magic { margin-top: 14px; }
+  .auth-magic-label { display: block; text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  /* "Create account" mode turns the button green so the mode switch is obvious. */
+  .btn-primary.btn-create { background: #16a34a; border-color: #16a34a; }
+  .btn-primary.btn-create:hover { background: #15803d; border-color: #15803d; }
 
   /* ============================================================
      Signed-in-as pill + switch link
@@ -2059,8 +2063,12 @@
         <button type="button" class="link-btn" id="auth-toggle-mode" onclick="toggleAuthMode()">New here? Create an account</button>
         <button type="button" class="link-btn" onclick="sendReset()">Forgot password?</button>
       </div>
+
+      <div class="auth-divider"><span>or</span></div>
+
       <div class="auth-magic">
-        <button type="button" class="link-btn" onclick="sendMagicLink()">Prefer no password? Email me a sign-in link</button>
+        <span class="auth-magic-label">Prefer no password?</span>
+        <button type="button" class="btn" onclick="sendMagicLink()">✉️ Email me a sign-in link</button>
       </div>
     </div>
   </div>
@@ -2705,11 +2713,13 @@ function toggleAuthMode() {
   const pw = document.getElementById('auth-password');
   if (authMode === 'signup') {
     btn.textContent = 'Create account';
+    btn.classList.add('btn-create');
     toggle.textContent = 'Have an account? Sign in';
     pw.setAttribute('autocomplete', 'new-password');
     pw.setAttribute('placeholder', 'Create a password (6+ characters)');
   } else {
     btn.textContent = 'Sign in';
+    btn.classList.remove('btn-create');
     toggle.textContent = 'New here? Create an account';
     pw.setAttribute('autocomplete', 'current-password');
     pw.setAttribute('placeholder', 'At least 6 characters');
