@@ -1142,7 +1142,25 @@ function locateMe() {
       console.log('[locateMe] captured', { lat, lon, locPicked });
       showToast('📍 Location captured — the store will get a map link on your order.');
     },
-    () => showToast('Unable to retrieve your location.')
+    err => {
+      let msg;
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          msg = 'Location permission was blocked. Allow location access for this site in your browser settings, or drag the map pin to your spot.';
+          break;
+        case err.POSITION_UNAVAILABLE:
+          msg = 'Your location is unavailable right now. Turn on GPS/location, or drag the map pin to your spot.';
+          break;
+        case err.TIMEOUT:
+          msg = 'Getting your location timed out — please try again, or drag the map pin to your spot.';
+          break;
+        default:
+          msg = 'Unable to retrieve your location' + (err.message ? ': ' + err.message : '.');
+      }
+      console.warn('[locateMe] geolocation error', err.code, err.message);
+      showToast(msg);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
