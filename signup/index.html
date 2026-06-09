@@ -2953,7 +2953,6 @@ async function proceedVerifiedUser(user) {
     if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
       renderAlreadyOwner(user.email, tenants);
       showStep('step-already-owner');
-      document.getElementById('signup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
   } catch (err) {
@@ -2963,9 +2962,6 @@ async function proceedVerifiedUser(user) {
     console.warn('getMyTenant failed', err);
   }
   showStep('step-details');
-  // Verified owners (e.g. returning from the verification link's Continue)
-  // should land on the form, not the marketing hero above it.
-  document.getElementById('signup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 auth.onAuthStateChanged(async user => {
@@ -2980,6 +2976,10 @@ auth.onAuthStateChanged(async user => {
       if (user && user.emailVerified) await user.getIdToken(true);
     } catch (e) { /* keep cached state */ }
   }
+  // A signed-in user belongs in the signup flow. The default page load shows
+  // the marketing "home" router page, so switch to the signup page (this is a
+  // hash-router SPA — pages toggle via is-active, they don't scroll).
+  navigateToPage('signup');
   if (user && user.emailVerified) {
     proceedVerifiedUser(user);
   } else {
