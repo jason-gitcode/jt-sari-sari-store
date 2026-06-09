@@ -2519,6 +2519,11 @@ tcol('products').onSnapshot(snapshot => {
     // Append any brand-new products at the end
     fresh.forEach(p => { if (!shuffledOrder.includes(p.id)) { PRODUCTS.push(p); shuffledOrder.push(p.id); } });
   }
+  // Phase 3 multi-branch: filter visible products by branchIds for
+  // the active branch + replace stock with per-branch inventory counts.
+  // Single-branch tenants (CURRENT_BRANCH_ID === null) skip this — the
+  // full tenant-level products array stays intact.
+  if (typeof applyBranchInventoryToProducts === 'function') applyBranchInventoryToProducts();
   Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
   saveCart();
   renderCategories();
@@ -2590,12 +2595,23 @@ function resolveInitialBranchId() {
   return null;
 }
 
-function setCurrentBranch(branchId, opts) {
+async function setCurrentBranch(branchId, opts) {
   const persist = (opts && opts.persist !== false);
   CURRENT_BRANCH_ID = branchId || null;
   if (persist) writeSavedBranchId(CURRENT_BRANCH_ID);
   renderBranchIndicator();
   closeBranchPicker();
+  // Phase 3 — switching branch reloads inventory + re-derives the
+  // PRODUCTS array. The products snapshot listener is already wired to
+  // re-apply branch inventory on its next fire, but we don't want to
+  // wait for that — refresh now so the storefront updates immediately.
+  if (typeof loadBranchInventory === 'function') {
+    await loadBranchInventory(CURRENT_BRANCH_ID);
+    if (typeof applyBranchInventoryToProducts === 'function') applyBranchInventoryToProducts();
+    if (typeof renderProducts === 'function') renderProducts();
+    if (typeof renderCategories === 'function') renderCategories();
+    if (typeof renderCart === 'function') renderCart();
+  }
 }
 
 function renderBranchIndicator() {
@@ -2669,6 +2685,46 @@ async function loadBranchesForStorefront() {
   }
 }
 
+// Phase 3 — per-branch inventory map. Populated by
+// loadBranchInventory() whenever CURRENT_BRANCH_ID changes. The map
+// is keyed by productId → { stock, available }. Used by
+// applyBranchInventoryToProducts() to overwrite the in-memory PRODUCTS
+// array so the existing render code (which reads p.stock) stays
+// branch-aware without a wholesale rewrite.
+let BRANCH_INVENTORY = {};
+
+async function loadBranchInventory(branchId) {
+  BRANCH_INVENTORY = {};
+  if (!branchId || !TENANT_ID) return;
+  try {
+    const snap = await db.collection('tenants').doc(TENANT_ID)
+      .collection('branches').doc(branchId)
+      .collection('inventory').get();
+    snap.docs.forEach(d => { BRANCH_INVENTORY[d.id] = d.data() || {}; });
+  } catch (e) {
+    console.warn('[branch inventory] load failed:', e);
+  }
+}
+
+// Filter + remap PRODUCTS array for the current branch. Should be
+// called whenever PRODUCTS is rebuilt (subscribeProducts onSnapshot)
+// OR whenever BRANCH_INVENTORY changes (branch switch).
+function applyBranchInventoryToProducts() {
+  if (!CURRENT_BRANCH_ID) return; // no-op for single-branch tenants
+  PRODUCTS = (PRODUCTS || []).filter(p => {
+    const branchIds = Array.isArray(p.branchIds) ? p.branchIds : [];
+    // Empty branchIds = shared catalog (visible at all branches).
+    return branchIds.length === 0 || branchIds.includes(CURRENT_BRANCH_ID);
+  }).map(p => {
+    const branchIds = Array.isArray(p.branchIds) ? p.branchIds : [];
+    if (branchIds.length === 0) return p; // shared product, keep tenant-level stock
+    // Branch-scoped: use per-branch inventory stock.
+    const inv = BRANCH_INVENTORY[String(p.id)];
+    if (!inv) return { ...p, stock: 0, available: false }; // no inventory doc = OOS at this branch
+    return { ...p, stock: inv.stock == null ? null : inv.stock, available: inv.available !== false };
+  });
+}
+
 // Storefront → checkout navigation. Appends ?branch={id} so the checkout
 // page picks up the active branch sync from the URL (no need to re-read
 // branches there if the picker hasn't run).
@@ -2735,6 +2791,10 @@ async function bootstrap() {
     CURRENT_BRANCH_ID = resolveInitialBranchId();
     if (CURRENT_BRANCH_ID) {
       renderBranchIndicator();
+      // Phase 3 — pre-load the branch's inventory so the first product
+      // render shows per-branch stock without a flash of tenant-level
+      // counts. Fires in parallel with the products subscription.
+      await loadBranchInventory(CURRENT_BRANCH_ID);
     } else {
       openBranchPicker();
     }

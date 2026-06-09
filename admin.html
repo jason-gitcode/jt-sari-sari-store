@@ -4024,7 +4024,37 @@
           <label>Stock Quantity</label>
           <input type="number" id="product-stock" step="1" inputmode="numeric" placeholder="Leave blank for unlimited" />
           <small id="stock-variant-hint" style="display:none;">Managed by variants — total: <strong id="stock-variant-total">0</strong></small>
+          <small id="stock-branch-hint" style="display:none; margin-top:4px; color:var(--muted);">Inventory is per branch — see "Branch visibility" below.</small>
         </div>
+      </div>
+
+      <!-- Branch visibility (Phase 3 — Pro multi-branch). Only shown when
+           tenant has ≥1 branch. Variant-having products are constrained
+           to All-branches until per-branch variants ships. -->
+      <div class="field form-grid full" id="branch-visibility-section" style="display:none;">
+        <label>Branch visibility</label>
+        <small>Choose which branches sell this product. Pick "All branches" for shared catalog (stock is one shared count); pick specific branches to track stock per location.</small>
+        <div id="branch-visibility-controls" style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+          <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:14px; color:var(--ink);">
+            <input type="radio" name="branch-visibility-mode" value="all" id="branch-vis-mode-all" onchange="onBranchVisibilityModeChange('all')" style="margin-top:3px;" />
+            <span>
+              <strong>Available at all branches</strong>
+              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">Shared catalog. Uses the single stock count above.</span>
+            </span>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:14px; color:var(--ink);">
+            <input type="radio" name="branch-visibility-mode" value="specific" id="branch-vis-mode-specific" onchange="onBranchVisibilityModeChange('specific')" style="margin-top:3px;" />
+            <span>
+              <strong>Pick specific branches</strong>
+              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">Track stock separately per branch. Set initial stock for each.</span>
+            </span>
+          </label>
+          <div id="branch-checkboxes-list" style="display:none; padding:10px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-sm); margin-left:24px;">
+            <!-- Populated by renderBranchVisibilityControls() — one row per branch:
+                 [checkbox] Branch name  · stock input -->
+          </div>
+        </div>
+        <small id="branch-vis-variant-warning" style="display:none; color:#92400e; margin-top:6px;">⚠️ Products with variants currently must be available at all branches. Per-branch variant inventory is coming in a future update.</small>
       </div>
 
       <div class="field form-grid full">
@@ -7209,6 +7239,8 @@ function onBranchFilterChange(value) {
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderSalesReport === 'function') renderSalesReport();
   if (typeof renderRestockingReport === 'function') renderRestockingReport();
+  // Phase 3: Products tab also scopes to the selected branch.
+  if (typeof renderProducts === 'function') renderProducts();
 }
 
 // Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
@@ -8867,6 +8899,15 @@ async function toggleHidden(id, hidden) {
 
 function renderProducts() {
   let filtered = products;
+  // Phase 3: Branch filter — when a specific branch is selected in the
+  // admin header dropdown, show only products available at that branch
+  // (either shared = no branchIds, or explicitly tagged for that branch).
+  if (SELECTED_BRANCH_FILTER) {
+    filtered = filtered.filter(p => {
+      const branchIds = Array.isArray(p.branchIds) ? p.branchIds : [];
+      return branchIds.length === 0 || branchIds.includes(SELECTED_BRANCH_FILTER);
+    });
+  }
   if (adminActiveCategory !== 'All') {
     filtered = filtered.filter(p => p.category === adminActiveCategory);
   }
@@ -9182,6 +9223,7 @@ function editProduct(id) {
   }
   updateProfitMargin();
 
+  if (typeof renderBranchVisibilityControls === 'function') renderBranchVisibilityControls(p);
   showProductFormModal();
 }
 
@@ -9241,13 +9283,190 @@ async function saveProduct(e) {
 
   formData.id = editingProductId || (products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1);
 
+  // Multi-branch (Phase 3): read Branch visibility selection. Products
+  // with variants must stay "all branches" until per-branch variants
+  // ships (Phase 3b). Single-branch tenants skip this entirely.
+  const hasBranches = Array.isArray(branchesData) && branchesData.length > 0;
+  const hasVariants = formData.variants.length > 0;
+  let branchInventoryWrites = []; // [{ branchId, stock }] to write after the product doc
+  if (hasBranches && !hasVariants) {
+    const modeEl = document.querySelector('input[name="branch-visibility-mode"]:checked');
+    const mode = modeEl ? modeEl.value : 'all';
+    if (mode === 'specific') {
+      const picked = Array.from(document.querySelectorAll('[data-branch-checkbox]:checked'))
+        .map(cb => cb.value);
+      if (picked.length === 0) {
+        showToast('Pick at least one branch (or switch to "Available at all branches").', 'error');
+        return;
+      }
+      if (picked.length === branchesData.length) {
+        // All branches picked = same as "All branches" — store as shared.
+        formData.branchIds = firebase.firestore.FieldValue.delete();
+      } else {
+        formData.branchIds = picked;
+      }
+      // Read each branch's stock input
+      picked.forEach(bid => {
+        const stockInput = document.querySelector(`[data-branch-stock="${bid}"]`);
+        const stockVal = stockInput && stockInput.value !== '' ? parseInt(stockInput.value) : null;
+        branchInventoryWrites.push({ branchId: bid, stock: stockVal });
+      });
+      // Branch-scoped products: clear the top-level stock since inventory
+      // lives at the branch subcollection. Avoid stale ambiguity.
+      formData.stock = null;
+    } else {
+      // 'all' mode — explicit shared catalog. Drop branchIds.
+      formData.branchIds = firebase.firestore.FieldValue.delete();
+    }
+  } else {
+    // Either no branches yet OR variants present — force shared catalog.
+    formData.branchIds = firebase.firestore.FieldValue.delete();
+  }
+
   try {
     await tcol('products').doc(String(formData.id)).set(formData);
+    // After the product doc is written, seed/update per-branch inventory
+    // docs for any branch-specific products. Best-effort — if these
+    // partial writes fail we still leave the product saved.
+    if (branchInventoryWrites.length > 0) {
+      const me = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
+      const writes = branchInventoryWrites.map(w =>
+        db.collection('tenants').doc(TENANT_ID)
+          .collection('branches').doc(w.branchId)
+          .collection('inventory').doc(String(formData.id))
+          .set({
+            productId: String(formData.id),
+            stock: (w.stock == null ? null : w.stock),
+            available: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: me
+          }, { merge: true })
+      );
+      try { await Promise.all(writes); }
+      catch (err) {
+        console.warn('[branch inventory seed] partial failure:', err && err.message);
+        showToast('Product saved, but seeding branch inventory partially failed. Check Firestore.', 'warn');
+      }
+    }
     showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
     closeProductModal();
   } catch (err) {
     console.error('Save error:', err);
     showToast('Error saving product', 'error');
+  }
+}
+
+// ============================================================
+// Phase 3 — Branch visibility UI for the product form.
+//
+// Single-branch tenants (and tenants with 0 branches) don't see the
+// section at all. When ≥1 branch exists, the radio toggles between
+// "All branches" (shared catalog → uses top-level product.stock) and
+// "Pick specific branches" (per-branch inventory → seeds inventory
+// docs at tenants/{tid}/branches/{bid}/inventory/{pid}).
+//
+// Variants currently force "All branches" — per-branch variants is a
+// future build (Phase 3b).
+// ============================================================
+function renderBranchVisibilityControls(product, defaultBranchId) {
+  const section = document.getElementById('branch-visibility-section');
+  if (!section) return;
+  const hasBranches = Array.isArray(branchesData) && branchesData.length > 0;
+  if (!hasBranches) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const listEl = document.getElementById('branch-checkboxes-list');
+  const variantWarning = document.getElementById('branch-vis-variant-warning');
+  const allRadio = document.getElementById('branch-vis-mode-all');
+  const specificRadio = document.getElementById('branch-vis-mode-specific');
+
+  // Existing product → infer mode from product.branchIds
+  // New product → default to "specific" + active branch filter (if any),
+  //               else "all"
+  let mode = 'all';
+  let pickedIds = [];
+  let perBranchStock = {};
+  if (product && Array.isArray(product.branchIds) && product.branchIds.length > 0) {
+    mode = 'specific';
+    pickedIds = product.branchIds.slice();
+  } else if (!product && SELECTED_BRANCH_FILTER) {
+    // Adding from a branch-scoped view → pre-tag this branch.
+    mode = 'specific';
+    pickedIds = [SELECTED_BRANCH_FILTER];
+  } else if (!product && defaultBranchId) {
+    mode = 'specific';
+    pickedIds = [defaultBranchId];
+  }
+
+  // Variant check — disables specific mode.
+  const variantRows = document.querySelectorAll('[data-variant-name]');
+  const hasVariants = variantRows.length > 0;
+  if (variantWarning) variantWarning.style.display = hasVariants ? '' : 'none';
+  specificRadio.disabled = hasVariants;
+  if (hasVariants) { mode = 'all'; pickedIds = []; }
+
+  allRadio.checked = mode === 'all';
+  specificRadio.checked = mode === 'specific';
+
+  // Populate the per-branch rows. Each row: [checkbox] [name] [stock input].
+  listEl.innerHTML = branchesData.map(b => {
+    const checked = pickedIds.includes(b.id);
+    return `
+      <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px dashed var(--line);">
+        <label style="display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink); cursor:pointer; flex:1; min-width:0;">
+          <input type="checkbox" data-branch-checkbox value="${escSupportText(b.id)}" ${checked ? 'checked' : ''} onchange="onBranchCheckboxChange()" />
+          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escSupportText(b.name || b.id)}</span>
+        </label>
+        <input type="number" data-branch-stock="${escSupportText(b.id)}" min="0" step="1" inputmode="numeric"
+          placeholder="stock" value="${perBranchStock[b.id] != null ? perBranchStock[b.id] : ''}"
+          style="width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; outline:none; background:var(--surface); color:var(--ink);" />
+      </div>
+    `;
+  }).join('');
+
+  // If editing an existing branch-scoped product, fetch the per-branch
+  // stock counts asynchronously and populate the inputs.
+  if (product && Array.isArray(product.branchIds) && product.branchIds.length > 0) {
+    product.branchIds.forEach(bid => {
+      db.collection('tenants').doc(TENANT_ID)
+        .collection('branches').doc(bid)
+        .collection('inventory').doc(String(product.id))
+        .get().then(snap => {
+          if (!snap.exists) return;
+          const inv = snap.data() || {};
+          const input = document.querySelector(`[data-branch-stock="${bid}"]`);
+          if (input && inv.stock != null) input.value = inv.stock;
+        }).catch(() => {});
+    });
+  }
+
+  onBranchVisibilityModeChange(mode);
+}
+
+function onBranchVisibilityModeChange(mode) {
+  const listEl = document.getElementById('branch-checkboxes-list');
+  const stockInput = document.getElementById('product-stock');
+  const branchHint = document.getElementById('stock-branch-hint');
+  if (!listEl || !stockInput) return;
+  if (mode === 'specific') {
+    listEl.style.display = '';
+    stockInput.disabled = true;
+    stockInput.style.opacity = '0.5';
+    if (branchHint) branchHint.style.display = '';
+  } else {
+    listEl.style.display = 'none';
+    stockInput.disabled = false;
+    stockInput.style.opacity = '';
+    if (branchHint) branchHint.style.display = 'none';
+  }
+}
+
+function onBranchCheckboxChange() {
+  // Auto-promote to "specific" mode when the user clicks a checkbox.
+  const anyChecked = document.querySelectorAll('[data-branch-checkbox]:checked').length > 0;
+  if (anyChecked) {
+    document.getElementById('branch-vis-mode-specific').checked = true;
+    onBranchVisibilityModeChange('specific');
   }
 }
 
@@ -9272,6 +9491,7 @@ function openAddModal() {
     return;
   }
   resetForm();
+  if (typeof renderBranchVisibilityControls === 'function') renderBranchVisibilityControls(null);
   showProductFormModal();
 }
 

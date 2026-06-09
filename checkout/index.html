@@ -1503,19 +1503,55 @@ async function placeOrder() {
       const productRefs = productIds.map(pid => tcol('products').doc(pid));
       const snaps = await Promise.all(productRefs.map(ref => transaction.get(ref)));
 
+      // Phase 3 — for branch-scoped products, ALSO read the branch's
+      // inventory doc; we decrement that instead of product-level stock.
+      const branchInvRefs = [];
+      const branchInvSnaps = [];
+      const isBranchScoped = [];
+      for (let i = 0; i < productIds.length; i++) {
+        const data = snaps[i].data() || {};
+        const branchIds = Array.isArray(data.branchIds) ? data.branchIds : [];
+        const hasVariantItems = productGroups[productIds[i]].some(it => it.variantIdx !== null);
+        const scoped = !hasVariantItems
+          && branchIds.length > 0
+          && CURRENT_BRANCH_ID
+          && branchIds.includes(CURRENT_BRANCH_ID);
+        isBranchScoped.push(scoped);
+        if (scoped) {
+          const invRef = db.collection('tenants').doc(TENANT_ID)
+            .collection('branches').doc(CURRENT_BRANCH_ID)
+            .collection('inventory').doc(productIds[i]);
+          branchInvRefs.push(invRef);
+          branchInvSnaps.push(await transaction.get(invRef));
+        } else {
+          branchInvRefs.push(null);
+          branchInvSnaps.push(null);
+        }
+      }
+
       // Validate stock — reads must all complete before any writes
       for (let i = 0; i < productIds.length; i++) {
         const data = snaps[i].data();
         for (const item of productGroups[productIds[i]]) {
           if (item.variantIdx !== null) {
-            // Variant product — check per-variant stock
             const vStock = data.variants?.[item.variantIdx]?.stock ?? null;
             if (vStock !== null) {
               if (vStock === 0) { stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg); }
               if (vStock < item.qty) { stockErrorMsg = `Only ${vStock} of "${item.productName}" left in stock.`; throw new Error(stockErrorMsg); }
             }
+          } else if (isBranchScoped[i]) {
+            const invSnap = branchInvSnaps[i];
+            if (!invSnap || !invSnap.exists) {
+              stockErrorMsg = `"${item.productName}" is sold out at this branch.`; throw new Error(stockErrorMsg);
+            }
+            const inv = invSnap.data() || {};
+            if (inv.available === false || inv.stock === 0) {
+              stockErrorMsg = `"${item.productName}" is sold out at this branch.`; throw new Error(stockErrorMsg);
+            }
+            if (inv.stock !== null && inv.stock !== undefined && inv.stock < item.qty) {
+              stockErrorMsg = `Only ${inv.stock} of "${item.productName}" left at this branch.`; throw new Error(stockErrorMsg);
+            }
           } else {
-            // Non-variant product — check product-level stock
             if (!snaps[i].exists || data.available === false || data.stock === 0) {
               stockErrorMsg = `"${item.productName}" is sold out.`; throw new Error(stockErrorMsg);
             }
@@ -1541,20 +1577,26 @@ async function placeOrder() {
             if (!item || v.stock === null || v.stock === undefined) return v;
             return { ...v, stock: Math.max(0, v.stock - item.qty) };
           });
-          // Skip the write entirely if nothing changed — avoids a no-op
-          // update that could trip Firestore rules' diff check.
           const variantsChanged = JSON.stringify(newVariants) !== JSON.stringify(data.variants || []);
           if (variantsChanged) upd.variants = newVariants;
-          // Mark unavailable only when every TRACKED variant is depleted.
-          // Variants with null/undefined stock are *untracked*, not exhausted.
           const tracked = newVariants.filter(v => v.stock !== null && v.stock !== undefined);
           if (tracked.length > 0 && tracked.every(v => v.stock === 0)) upd.available = false;
         }
-        if (plainItems.length > 0 && data.stock !== null && data.stock !== undefined) {
+        if (plainItems.length > 0) {
           const totalQty = plainItems.reduce((s, it) => s + it.qty, 0);
-          const newStock = Math.max(0, data.stock - totalQty);
-          upd.stock = newStock;
-          if (newStock === 0) upd.available = false;
+          if (isBranchScoped[i]) {
+            const inv = (branchInvSnaps[i].data() || {});
+            if (inv.stock !== null && inv.stock !== undefined) {
+              const newStock = Math.max(0, inv.stock - totalQty);
+              const invUpd = { stock: newStock, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+              if (newStock === 0) invUpd.available = false;
+              transaction.update(branchInvRefs[i], invUpd);
+            }
+          } else if (data.stock !== null && data.stock !== undefined) {
+            const newStock = Math.max(0, data.stock - totalQty);
+            upd.stock = newStock;
+            if (newStock === 0) upd.available = false;
+          }
         }
         if (Object.keys(upd).length > 0) transaction.update(productRefs[i], upd);
       }
