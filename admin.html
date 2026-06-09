@@ -4284,18 +4284,20 @@ function renderTierBadge() {
 }
 
 // ----- Billing tab -----
-// Mirror of SUBSCRIPTION_TIERS in functions/index.js — single source of
-// truth for tier copy. If you edit one, edit the other.
+// Mirror of SUBSCRIPTION_TIERS in functions/index.js for name + amount.
+// The `features` arrays MIRROR THE SIGNUP PLANS PAGE — see
+// signup/index.html `data-plan-panel="..."` cards (Free / Growth / Pro).
+// Card order + wording must stay in sync between admin Billing and
+// the signup landing so tenants see the same pitch in both surfaces.
 const TIER_INFO = {
   free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,    supplierCap: 1,
-            features: ['5 products', '1 supplier', 'Storefront on pabilimart.com/<em>[store-name]</em>/',
-                       'Pabili Mart branding', 'No custom domain'] },
+            features: ['5 products', '1 supplier', 'Free storefront URL', 'Pabili Mart branding'] },
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 100,
-            features: ['500 products', '100 suppliers', 'Sales reports + analytics',
-                       'Pabili Mart branding', 'No custom domain'] },
+            features: ['500 products', 'Sales reports + analytics', '100 suppliers',
+                       'Pabili Mart storefront URL', 'Pabili Mart branding'] },
   pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 10000, supplierCap: 5000,
-            features: ['10,000 products', '5,000 suppliers', 'Multi-branch support',
-                       'Priority support', 'Custom domain'] }
+            features: ['10,000 products', 'Multi-branch support', 'Priority support',
+                       'Custom domain', '5,000 suppliers'] }
 };
 
 function fmtPHP(amount) {
