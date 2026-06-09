@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="color-scheme" content="light" />
+<title>Pabili Mart — Account</title>
+<link rel="icon" href="/newlogo.jpeg" />
+<style>
+  :root {
+    --ink: #0f172a; --ink-soft: #334155; --muted: #64748b;
+    --line: #e2e8f0; --line-strong: #cbd5e1;
+    --surface: #ffffff; --bg: #f6faf7;
+    --accent: #16a34a; --accent-dark: #15803d;
+    --danger: #dc2626;
+    --radius: 14px; --radius-sm: 9px;
+    --shadow: 0 10px 30px rgba(16,24,16,0.10), 0 2px 8px rgba(16,24,16,0.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background: linear-gradient(180deg, #f6faf7 0%, #eef5f0 100%);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    width: 100%; max-width: 420px;
+    padding: 36px 32px 32px;
+    text-align: center;
+  }
+  .brand { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 26px; }
+  .brand-logo {
+    width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
+    box-shadow: 0 1px 4px rgba(16,24,16,0.12), 0 0 0 1px rgba(16,24,16,0.04);
+  }
+  .brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .icon {
+    width: 66px; height: 66px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 32px; margin-bottom: 20px;
+  }
+  .icon.success { background: linear-gradient(135deg,#dcfce7,#86efac); }
+  .icon.error   { background: linear-gradient(135deg,#fee2e2,#fca5a5); }
+  .icon.neutral { background: linear-gradient(135deg,#e2e8f0,#cbd5e1); }
+  .spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 4px solid var(--line); border-top-color: var(--accent);
+    animation: spin .8s linear infinite; margin: 8px auto 24px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 22px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+  .msg { font-size: 15px; color: var(--muted); line-height: 1.55; margin: 0 0 24px; }
+  .msg strong { color: var(--ink-soft); }
+  .field { text-align: left; margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    font-size: 15px; font-family: inherit; color: var(--ink); background: var(--surface);
+    outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 100%; padding: 13px 18px; border: 1px solid var(--accent);
+    border-radius: var(--radius-sm); background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+    text-decoration: none; transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .form-error { color: var(--danger); font-size: 13px; margin-top: 4px; min-height: 16px; text-align: left; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <img class="brand-logo" src="/newlogo.jpeg" alt="" />
+      <span class="brand-name">Pabili Mart</span>
+    </div>
+
+    <div class="spinner" id="spinner"></div>
+    <div class="icon neutral" id="icon" hidden></div>
+
+    <h1 id="title">One moment…</h1>
+    <p class="msg" id="message">Verifying your link.</p>
+
+    <!-- Password-reset form (resetPassword mode) -->
+    <form id="reset-form" hidden onsubmit="event.preventDefault(); submitReset();">
+      <div class="field">
+        <label for="pw1">New password</label>
+        <input id="pw1" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+      </div>
+      <div class="field">
+        <label for="pw2">Confirm new password</label>
+        <input id="pw2" type="password" autocomplete="new-password" placeholder="Re-enter password" />
+      </div>
+      <div class="form-error" id="reset-error"></div>
+      <button type="submit" class="btn" id="reset-btn">Update password</button>
+    </form>
+
+    <a class="btn" id="cta" hidden href="#">Continue</a>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDM0oTTumombQiZy1xFMBwro8X1oqzNDAs",
+    authDomain: "pabilimart.com",
+    projectId: "jt-sari-sari-store",
+    storageBucket: "jt-sari-sari-store.firebasestorage.app",
+    messagingSenderId: "625852109606",
+    appId: "1:625852109606:web:7474c10133701eafbce7e7"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+
+  const params = new URLSearchParams(location.search);
+  const mode = params.get('mode');
+  const oobCode = params.get('oobCode');
+  const continueParam = params.get('continueUrl');
+
+  const elSpinner = document.getElementById('spinner');
+  const elIcon = document.getElementById('icon');
+  const elTitle = document.getElementById('title');
+  const elMsg = document.getElementById('message');
+  const elCta = document.getElementById('cta');
+  const elForm = document.getElementById('reset-form');
+
+  // Only ever continue to a same-origin URL (avoid open-redirects).
+  function safeContinue(fallback) {
+    if (continueParam) {
+      try {
+        const u = new URL(continueParam, location.origin);
+        if (u.origin === location.origin) return u.href;
+      } catch (e) { /* fall through */ }
+    }
+    return fallback;
+  }
+
+  function setIcon(kind) {
+    elSpinner.hidden = true;
+    elIcon.hidden = false;
+    elIcon.className = 'icon ' + kind;
+    elIcon.textContent = kind === 'success' ? '✅' : kind === 'error' ? '⚠️' : '🔑';
+  }
+  function showResult(kind, title, message) {
+    setIcon(kind);
+    elTitle.textContent = title;
+    elMsg.innerHTML = message;
+  }
+  function showCta(text, href) { elCta.textContent = text; elCta.href = href; elCta.hidden = false; }
+
+  async function run() {
+    if (!mode || !oobCode) {
+      showResult('error', 'Invalid link', 'This link is missing information. Please open the most recent email we sent you.');
+      return;
+    }
+    try {
+      if (mode === 'verifyEmail' || mode === 'verifyAndChangeEmail') {
+        await auth.applyActionCode(oobCode);
+        showResult('success', 'Email verified', 'Your email is confirmed. You can sign in now and finish setting up your store.');
+        showCta('Continue', safeContinue('/signup/'));
+      } else if (mode === 'recoverEmail') {
+        const info = await auth.checkActionCode(oobCode);
+        await auth.applyActionCode(oobCode);
+        const email = (info && info.data && info.data.email) ? info.data.email : 'your previous address';
+        showResult('success', 'Email change reverted', `Your sign-in email has been restored to <strong>${email}</strong>. If you didn't request the change, reset your password to secure your account.`);
+        showCta('Continue', safeContinue('/signup/'));
+      } else if (mode === 'resetPassword') {
+        const email = await auth.verifyPasswordResetCode(oobCode);
+        setIcon('neutral');
+        elTitle.textContent = 'Choose a new password';
+        elMsg.innerHTML = `For <strong>${email}</strong>`;
+        elForm.hidden = false;
+        document.getElementById('pw1').focus();
+      } else if (mode === 'signIn') {
+        // Email-link sign-in is completed inside the app; bounce there.
+        location.replace(safeContinue('/signup/'));
+      } else {
+        showResult('error', 'Unsupported request', 'We couldn’t handle this link. Please try again from the app.');
+      }
+    } catch (err) {
+      console.error('[auth-action]', err);
+      showResult('error', 'Link expired or already used', 'This link may have expired or already been used. Request a new one and try again.');
+    }
+  }
+
+  async function submitReset() {
+    const p1 = document.getElementById('pw1').value;
+    const p2 = document.getElementById('pw2').value;
+    const errEl = document.getElementById('reset-error');
+    const btn = document.getElementById('reset-btn');
+    errEl.textContent = '';
+    if (p1.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+    if (p1 !== p2) { errEl.textContent = 'Passwords do not match.'; return; }
+    btn.disabled = true; btn.textContent = 'Updating…';
+    try {
+      await auth.confirmPasswordReset(oobCode, p1);
+      elForm.hidden = true;
+      showResult('success', 'Password updated', 'Your new password is set. You can sign in with it now.');
+      showCta('Continue to sign in', safeContinue('/signup/'));
+    } catch (err) {
+      console.error('[auth-action] reset', err);
+      errEl.textContent = 'That link expired or was already used. Request a new reset email.';
+      btn.disabled = false; btn.textContent = 'Update password';
+    }
+  }
+
+  run();
+  </script>
+</body>
+</html>

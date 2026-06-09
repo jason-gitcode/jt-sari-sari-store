@@ -6651,7 +6651,7 @@ async function adminEmailAuth() {
   try {
     if (adminAuthMode === 'signup') {
       const cred = await auth.createUserWithEmailAndPassword(email, pw);
-      await cred.user.sendEmailVerification();
+      await cred.user.sendEmailVerification({ url: window.location.origin + window.location.pathname });
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
     }
@@ -6667,7 +6667,7 @@ async function adminSendReset() {
   const errEl = document.getElementById('login-error');
   if (!email) { errEl.textContent = 'Type your email first, then tap "Forgot password?".'; return; }
   try {
-    await auth.sendPasswordResetEmail(email);
+    await auth.sendPasswordResetEmail(email, { url: window.location.origin + window.location.pathname });
     errEl.textContent = '';
     showToast(`Password-reset link sent to ${email}.`, 'success');
   } catch (e) { errEl.textContent = adminAuthError(e); }
@@ -6723,7 +6723,7 @@ function adminHideVerify() { document.getElementById('admin-verify-overlay').hid
 async function adminResendVerification() {
   const u = auth.currentUser;
   if (!u) return;
-  try { await u.sendEmailVerification(); showToast(`Verification link re-sent to ${u.email}.`, 'success'); }
+  try { await u.sendEmailVerification({ url: window.location.origin + window.location.pathname }); showToast(`Verification link re-sent to ${u.email}.`, 'success'); }
   catch (e) { showToast(adminAuthError(e), 'error'); }
 }
 async function adminCheckVerified() {
