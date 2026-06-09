@@ -2015,7 +2015,7 @@
   <div class="signup-inner">
     <div class="section-head">
       <h2>Create your store.</h2>
-      <p>Sign in with Google, then fill in your store details. We'll have you live in 2 minutes.</p>
+      <p>Sign in with Google or email, then fill in your store details. We'll have you live in 2 minutes.</p>
     </div>
     <!-- Selected plan banner — appears once the user has picked a tier
          from the Pricing section. selectTier() updates the text + class
@@ -2664,7 +2664,7 @@ function scrollToPricing() {
 // and SHOULD snap the now-collapsed card back into view.
 let _showStepFiredOnce = false;
 function showStep(id) {
-  ['step-signin', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
+  ['step-signin', 'step-verify', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
   if (_showStepFiredOnce) {
