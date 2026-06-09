@@ -9167,9 +9167,16 @@ function renderProductViewBody(p) {
 
   // Stock / availability
   let stockHtml;
+  const isBranchScoped = Array.isArray(p.branchIds) && p.branchIds.length > 0;
   if (p.variants && p.variants.length > 0) {
     const stockSum = p.variants.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
     stockHtml = `${stockSum} (across ${p.variants.length} variant${p.variants.length === 1 ? '' : 's'})`;
+  } else if (isBranchScoped) {
+    // Phase 3: branch-scoped products track stock per-branch in the
+    // inventory subcollection. Show a loading state, then re-render with
+    // the breakdown once the parallel reads resolve.
+    stockHtml = '<span id="branch-stock-loading" style="color:var(--muted);">Loading per-branch…</span>';
+    setTimeout(() => populateBranchStockBreakdown(p), 0);
   } else if (p.stock === null || p.stock === undefined || p.stock === '') {
     stockHtml = 'Unlimited';
   } else {
@@ -9211,6 +9218,41 @@ function renderProductViewBody(p) {
       ${variantsHtml}
     </div>
   `;
+}
+
+// Phase 3 — fetch per-branch inventory for a branch-scoped product and
+// rewrite the Stock row in the view modal with a breakdown like
+// "Pasig: 10 · Dasmariñas: 0".
+async function populateBranchStockBreakdown(p) {
+  const target = document.getElementById('branch-stock-loading');
+  if (!target) return;
+  if (!Array.isArray(p.branchIds) || p.branchIds.length === 0) return;
+  try {
+    const snaps = await Promise.all(p.branchIds.map(bid =>
+      db.collection('tenants').doc(TENANT_ID)
+        .collection('branches').doc(bid)
+        .collection('inventory').doc(String(p.id))
+        .get()
+    ));
+    const parts = p.branchIds.map((bid, idx) => {
+      const branch = (branchesData || []).find(b => b.id === bid);
+      const label = (branch && branch.name) || bid;
+      const snap = snaps[idx];
+      let stockTxt = '—';
+      if (snap && snap.exists) {
+        const inv = snap.data() || {};
+        if (inv.stock === null || inv.stock === undefined) stockTxt = '∞';
+        else stockTxt = String(inv.stock);
+      } else {
+        stockTxt = '0 (no inventory doc)';
+      }
+      return `<span style="display:inline-block;margin-right:14px;">${escSupportText(label)}: <strong style="color:var(--ink);">${stockTxt}</strong></span>`;
+    });
+    target.outerHTML = `<div style="color:var(--ink);">${parts.join('')}</div>`;
+  } catch (err) {
+    console.warn('[populateBranchStockBreakdown] failed:', err);
+    target.textContent = '—';
+  }
 }
 
 function editProduct(id) {
