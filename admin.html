@@ -4514,13 +4514,13 @@ function renderTierBadge() {
 // the signup landing so tenants see the same pitch in both surfaces.
 const TIER_INFO = {
   free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5,    supplierCap: 1,
-            features: ['5 products', '1 supplier', 'Free storefront URL', 'Pabili Mart branding'] },
+            features: ['5 products', '1 supplier', 'Pabili Mart storefront URL', 'Pabili Mart branding'] },
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 100,
-            features: ['500 products', 'Sales reports + analytics', '100 suppliers',
-                       'Pabili Mart storefront URL', 'Pabili Mart branding'] },
+            features: ['500 products', '100 suppliers', 'Pabili Mart storefront URL',
+                       'Pabili Mart branding', 'Sales reports + analytics'] },
   pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 10000, supplierCap: 5000,
-            features: ['10,000 products', 'Multi-branch support', 'Priority support',
-                       'Custom domain', '5,000 suppliers'] }
+            features: ['10,000 products', '5,000 suppliers', 'Custom domain',
+                       'Multi-branch support', 'Priority support'] }
 };
 
 function fmtPHP(amount) {
