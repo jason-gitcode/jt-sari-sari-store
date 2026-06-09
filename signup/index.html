@@ -2780,7 +2780,7 @@ async function emailAuthSubmit() {
   try {
     if (authMode === 'signup') {
       const cred = await auth.createUserWithEmailAndPassword(email, pw);
-      await cred.user.sendEmailVerification({ url: window.location.origin + window.location.pathname + '?go=signup' });
+      await cred.user.sendEmailVerification({ url: window.location.origin + '/signup/?go=signup' });
       // onAuthStateChanged routes the (unverified) user to step-verify.
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
@@ -2798,7 +2798,7 @@ async function sendReset() {
   const email = (document.getElementById('auth-email').value || '').trim();
   if (!email) { showNotice('Reset password', 'Type your email above first, then tap "Forgot password?".'); return; }
   try {
-    await auth.sendPasswordResetEmail(email, { url: window.location.origin + window.location.pathname + '?go=signup' });
+    await auth.sendPasswordResetEmail(email, { url: window.location.origin + '/signup/?go=signup' });
     showNotice('Check your email', `We sent a password-reset link to ${email}.`);
   } catch (err) {
     showNotice('Reset failed', authError(err));
@@ -2826,7 +2826,7 @@ async function submitMagicLink() {
   btn.disabled = true; btn.textContent = 'Sending…';
   try {
     await auth.sendSignInLinkToEmail(email, {
-      url: window.location.origin + window.location.pathname,
+      url: window.location.origin + '/signup/',
       handleCodeInApp: true,
     });
     window.localStorage.setItem(MAGIC_LINK_KEY, email);
@@ -2859,7 +2859,7 @@ async function resendVerification() {
   const u = auth.currentUser;
   if (!u) { showStep('step-signin'); return; }
   try {
-    await u.sendEmailVerification({ url: window.location.origin + window.location.pathname + '?go=signup' });
+    await u.sendEmailVerification({ url: window.location.origin + '/signup/?go=signup' });
     showNotice('Sent', `We re-sent the verification link to ${u.email}.`);
   } catch (err) {
     showNotice('Could not resend', authError(err));
