@@ -1479,6 +1479,29 @@
     }
     .form-grid.full { grid-template-columns: 1fr; }
 
+    /* Phase 3 Branch visibility — override the global .field input { width: 100% }
+       for radios + checkboxes inside this section. Otherwise the radios
+       blow up to 100% width and crush the label text into a 1-char column. */
+    #branch-visibility-section input[type="radio"],
+    #branch-visibility-section input[type="checkbox"] {
+      width: auto !important;
+      padding: 0 !important;
+      flex: 0 0 auto;
+    }
+    /* Stock inputs inside the per-branch checkbox rows are also nested
+       inside .field, so the global rule would make them stretch to fill
+       the row. Pin them to a fixed pixel width. */
+    #branch-visibility-section input[type="number"] {
+      width: 90px !important;
+      flex: 0 0 auto;
+    }
+    /* Labels inside .field get display:block by default — we need flex
+       on our radio cards + checkbox rows. Override scoped to this section. */
+    #branch-visibility-section label.bv-row {
+      display: flex !important;
+      margin-bottom: 0;
+    }
+
     .variant-item {
       background: var(--surface-2);
       border: 1px solid var(--line);
@@ -4037,16 +4060,16 @@
         <label style="display:block; width:100%;">Branch visibility</label>
         <small style="display:block; width:100%;">Choose which branches sell this product. Pick "All branches" for shared catalog (one shared stock count); pick specific branches to track stock per location.</small>
         <div id="branch-visibility-controls" style="margin-top:10px; display:block; width:100%;">
-          <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; margin-bottom:8px; width:100%; box-sizing:border-box; background:var(--surface);">
-            <input type="radio" name="branch-visibility-mode" value="all" id="branch-vis-mode-all" onchange="onBranchVisibilityModeChange('all')" style="margin-top:3px; flex-shrink:0;" />
-            <span style="flex:1; min-width:0;">
+          <label class="bv-row" style="align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; margin-bottom:8px; width:100%; box-sizing:border-box; background:var(--surface);">
+            <input type="radio" name="branch-visibility-mode" value="all" id="branch-vis-mode-all" onchange="onBranchVisibilityModeChange('all')" style="margin-top:3px;" />
+            <span style="flex:1 1 auto; min-width:0;">
               <span style="display:block; font-size:14px; font-weight:600; color:var(--ink);">Available at all branches</span>
               <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px; line-height:1.4;">Shared catalog. Uses the single stock count above.</span>
             </span>
           </label>
-          <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; width:100%; box-sizing:border-box; background:var(--surface);">
-            <input type="radio" name="branch-visibility-mode" value="specific" id="branch-vis-mode-specific" onchange="onBranchVisibilityModeChange('specific')" style="margin-top:3px; flex-shrink:0;" />
-            <span style="flex:1; min-width:0;">
+          <label class="bv-row" style="align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; width:100%; box-sizing:border-box; background:var(--surface);">
+            <input type="radio" name="branch-visibility-mode" value="specific" id="branch-vis-mode-specific" onchange="onBranchVisibilityModeChange('specific')" style="margin-top:3px;" />
+            <span style="flex:1 1 auto; min-width:0;">
               <span style="display:block; font-size:14px; font-weight:600; color:var(--ink);">Pick specific branches</span>
               <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px; line-height:1.4;">Track stock separately per branch. Set initial stock for each.</span>
             </span>
@@ -9421,12 +9444,12 @@ function renderBranchVisibilityControls(product, defaultBranchId) {
       ${branchesData.map(b => {
         const checked = pickedIds.includes(b.id);
         return `
-          <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--line); margin:0; width:100%; box-sizing:border-box;">
-            <input type="checkbox" data-branch-checkbox value="${escSupportText(b.id)}" ${checked ? 'checked' : ''} onchange="onBranchCheckboxChange()" style="flex-shrink:0; margin:0;" />
-            <span style="flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escSupportText(b.name || b.id)}</span>
+          <label class="bv-row" style="align-items:center; gap:10px; padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--line); margin:0; width:100%; box-sizing:border-box;">
+            <input type="checkbox" data-branch-checkbox value="${escSupportText(b.id)}" ${checked ? 'checked' : ''} onchange="onBranchCheckboxChange()" style="margin:0;" />
+            <span style="flex:1 1 auto; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escSupportText(b.name || b.id)}</span>
             <input type="number" data-branch-stock="${escSupportText(b.id)}" min="0" step="1" inputmode="numeric"
               placeholder="—" value="${perBranchStock[b.id] != null ? perBranchStock[b.id] : ''}"
-              style="width:90px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; outline:none; background:var(--surface); color:var(--ink); flex-shrink:0; box-sizing:border-box; text-align:right;" />
+              style="padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; outline:none; background:var(--surface); color:var(--ink); box-sizing:border-box; text-align:right;" />
           </label>
         `;
       }).join('')}
