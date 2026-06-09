@@ -9353,6 +9353,11 @@ async function saveProduct(e) {
   // Multi-branch (Phase 3): read Branch visibility selection. Products
   // with variants must stay "all branches" until per-branch variants
   // ships (Phase 3b). Single-branch tenants skip this entirely.
+  //
+  // NOTE: we deliberately don't use FieldValue.delete() here — .set()
+  // without {merge:true} doesn't accept it. Just omit the field from
+  // formData when it shouldn't be present; .set() then writes the doc
+  // without a branchIds field (which the storefront treats as shared).
   const hasBranches = Array.isArray(branchesData) && branchesData.length > 0;
   const hasVariants = formData.variants.length > 0;
   let branchInventoryWrites = []; // [{ branchId, stock }] to write after the product doc
@@ -9366,13 +9371,10 @@ async function saveProduct(e) {
         showToast('Pick at least one branch (or switch to "Available at all branches").', 'error');
         return;
       }
-      if (picked.length === branchesData.length) {
-        // All branches picked = same as "All branches" — store as shared.
-        formData.branchIds = firebase.firestore.FieldValue.delete();
-      } else {
-        formData.branchIds = picked;
-      }
-      // Read each branch's stock input
+      // Always save the explicit array. Even when the user picks every
+      // branch, we keep them as branch-scoped — they meaningfully set
+      // per-branch stock values that we'd lose if we normalized to shared.
+      formData.branchIds = picked;
       picked.forEach(bid => {
         const stockInput = document.querySelector(`[data-branch-stock="${bid}"]`);
         const stockVal = stockInput && stockInput.value !== '' ? parseInt(stockInput.value) : null;
@@ -9382,12 +9384,12 @@ async function saveProduct(e) {
       // lives at the branch subcollection. Avoid stale ambiguity.
       formData.stock = null;
     } else {
-      // 'all' mode — explicit shared catalog. Drop branchIds.
-      formData.branchIds = firebase.firestore.FieldValue.delete();
+      // 'all' mode — explicit shared catalog. Omit branchIds entirely.
+      delete formData.branchIds;
     }
   } else {
     // Either no branches yet OR variants present — force shared catalog.
-    formData.branchIds = firebase.firestore.FieldValue.delete();
+    delete formData.branchIds;
   }
 
   try {
@@ -9419,7 +9421,10 @@ async function saveProduct(e) {
     closeProductModal();
   } catch (err) {
     console.error('Save error:', err);
-    showToast('Error saving product', 'error');
+    // Surface the underlying Firestore message so transient bugs
+    // (auth, rules, FieldValue.delete misuse, etc.) are visible.
+    const msg = (err && err.message) ? err.message : 'Error saving product';
+    showToast(msg, 'error');
   }
 }
 
