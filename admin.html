@@ -4030,31 +4030,33 @@
 
       <!-- Branch visibility (Phase 3 — Pro multi-branch). Only shown when
            tenant has ≥1 branch. Variant-having products are constrained
-           to All-branches until per-branch variants ships. -->
-      <div class="field form-grid full" id="branch-visibility-section" style="display:none;">
-        <label>Branch visibility</label>
-        <small>Choose which branches sell this product. Pick "All branches" for shared catalog (stock is one shared count); pick specific branches to track stock per location.</small>
-        <div id="branch-visibility-controls" style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
-          <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:14px; color:var(--ink);">
-            <input type="radio" name="branch-visibility-mode" value="all" id="branch-vis-mode-all" onchange="onBranchVisibilityModeChange('all')" style="margin-top:3px;" />
-            <span>
-              <strong>Available at all branches</strong>
-              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">Shared catalog. Uses the single stock count above.</span>
+           to All-branches until per-branch variants ships.
+           NOTE: not using .form-grid here — that class is display:grid with
+           auto-fit columns and would mis-place the inner control rows. -->
+      <div class="field full" id="branch-visibility-section" style="display:none; grid-column: 1 / -1;">
+        <label style="display:block; width:100%;">Branch visibility</label>
+        <small style="display:block; width:100%;">Choose which branches sell this product. Pick "All branches" for shared catalog (one shared stock count); pick specific branches to track stock per location.</small>
+        <div id="branch-visibility-controls" style="margin-top:10px; display:block; width:100%;">
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; margin-bottom:8px; width:100%; box-sizing:border-box; background:var(--surface);">
+            <input type="radio" name="branch-visibility-mode" value="all" id="branch-vis-mode-all" onchange="onBranchVisibilityModeChange('all')" style="margin-top:3px; flex-shrink:0;" />
+            <span style="flex:1; min-width:0;">
+              <span style="display:block; font-size:14px; font-weight:600; color:var(--ink);">Available at all branches</span>
+              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px; line-height:1.4;">Shared catalog. Uses the single stock count above.</span>
             </span>
           </label>
-          <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:14px; color:var(--ink);">
-            <input type="radio" name="branch-visibility-mode" value="specific" id="branch-vis-mode-specific" onchange="onBranchVisibilityModeChange('specific')" style="margin-top:3px;" />
-            <span>
-              <strong>Pick specific branches</strong>
-              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px;">Track stock separately per branch. Set initial stock for each.</span>
+          <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); cursor:pointer; width:100%; box-sizing:border-box; background:var(--surface);">
+            <input type="radio" name="branch-visibility-mode" value="specific" id="branch-vis-mode-specific" onchange="onBranchVisibilityModeChange('specific')" style="margin-top:3px; flex-shrink:0;" />
+            <span style="flex:1; min-width:0;">
+              <span style="display:block; font-size:14px; font-weight:600; color:var(--ink);">Pick specific branches</span>
+              <span style="display:block; font-size:12px; color:var(--muted); margin-top:2px; line-height:1.4;">Track stock separately per branch. Set initial stock for each.</span>
             </span>
           </label>
-          <div id="branch-checkboxes-list" style="display:none; padding:10px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-sm); margin-left:24px;">
+          <div id="branch-checkboxes-list" style="display:none; padding:8px 0 0; margin-top:8px; width:100%; box-sizing:border-box;">
             <!-- Populated by renderBranchVisibilityControls() — one row per branch:
-                 [checkbox] Branch name  · stock input -->
+                 [checkbox] [Branch name] [stock input] -->
           </div>
         </div>
-        <small id="branch-vis-variant-warning" style="display:none; color:#92400e; margin-top:6px;">⚠️ Products with variants currently must be available at all branches. Per-branch variant inventory is coming in a future update.</small>
+        <small id="branch-vis-variant-warning" style="display:none; color:#92400e; margin-top:10px;">⚠️ Products with variants currently must be available at all branches. Per-branch variant inventory is coming in a future update.</small>
       </div>
 
       <div class="field form-grid full">
@@ -9409,20 +9411,31 @@ function renderBranchVisibilityControls(product, defaultBranchId) {
   specificRadio.checked = mode === 'specific';
 
   // Populate the per-branch rows. Each row: [checkbox] [name] [stock input].
-  listEl.innerHTML = branchesData.map(b => {
-    const checked = pickedIds.includes(b.id);
-    return `
-      <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px dashed var(--line);">
-        <label style="display:flex; align-items:center; gap:6px; font-size:14px; color:var(--ink); cursor:pointer; flex:1; min-width:0;">
-          <input type="checkbox" data-branch-checkbox value="${escSupportText(b.id)}" ${checked ? 'checked' : ''} onchange="onBranchCheckboxChange()" />
-          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escSupportText(b.name || b.id)}</span>
-        </label>
-        <input type="number" data-branch-stock="${escSupportText(b.id)}" min="0" step="1" inputmode="numeric"
-          placeholder="stock" value="${perBranchStock[b.id] != null ? perBranchStock[b.id] : ''}"
-          style="width:80px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; outline:none; background:var(--surface); color:var(--ink);" />
+  // Layout: flex row, name flex-grows to fill, stock input fixed-width on right.
+  listEl.innerHTML = `
+    <div style="background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden;">
+      <div style="display:flex; padding:8px 12px; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div style="flex:1;">Branch</div>
+        <div style="width:90px; text-align:left;">Initial stock</div>
       </div>
-    `;
-  }).join('');
+      ${branchesData.map(b => {
+        const checked = pickedIds.includes(b.id);
+        return `
+          <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--line); margin:0; width:100%; box-sizing:border-box;">
+            <input type="checkbox" data-branch-checkbox value="${escSupportText(b.id)}" ${checked ? 'checked' : ''} onchange="onBranchCheckboxChange()" style="flex-shrink:0; margin:0;" />
+            <span style="flex:1; min-width:0; font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escSupportText(b.name || b.id)}</span>
+            <input type="number" data-branch-stock="${escSupportText(b.id)}" min="0" step="1" inputmode="numeric"
+              placeholder="—" value="${perBranchStock[b.id] != null ? perBranchStock[b.id] : ''}"
+              style="width:90px; padding:6px 8px; border:1px solid var(--line); border-radius:var(--radius-sm); font-size:13px; outline:none; background:var(--surface); color:var(--ink); flex-shrink:0; box-sizing:border-box; text-align:right;" />
+          </label>
+        `;
+      }).join('')}
+    </div>
+    <small style="display:block; color:var(--muted); margin-top:6px;">Leave stock blank for "unlimited" at that branch.</small>
+  `;
+  // Strip trailing border on the last row for a cleaner look.
+  const rows = listEl.querySelectorAll('label');
+  if (rows.length > 0) rows[rows.length - 1].style.borderBottom = 'none';
 
   // If editing an existing branch-scoped product, fetch the per-branch
   // stock counts asynchronously and populate the inputs.
