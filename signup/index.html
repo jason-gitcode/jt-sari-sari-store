@@ -1093,6 +1093,11 @@
   .btn-primary:hover { background: #000; border-color: #000; }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .gicon { width: 18px; height: 18px; }
+  /* Email / magic-link auth controls on the sign-in step */
+  .auth-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--muted); font-size: 13px; }
+  .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .auth-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .auth-magic { margin-top: 14px; text-align: center; }
 
   /* ============================================================
      Signed-in-as pill + switch link
@@ -2027,7 +2032,7 @@
     <div class="step-title">Step 1 of 2 · Sign in</div>
     <div class="step-body">
       <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
-        Sign in with the Google account you want to use to manage your store.
+        Sign in to manage your store — use Google, or your email address.
       </p>
       <button id="signin-btn" class="btn">
         <svg class="gicon" viewBox="0 0 24 24">
@@ -2038,6 +2043,40 @@
         </svg>
         Continue with Google
       </button>
+
+      <div class="auth-divider"><span>or</span></div>
+
+      <div class="field">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" class="input" type="email" autocomplete="email" placeholder="you@email.com" />
+      </div>
+      <div class="field">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+      </div>
+      <button type="button" id="email-auth-btn" class="btn btn-primary" onclick="emailAuthSubmit()">Sign in</button>
+      <div class="auth-links">
+        <button type="button" class="link-btn" id="auth-toggle-mode" onclick="toggleAuthMode()">New here? Create an account</button>
+        <button type="button" class="link-btn" onclick="sendReset()">Forgot password?</button>
+      </div>
+      <div class="auth-magic">
+        <button type="button" class="link-btn" onclick="sendMagicLink()">Prefer no password? Email me a sign-in link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERIFY EMAIL (email/password owners awaiting verification) -->
+  <div id="step-verify" class="hidden">
+    <div class="step-title">Verify your email</div>
+    <div class="step-body">
+      <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+        We sent a verification link to <strong id="verify-email"></strong>. Open it on this device, then tap below.
+      </p>
+      <button type="button" class="btn btn-primary" onclick="checkVerified()">I've verified — continue</button>
+      <div class="auth-links">
+        <button type="button" class="link-btn" onclick="resendVerification()">Resend link</button>
+        <button type="button" class="link-btn" onclick="signOut()">Use a different account</button>
+      </div>
     </div>
   </div>
 
@@ -2652,6 +2691,141 @@ function signOut() {
   auth.signOut();
 }
 
+// ============================================================
+// Email + password / magic-link auth (alongside Google). The backend
+// already requires email_verified on every callable, so unverified
+// email/password owners are routed to step-verify before they can
+// create or manage a store. Magic-link + Google users are pre-verified.
+// ============================================================
+let authMode = 'signin'; // 'signin' | 'signup'
+function toggleAuthMode() {
+  authMode = (authMode === 'signin') ? 'signup' : 'signin';
+  const btn = document.getElementById('email-auth-btn');
+  const toggle = document.getElementById('auth-toggle-mode');
+  const pw = document.getElementById('auth-password');
+  if (authMode === 'signup') {
+    btn.textContent = 'Create account';
+    toggle.textContent = 'Have an account? Sign in';
+    pw.setAttribute('autocomplete', 'new-password');
+    pw.setAttribute('placeholder', 'Create a password (6+ characters)');
+  } else {
+    btn.textContent = 'Sign in';
+    toggle.textContent = 'New here? Create an account';
+    pw.setAttribute('autocomplete', 'current-password');
+    pw.setAttribute('placeholder', 'At least 6 characters');
+  }
+}
+
+function authError(err) {
+  const code = (err && err.code) || '';
+  const map = {
+    'auth/invalid-email': 'That email address looks invalid.',
+    'auth/user-not-found': 'No account with that email. Tap "Create an account" to sign up.',
+    'auth/wrong-password': 'Wrong password. Try again or reset it below.',
+    'auth/invalid-credential': 'Email or password is incorrect.',
+    'auth/email-already-in-use': 'That email already has an account — switch to "Sign in".',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+  };
+  return map[code] || (err && err.message) || 'Please try again.';
+}
+
+async function emailAuthSubmit() {
+  const email = (document.getElementById('auth-email').value || '').trim();
+  const pw = document.getElementById('auth-password').value || '';
+  if (!email || !pw) { showNotice('Almost there', 'Enter your email and password.'); return; }
+  const btn = document.getElementById('email-auth-btn');
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Please wait…';
+  try {
+    if (authMode === 'signup') {
+      const cred = await auth.createUserWithEmailAndPassword(email, pw);
+      await cred.user.sendEmailVerification();
+      // onAuthStateChanged routes the (unverified) user to step-verify.
+    } else {
+      await auth.signInWithEmailAndPassword(email, pw);
+      // onAuthStateChanged routes: verified → details, unverified → step-verify.
+    }
+  } catch (err) {
+    console.error(err);
+    showNotice('Sign-in failed', authError(err));
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+async function sendReset() {
+  const email = (document.getElementById('auth-email').value || '').trim();
+  if (!email) { showNotice('Reset password', 'Type your email above first, then tap "Forgot password?".'); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showNotice('Check your email', `We sent a password-reset link to ${email}.`);
+  } catch (err) {
+    showNotice('Reset failed', authError(err));
+  }
+}
+
+const MAGIC_LINK_KEY = 'emailForSignIn';
+async function sendMagicLink() {
+  const email = (document.getElementById('auth-email').value || '').trim();
+  if (!email) { showNotice('Email me a link', 'Type your email above first, then tap the link option.'); return; }
+  try {
+    await auth.sendSignInLinkToEmail(email, {
+      url: window.location.origin + window.location.pathname,
+      handleCodeInApp: true,
+    });
+    window.localStorage.setItem(MAGIC_LINK_KEY, email);
+    showNotice('Check your email', `Tap the sign-in link we just sent to ${email} — it signs you in, no password needed.`);
+  } catch (err) {
+    showNotice('Could not send link', authError(err));
+  }
+}
+
+// Complete a magic-link sign-in if this page was opened from one.
+(function completeMagicLink() {
+  if (!auth.isSignInWithEmailLink || !auth.isSignInWithEmailLink(window.location.href)) return;
+  let email = window.localStorage.getItem(MAGIC_LINK_KEY);
+  if (!email) email = window.prompt('Confirm the email you used to request the link:');
+  if (!email) return;
+  auth.signInWithEmailLink(email, window.location.href)
+    .then(() => {
+      window.localStorage.removeItem(MAGIC_LINK_KEY);
+      // Strip the link params so a refresh doesn't re-trigger sign-in.
+      history.replaceState({}, document.title, window.location.origin + window.location.pathname + window.location.hash);
+    })
+    .catch(err => showNotice('Sign-in link problem', authError(err)));
+})();
+
+async function resendVerification() {
+  const u = auth.currentUser;
+  if (!u) { showStep('step-signin'); return; }
+  try {
+    await u.sendEmailVerification();
+    showNotice('Sent', `We re-sent the verification link to ${u.email}.`);
+  } catch (err) {
+    showNotice('Could not resend', authError(err));
+  }
+}
+
+async function checkVerified() {
+  const u = auth.currentUser;
+  if (!u) { showStep('step-signin'); return; }
+  try {
+    await u.reload();
+    const fresh = auth.currentUser;
+    if (fresh && fresh.emailVerified) {
+      // Force a token refresh so the email_verified=true claim reaches the
+      // Cloud Functions (the cached token still says false otherwise).
+      await fresh.getIdToken(true);
+      proceedVerifiedUser(fresh);
+    } else {
+      showNotice('Not yet verified', 'Open the verification link in your email, then tap "I\'ve verified" again.');
+    }
+  } catch (err) {
+    showNotice('Something went wrong', authError(err));
+  }
+}
+
 async function submitForm(e) {
   e.preventDefault();
   clearStatus();
@@ -2712,37 +2886,39 @@ function renderAlreadyOwner(email, tenants) {
   `).join('');
 }
 
+async function proceedVerifiedUser(user) {
+  document.getElementById('signed-email').textContent = user.email;
+  // Ask the backend whether this account already owns a tenant. The
+  // firestore.rules don't allow client-side listing of tenants, so we
+  // can't do this query directly. The function bypasses with admin
+  // privileges and only returns this user's own tenants.
+  try {
+    const { data } = await getMyTenant({});
+    const tenants = Array.isArray(data?.tenants) ? data.tenants : [];
+    const cap = (typeof data?.cap === 'number') ? data.cap : 1;
+    // Superadmins can create more, so skip the gate even if they already own.
+    if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
+      renderAlreadyOwner(user.email, tenants);
+      showStep('step-already-owner');
+      return;
+    }
+  } catch (err) {
+    // If the function call fails (e.g. cold start hiccup, network), fall
+    // through to the form. createTenant will still enforce the cap on
+    // submit, so the user just sees the slower error path — same as before.
+    console.warn('getMyTenant failed', err);
+  }
+  showStep('step-details');
+}
+
 auth.onAuthStateChanged(async user => {
   if (user && user.emailVerified) {
-    document.getElementById('signed-email').textContent = user.email;
-
-    // Ask the backend whether this account already owns a tenant. The
-    // firestore.rules don't allow client-side listing of tenants, so we
-    // can't do this query directly. The function bypasses with admin
-    // privileges and only returns this user's own tenants.
-    try {
-      const { data } = await getMyTenant({});
-      const tenants = Array.isArray(data?.tenants) ? data.tenants : [];
-      const cap = (typeof data?.cap === 'number') ? data.cap : 1;
-      // Superadmins can create more, so skip the gate even if they already own.
-      if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
-        renderAlreadyOwner(user.email, tenants);
-        showStep('step-already-owner');
-        return;
-      }
-    } catch (err) {
-      // If the function call fails (e.g. cold start hiccup, network), fall
-      // through to the form. createTenant will still enforce the cap on
-      // submit, so the user just sees the slower error path — same as before.
-      console.warn('getMyTenant failed', err);
-    }
-
-    showStep('step-details');
+    proceedVerifiedUser(user);
+  } else if (user && !user.emailVerified) {
+    // Email/password owner who hasn't clicked their verification link yet.
+    document.getElementById('verify-email').textContent = user.email;
+    showStep('step-verify');
   } else {
-    if (user && !user.emailVerified) {
-      // Email/password user; we only support Google. Sign them out.
-      auth.signOut();
-    }
     showStep('step-signin');
   }
 });
