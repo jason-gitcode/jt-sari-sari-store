@@ -977,9 +977,15 @@ exports.confirmManualPayment = onCall(async (request) => {
       trialEndsAt: null,
       trialUsedAt,
       pastDueSince: null,
+      // Lifecycle automation (Phase C-1): clear ALL terminal-state markers
+      // when a payment confirms — a single payment can resurrect a tenant
+      // from grace/suspended/cancelled-scheduled back to active.
+      graceSince: null,
       suspendedAt: null,
       cancelledAt: null,
       cancellationReason: null,
+      cancelAtPeriodEnd: false,
+      cancellationRequestedAt: null,
       paymentMethod: 'manual_gcash',
       lastConfirmedPaymentRef: pref.path,
       lastConfirmedAt: FieldValue.serverTimestamp()
@@ -1780,4 +1786,312 @@ exports.checkCustomDomainsHealth = onSchedule({
       console.warn('[checkCustomDomainsHealth] Discord post failed:', err.message);
     }
   }
+});
+
+// ============================================================
+// SUBSCRIPTION LIFECYCLE AUTOMATION (Phase C-1)
+//
+// Daily scheduled function transitions subscriptions through the
+// lifecycle state machine:
+//
+//   trialing  → past_due   (trial ended without payment)
+//   active    → past_due   (currentPeriodEnd passed without renewal)
+//   active    → cancelled  (cancelAtPeriodEnd=true + currentPeriodEnd reached)
+//   past_due  → grace      (after PAST_DUE_DAYS)
+//   grace     → suspended  (after GRACE_DAYS)
+//   suspended → cancelled  (after SUSPENDED_DAYS)
+//
+// Transitions are idempotent — re-running the function on the same
+// day no-ops when the precondition is already satisfied. Tier mirrors
+// (root doc + settings/store) drop to 'free' on cancellation; status
+// changes alone don't touch tier (a past_due Pro tenant is still Pro
+// internally, just behind on payment).
+//
+// Discord summary posts to platform/billing.subscriptionDiscordWebhook
+// when any tenant transitions, so Jason gets a daily heartbeat.
+// ============================================================
+
+const LIFECYCLE_PAST_DUE_DAYS = 7;
+const LIFECYCLE_GRACE_DAYS = 7;
+const LIFECYCLE_SUSPENDED_DAYS = 60;
+
+function _daysBetween(laterDate, earlierTs) {
+  if (!earlierTs) return Infinity;
+  const earlierMs = earlierTs.toMillis ? earlierTs.toMillis() : new Date(earlierTs).getTime();
+  if (!Number.isFinite(earlierMs)) return Infinity;
+  return (laterDate.getTime() - earlierMs) / (24 * 60 * 60 * 1000);
+}
+
+exports.runSubscriptionLifecycle = onSchedule({
+  schedule: 'every day 03:00',
+  timeZone: 'Asia/Manila'
+}, async () => {
+  console.log('[runSubscriptionLifecycle] starting daily run');
+  const now = new Date();
+
+  // Iterate all tenants. At pilot scale (<10K tenants) this is fine —
+  // ~10K reads per day = $0.006/mo at $0.06 per 100K reads. Collection-
+  // group on subscription/current with composite indexes would be more
+  // efficient at 100K+ tenants; not worth the index setup now.
+  let tenantsSnap;
+  try {
+    tenantsSnap = await db.collection('tenants').get();
+  } catch (err) {
+    console.error('[runSubscriptionLifecycle] tenants read failed:', err.message);
+    return;
+  }
+  console.log('[runSubscriptionLifecycle] scanning', tenantsSnap.size, 'tenants');
+
+  const transitions = [];
+  let scanned = 0, unchanged = 0, errored = 0;
+
+  for (const tenantDoc of tenantsSnap.docs) {
+    scanned++;
+    const tid = tenantDoc.id;
+    const tenantData = tenantDoc.data() || {};
+    const subRef = tenantDoc.ref.collection('subscription').doc('current');
+    let subSnap;
+    try {
+      subSnap = await subRef.get();
+    } catch (err) {
+      errored++;
+      console.warn('[runSubscriptionLifecycle] subscription read failed for', tid, ':', err.message);
+      continue;
+    }
+    if (!subSnap.exists) { unchanged++; continue; }
+    const sub = subSnap.data() || {};
+    const status = (sub.status || 'active').toLowerCase();
+    const tier = (sub.tier || 'free').toLowerCase();
+
+    // Free tier never transitions (no renewal, no trial).
+    if (tier === 'free') { unchanged++; continue; }
+
+    const trialEnd = sub.trialEndsAt;
+    const periodEnd = sub.currentPeriodEnd;
+    const pastDueSince = sub.pastDueSince;
+    const graceSince = sub.graceSince;
+    const suspendedAt = sub.suspendedAt;
+    const cancelAtPeriodEnd = sub.cancelAtPeriodEnd === true;
+
+    let next = null;     // { status, patch, label }
+
+    // 1. trialing → past_due (trial expired)
+    if (status === 'trialing' && trialEnd && _daysBetween(now, trialEnd) >= 0) {
+      next = {
+        status: 'past_due',
+        patch: { status: 'past_due', pastDueSince: FieldValue.serverTimestamp() },
+        label: 'trialing→past_due'
+      };
+    }
+    // 2. active → cancelled (scheduled cancellation reached period end)
+    else if (status === 'active' && cancelAtPeriodEnd && periodEnd && _daysBetween(now, periodEnd) >= 0) {
+      next = {
+        status: 'cancelled',
+        patch: {
+          status: 'cancelled',
+          cancelledAt: FieldValue.serverTimestamp(),
+          cancellationReason: sub.cancellationReason || 'tenant_requested_at_period_end',
+          tier: 'free' // drop tier on cancellation
+        },
+        label: 'active→cancelled (scheduled)',
+        dropTier: true
+      };
+    }
+    // 3. active → past_due (period end passed without payment AND no cancel)
+    else if (status === 'active' && !cancelAtPeriodEnd && periodEnd && _daysBetween(now, periodEnd) >= 0) {
+      next = {
+        status: 'past_due',
+        patch: { status: 'past_due', pastDueSince: FieldValue.serverTimestamp() },
+        label: 'active→past_due'
+      };
+    }
+    // 4. past_due → grace (after LIFECYCLE_PAST_DUE_DAYS)
+    else if (status === 'past_due' && _daysBetween(now, pastDueSince) >= LIFECYCLE_PAST_DUE_DAYS) {
+      next = {
+        status: 'grace',
+        patch: { status: 'grace', graceSince: FieldValue.serverTimestamp() },
+        label: 'past_due→grace'
+      };
+    }
+    // 5. grace → suspended (after LIFECYCLE_GRACE_DAYS)
+    else if (status === 'grace' && _daysBetween(now, graceSince) >= LIFECYCLE_GRACE_DAYS) {
+      next = {
+        status: 'suspended',
+        patch: { status: 'suspended', suspendedAt: FieldValue.serverTimestamp() },
+        label: 'grace→suspended'
+      };
+    }
+    // 6. suspended → cancelled (after LIFECYCLE_SUSPENDED_DAYS)
+    else if (status === 'suspended' && _daysBetween(now, suspendedAt) >= LIFECYCLE_SUSPENDED_DAYS) {
+      next = {
+        status: 'cancelled',
+        patch: {
+          status: 'cancelled',
+          cancelledAt: FieldValue.serverTimestamp(),
+          cancellationReason: 'lifecycle_auto_suspended_too_long',
+          tier: 'free'
+        },
+        label: 'suspended→cancelled',
+        dropTier: true
+      };
+    }
+
+    if (!next) { unchanged++; continue; }
+
+    try {
+      // Apply patch to subscription doc.
+      await subRef.update(next.patch);
+      // On cancellation, drop the tier mirrors so storefront branding +
+      // product cap revert. Root doc + settings/store both flip.
+      if (next.dropTier) {
+        await tenantDoc.ref.update({ tier: 'free' });
+        await tenantDoc.ref.collection('settings').doc('store').set({ tier: 'free' }, { merge: true });
+      }
+      transitions.push({
+        tid,
+        name: tenantData.name || tid,
+        label: next.label,
+        tier
+      });
+    } catch (err) {
+      errored++;
+      console.warn('[runSubscriptionLifecycle] write failed for', tid, ':', err.message);
+    }
+  }
+
+  console.log(`[runSubscriptionLifecycle] done: scanned=${scanned}, transitions=${transitions.length}, unchanged=${unchanged}, errored=${errored}`);
+
+  // Discord summary if anything transitioned.
+  if (transitions.length > 0) {
+    try {
+      const billingSnap = await db.collection('platform').doc('billing').get();
+      const billing = billingSnap.exists ? (billingSnap.data() || {}) : {};
+      const webhook = billing.subscriptionDiscordWebhook || billing.prioritySupportWebhook || null;
+      if (webhook) {
+        const lines = transitions.map(t => `• **${t.name}** (\`${t.tid}\`, ${t.tier}) → ${t.label}`);
+        const content = [
+          `📅 **Subscription Lifecycle — Daily Run**`,
+          `${transitions.length} transition${transitions.length === 1 ? '' : 's'} (scanned ${scanned}):`,
+          '',
+          lines.join('\n')
+        ].join('\n');
+        await fetch(webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        });
+      }
+    } catch (err) {
+      console.warn('[runSubscriptionLifecycle] Discord post failed:', err.message);
+    }
+  }
+});
+
+// ============================================================
+// cancelSubscription — tenant owner (or superadmin) requests cancellation.
+// Sets cancelAtPeriodEnd=true; the tenant keeps access through their
+// currentPeriodEnd. The daily lifecycle function does the actual
+// transition to 'cancelled' + drops the tier mirror at that date.
+// Cancellation is reversible until period end via reactivateSubscription.
+//
+// For trialing subscriptions, cancellation is immediate (no period end
+// they're paying through) — status flips to cancelled now.
+// ============================================================
+exports.cancelSubscription = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  const reason = String(data.reason || '').trim().slice(0, 500);
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can cancel its subscription.');
+  }
+
+  const subRef = tref.collection('subscription').doc('current');
+  const subSnap = await subRef.get();
+  if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription to cancel.');
+  const sub = subSnap.data() || {};
+  const status = (sub.status || 'active').toLowerCase();
+  const tier = (sub.tier || 'free').toLowerCase();
+
+  if (tier === 'free') throw new HttpsError('failed-precondition', 'You\'re already on the free plan.');
+  if (status === 'cancelled') throw new HttpsError('failed-precondition', 'Subscription is already cancelled.');
+
+  // Trialing → immediate cancel (nothing paid through). Otherwise →
+  // schedule for period end.
+  if (status === 'trialing') {
+    await subRef.update({
+      status: 'cancelled',
+      cancelledAt: FieldValue.serverTimestamp(),
+      cancellationReason: reason || 'trial_cancelled_by_tenant',
+      cancelAtPeriodEnd: false,
+      tier: 'free'
+    });
+    await tref.update({ tier: 'free' });
+    await tref.collection('settings').doc('store').set({ tier: 'free' }, { merge: true });
+    return { ok: true, mode: 'immediate' };
+  }
+
+  await subRef.update({
+    cancelAtPeriodEnd: true,
+    cancellationRequestedAt: FieldValue.serverTimestamp(),
+    cancellationReason: reason || 'tenant_requested'
+  });
+  return { ok: true, mode: 'at_period_end' };
+});
+
+// ============================================================
+// reactivateSubscription — clears cancelAtPeriodEnd before the period
+// end is reached, so the tenant continues to be billed normally.
+// Only meaningful when status === 'active' AND cancelAtPeriodEnd === true.
+// ============================================================
+exports.reactivateSubscription = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can reactivate its subscription.');
+  }
+
+  const subRef = tref.collection('subscription').doc('current');
+  const subSnap = await subRef.get();
+  if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription found.');
+  const sub = subSnap.data() || {};
+  if (sub.cancelAtPeriodEnd !== true) {
+    throw new HttpsError('failed-precondition', 'Subscription is not scheduled for cancellation.');
+  }
+  if ((sub.status || '').toLowerCase() !== 'active') {
+    throw new HttpsError('failed-precondition', 'Only active subscriptions can be reactivated. If you\'re past_due/grace/suspended, submit a new payment instead.');
+  }
+
+  await subRef.update({
+    cancelAtPeriodEnd: false,
+    cancellationRequestedAt: null,
+    cancellationReason: null,
+    reactivatedAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true };
 });

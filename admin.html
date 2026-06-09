@@ -3828,6 +3828,32 @@
   </div>
 </div>
 
+<!-- CANCEL SUBSCRIPTION MODAL (Phase C-1) — themed cancel flow. Body
+     copy is set by cancelSubscription() based on trialing vs paid state.
+     Lets the tenant capture a reason (optional) so platform-side can
+     learn churn signals. -->
+<div class="supp-modal-overlay" id="cancel-sub-modal" onclick="closeCancelSubBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 480px;">
+    <div class="supp-modal-header">
+      <h2 id="cancel-sub-title">Cancel subscription?</h2>
+      <button type="button" class="close-btn" onclick="closeCancelSubModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 20px 24px;">
+      <div id="cancel-sub-body" style="margin-bottom:14px;"></div>
+      <div>
+        <label for="cancel-sub-reason" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Why are you cancelling? <span style="text-transform:none;font-weight:400;color:var(--muted);">(optional, helps us improve)</span></label>
+        <textarea id="cancel-sub-reason" maxlength="500" rows="3" placeholder="Anything we should know about?"
+          style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:13px; font-family:inherit; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+      </div>
+      <div id="cancel-sub-status" style="font-size:12px; color:var(--error); min-height:16px; margin-top:10px;"></div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeCancelSubModal()">Keep my subscription</button>
+      <button type="button" class="btn-danger" id="cancel-sub-confirm-btn" onclick="confirmCancelSubscription()">Yes, cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- BRANCH FORM MODAL — used for both add + edit. branchFormMode='add'|'edit'
      determines which Cloud Function fires on Save. Pro-only; gated upstream
      by the LOCKED_FEATURES['multi-branch'] modal so this form never opens
@@ -4505,10 +4531,21 @@ function renderBillingTab() {
         <div>After trial: <strong>${fmtPHP(info.amount)}/mo</strong></div>
       `;
     } else if (status === 'active') {
-      statusBlock = `
-        <div style="color:#16a34a;font-weight:600;">✓ Paid through ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
-        <div style="margin-top:4px;">Next bill: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong> on ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
-      `;
+      // Phase C-1: cancelAtPeriodEnd means tenant scheduled cancellation.
+      // They keep access until currentPeriodEnd; show "Ending {date}"
+      // instead of "Next bill" + flag the reactivate option in the body.
+      if (subscriptionData.cancelAtPeriodEnd === true) {
+        statusBlock = `
+          <div style="color:#f59e0b;font-weight:600;">⏳ Cancellation scheduled</div>
+          <div style="margin-top:4px;">Your plan ends on <strong>${fmtBillingDate(subscriptionData.currentPeriodEnd)}</strong>. After that you'll drop to PabiliMart Free.</div>
+          <div style="margin-top:4px;font-size:12px;color:var(--muted);">Changed your mind? Click <strong style="color:#16a34a;">Reactivate</strong> below to keep your subscription.</div>
+        `;
+      } else {
+        statusBlock = `
+          <div style="color:#16a34a;font-weight:600;">✓ Paid through ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
+          <div style="margin-top:4px;">Next bill: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong> on ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
+        `;
+      }
     } else if (status === 'past_due' || status === 'grace') {
       statusBlock = `
         <div style="color:#dc2626;font-weight:700;">⚠️ Payment overdue</div>
@@ -4550,11 +4587,18 @@ function renderBillingTab() {
     }
 
     // Cancel sits in the bottom-right as a small secondary text link.
-    // Primary action sits in the bottom-LEFT (per UX iteration: action +
-    // cancel share a single bottom row, left/right balanced).
-    const cancelLinkInline = (tier !== 'free' && status !== 'cancelled')
-      ? `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>`
-      : '';
+    // Primary action sits in the bottom-LEFT. When the tenant has already
+    // scheduled a cancellation (cancelAtPeriodEnd=true), we swap the
+    // cancel link for a "Keep subscription" reactivate link.
+    const cancelAtEnd = subscriptionData.cancelAtPeriodEnd === true;
+    let cancelLinkInline = '';
+    if (tier !== 'free' && status !== 'cancelled') {
+      if (cancelAtEnd) {
+        cancelLinkInline = `<button onclick="reactivateSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:#16a34a;cursor:pointer;text-decoration:underline;">Reactivate</button>`;
+      } else {
+        cancelLinkInline = `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>`;
+      }
+    }
 
     const hasBottomRow = primaryActionHtml || cancelLinkInline;
     const bottomRowHtml = hasBottomRow
@@ -4822,8 +4866,66 @@ function requestTierChange(tier) {
   showPayNowModal();
 }
 
+// ============================================================
+// SUBSCRIPTION CANCELLATION (Phase C-1)
+//
+// Cancel flow: themed modal explains what happens (kept active until
+// period end, can be reactivated until then), captures optional reason,
+// calls cancelSubscription callable. For trialing tenants the function
+// flips status immediately to cancelled.
+//
+// Reactivate: a single-button modal for tenants who scheduled
+// cancellation but want to undo it before period end.
+// ============================================================
 function cancelSubscription() {
-  alert('Plan cancellation flow coming in the next update.');
+  if (!subscriptionData) return;
+  const tier = subscriptionData.tier || 'free';
+  const status = subscriptionData.status || 'active';
+  if (tier === 'free') { showToast('You\'re already on Free.', 'info'); return; }
+  if (status === 'cancelled') { showToast('Subscription is already cancelled.', 'info'); return; }
+  const tierLabel = TIER_INFO[tier] ? TIER_INFO[tier].name : tier;
+  const isTrialing = status === 'trialing';
+  const periodEnd = subscriptionData.currentPeriodEnd;
+  const periodEndLabel = periodEnd ? fmtBillingDate(periodEnd) : '—';
+  document.getElementById('cancel-sub-title').textContent = isTrialing ? 'Cancel trial?' : 'Cancel subscription?';
+  document.getElementById('cancel-sub-body').innerHTML = isTrialing
+    ? `<div style="font-size:13px;color:var(--ink);line-height:1.55;">You're on a <strong>${escSupportText(tierLabel)}</strong> trial. Cancelling now will end the trial immediately and drop you back to <strong>PabiliMart Free</strong>. Your one-trial-per-tenant entitlement remains used — you'll need to pay directly to come back to a paid tier later.</div>`
+    : `<div style="font-size:13px;color:var(--ink);line-height:1.55;">Your <strong>${escSupportText(tierLabel)}</strong> subscription stays active through <strong>${escSupportText(periodEndLabel)}</strong>. After that, you drop to <strong>PabiliMart Free</strong> automatically. You can reactivate any time before that date — no need to repay.</div>`;
+  document.getElementById('cancel-sub-reason').value = '';
+  document.getElementById('cancel-sub-status').textContent = '';
+  document.getElementById('cancel-sub-modal').classList.add('show');
+}
+function closeCancelSubModal() { document.getElementById('cancel-sub-modal').classList.remove('show'); }
+function closeCancelSubBackdrop(e) { if (e && e.target !== e.currentTarget) return; closeCancelSubModal(); }
+async function confirmCancelSubscription() {
+  const reason = (document.getElementById('cancel-sub-reason').value || '').trim();
+  const btn = document.getElementById('cancel-sub-confirm-btn');
+  const statusEl = document.getElementById('cancel-sub-status');
+  btn.disabled = true; btn.textContent = 'Cancelling…';
+  statusEl.textContent = '';
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('cancelSubscription');
+    const res = await fn({ tid: TENANT_ID, reason });
+    closeCancelSubModal();
+    const mode = res && res.data && res.data.mode;
+    showToast(mode === 'immediate' ? 'Trial cancelled. You\'re now on Free.' : 'Subscription scheduled to end. You can reactivate any time before then.', 'success');
+  } catch (err) {
+    console.error('cancelSubscription failed:', err);
+    statusEl.textContent = (err && err.message) ? err.message : 'Cancel failed. Try again.';
+    btn.disabled = false; btn.textContent = 'Yes, cancel';
+  }
+}
+async function reactivateSubscription() {
+  const ok = confirm('Reactivate your subscription? You\'ll be billed normally at the next period.');
+  if (!ok) return;
+  try {
+    const fn = firebase.app().functions('asia-southeast1').httpsCallable('reactivateSubscription');
+    await fn({ tid: TENANT_ID });
+    showToast('Subscription reactivated.', 'success');
+  } catch (err) {
+    console.error('reactivateSubscription failed:', err);
+    showToast((err && err.message) ? err.message : 'Reactivation failed. Try again.', 'error');
+  }
 }
 
 function showPayNowModal() {
