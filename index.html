@@ -80,6 +80,113 @@
 </script>
 <style>
   html.no-default-logo #brand-logo { display: none !important; }
+
+  /* Branch picker (Pro multi-branch) — modal shown when a tenant has
+     branches and the customer hasn't picked one yet. Sits on top of
+     the storefront so they pick before browsing. */
+  .branch-picker-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+  .branch-picker-overlay.show { display: flex; }
+  .branch-picker-card {
+    background: #fff;
+    border-radius: 14px;
+    max-width: 420px;
+    width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  }
+  .branch-picker-head {
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .branch-picker-head h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+  }
+  .branch-picker-head p {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 6px 0 0;
+    line-height: 1.5;
+  }
+  .branch-picker-list {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .branch-picker-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .branch-picker-item:hover { background: #f9fafb; border-color: #d1d5db; }
+  .branch-picker-item.default {
+    border-color: #16a34a;
+    background: rgba(22,163,74,0.06);
+  }
+  .branch-picker-item-name {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .branch-picker-item-addr {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+  .branch-picker-item-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(22,163,74,0.15);
+    color: #16a34a;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Active-branch indicator pill in the header — clickable to re-open picker. */
+  .branch-indicator {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(37,99,235,0.08);
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 0;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .branch-indicator.show { display: inline-flex; }
+  .branch-indicator:hover { background: rgba(37,99,235,0.15); }
+
   /* Custom domain loading splash — masks the brief async tenant lookup
      that happens before TENANT_ID is set. Removed by bootstrap() once
      the public/customDomains read resolves (typically <300ms). */
@@ -965,6 +1072,19 @@
 
 <div class="cd-splash" aria-hidden="true">Loading store…</div>
 
+<!-- Branch picker modal — only shown for tenants with branches AND no
+     branch already selected via ?branch= or localStorage. See bootstrap()
+     in the main script for the gating logic. -->
+<div class="branch-picker-overlay" id="branch-picker-overlay">
+  <div class="branch-picker-card">
+    <div class="branch-picker-head">
+      <h3 id="branch-picker-title">Pick a branch</h3>
+      <p id="branch-picker-subtitle">Which branch are you ordering from? Your choice is saved on this device.</p>
+    </div>
+    <div class="branch-picker-list" id="branch-picker-list"></div>
+  </div>
+</div>
+
 <header>
   <div class="nav">
     <a href="#" data-tenant-href="" class="logo" id="brand-logo">
@@ -974,6 +1094,9 @@
     <div class="brand-text">
       <h1 id="store-name">JS Mini Mart</h1>
       <small id="store-tag" style="display:none;"></small>
+      <button type="button" class="branch-indicator" id="branch-indicator" onclick="reopenBranchPicker()" aria-label="Change branch">
+        <span aria-hidden="true">📍</span><span id="branch-indicator-name">Branch</span><span style="opacity:.55;">· change</span>
+      </button>
     </div>
     <button class="cart-btn" onclick="openCart()">
       🛒 <span class="label">Cart</span>
@@ -1041,7 +1164,7 @@
   <div class="drawer-foot">
     <div class="totals grand"><span>Total</span><span id="grand-total">₱0.00</span></div>
     <button class="btn-secondary" id="remove-all-btn" onclick="removeAll()">Remove All</button>
-    <button class="checkout-btn" id="checkout-btn" onclick="window.location.href=tenantUrl('checkout/')" disabled>Checkout</button>
+    <button class="checkout-btn" id="checkout-btn" onclick="goToCheckout()" disabled>Checkout</button>
   </div>
 </aside>
 
@@ -2411,6 +2534,153 @@ tcol('products').onSnapshot(snapshot => {
 }
 
 // ============================================================
+// MULTI-BRANCH (Pro feature — Phase 2a) — storefront branch picker
+//
+// Tenants with branches in tenants/{tid}/branches see a picker modal
+// on entry (unless `?branch={id}` is in the URL or a choice is saved
+// in localStorage). The picked branch is used at checkout to route to
+// the branch's GCash account + pickup address + stamp branchId on the
+// order doc.
+//
+// Single-branch tenants (and Free/Growth without the feature) get the
+// normal storefront flow — branchesData is empty, picker never shows,
+// CURRENT_BRANCH_ID stays null, checkout uses tenant defaults.
+// ============================================================
+let BRANCHES = [];                 // loaded once at bootstrap; small data (<10 docs)
+let CURRENT_BRANCH_ID = null;      // null = single-branch / no choice made
+const BRANCH_STORAGE_KEY_PREFIX = 'pabilimart-branch-';
+
+function readSavedBranchId() {
+  try {
+    return localStorage.getItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID) || null;
+  } catch (_) { return null; }
+}
+function writeSavedBranchId(branchId) {
+  try {
+    if (branchId) localStorage.setItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID, branchId);
+    else          localStorage.removeItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID);
+  } catch (_) { /* ignore — quota / disabled storage */ }
+}
+
+function getBranchById(branchId) {
+  if (!branchId) return null;
+  return BRANCHES.find(b => b.id === branchId) || null;
+}
+
+function getDefaultBranch() {
+  if (!BRANCHES.length) return null;
+  return BRANCHES.find(b => b.isDefault === true) || BRANCHES[0];
+}
+
+// Resolve a branch from URL → localStorage → default. Returns null if
+// branches list is empty.
+function resolveInitialBranchId() {
+  if (!BRANCHES.length) return null;
+  // 1. ?branch={id} URL param — highest priority, also overwrites saved choice.
+  const params = new URLSearchParams(location.search);
+  const fromUrl = (params.get('branch') || '').trim().toLowerCase();
+  if (fromUrl && getBranchById(fromUrl)) {
+    writeSavedBranchId(fromUrl);
+    return fromUrl;
+  }
+  // 2. localStorage saved choice.
+  const saved = readSavedBranchId();
+  if (saved && getBranchById(saved)) return saved;
+  // 3. Nothing yet — return null to trigger the picker modal.
+  return null;
+}
+
+function setCurrentBranch(branchId, opts) {
+  const persist = (opts && opts.persist !== false);
+  CURRENT_BRANCH_ID = branchId || null;
+  if (persist) writeSavedBranchId(CURRENT_BRANCH_ID);
+  renderBranchIndicator();
+  closeBranchPicker();
+}
+
+function renderBranchIndicator() {
+  const ind = document.getElementById('branch-indicator');
+  const nameEl = document.getElementById('branch-indicator-name');
+  if (!ind || !nameEl) return;
+  if (!BRANCHES.length || !CURRENT_BRANCH_ID) {
+    ind.classList.remove('show');
+    return;
+  }
+  const branch = getBranchById(CURRENT_BRANCH_ID);
+  if (!branch) { ind.classList.remove('show'); return; }
+  nameEl.textContent = branch.name || branch.id;
+  ind.classList.add('show');
+}
+
+function openBranchPicker(opts) {
+  const overlay = document.getElementById('branch-picker-overlay');
+  const listEl = document.getElementById('branch-picker-list');
+  if (!overlay || !listEl) return;
+  const titleEl = document.getElementById('branch-picker-title');
+  const subEl = document.getElementById('branch-picker-subtitle');
+  const isReopen = opts && opts.reopen;
+  if (titleEl) titleEl.textContent = isReopen ? 'Change branch' : 'Pick a branch';
+  if (subEl) subEl.textContent = isReopen
+    ? 'Switch which branch you\'re ordering from.'
+    : 'Which branch are you ordering from? Your choice is saved on this device.';
+  listEl.innerHTML = BRANCHES.map(b => {
+    const isCurrent = b.id === CURRENT_BRANCH_ID;
+    const badge = b.isDefault ? '<span class="branch-picker-item-badge">Default</span>' : '';
+    const currentBadge = isCurrent ? '<span class="branch-picker-item-badge" style="background:rgba(37,99,235,0.15);color:#1d4ed8;">Current</span>' : '';
+    const addrLine = b.address ? `<div class="branch-picker-item-addr">${escBranchText(b.address)}</div>` : '';
+    return `
+      <button type="button" class="branch-picker-item ${b.isDefault ? 'default' : ''}" onclick="setCurrentBranch('${escBranchAttr(b.id)}')">
+        <div class="branch-picker-item-name">${escBranchText(b.name || b.id)} ${badge} ${currentBadge}</div>
+        ${addrLine}
+      </button>
+    `;
+  }).join('');
+  overlay.classList.add('show');
+}
+
+function reopenBranchPicker() {
+  openBranchPicker({ reopen: true });
+}
+
+function closeBranchPicker() {
+  const overlay = document.getElementById('branch-picker-overlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function escBranchText(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+function escBranchAttr(s) {
+  // For use inside single-quoted onclick="..." attributes: escape backslash,
+  // single quote, and angle brackets.
+  return String(s == null ? '' : s).replace(/[\\'<>]/g, c =>
+    ({ '\\': '\\\\', "'": "\\'", '<': '&lt;', '>': '&gt;' })[c]);
+}
+
+async function loadBranchesForStorefront() {
+  if (!TENANT_ID) return;
+  try {
+    const snap = await db.collection('tenants').doc(TENANT_ID).collection('branches').orderBy('createdAt', 'asc').get();
+    BRANCHES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('[branches] load failed:', e);
+    BRANCHES = [];
+  }
+}
+
+// Storefront → checkout navigation. Appends ?branch={id} so the checkout
+// page picks up the active branch sync from the URL (no need to re-read
+// branches there if the picker hasn't run).
+function goToCheckout() {
+  let url = tenantUrl('checkout/');
+  if (CURRENT_BRANCH_ID) {
+    url += (url.includes('?') ? '&' : '?') + 'branch=' + encodeURIComponent(CURRENT_BRANCH_ID);
+  }
+  window.location.href = url;
+}
+
+// ============================================================
 // BOOTSTRAP — tenant resolution gate, then subscriptions
 //
 // Two paths to TENANT_ID:
@@ -2456,6 +2726,19 @@ async function bootstrap() {
   subscribeStoreSettings();
   init();
   subscribeProducts();
+  // Branch picker (Pro multi-branch). Load branches one-shot — small
+  // data, no need for a snapshot listener on the customer side. If the
+  // tenant has any branches and the customer hasn't picked yet, open
+  // the picker modal. Single-branch tenants get the normal flow.
+  await loadBranchesForStorefront();
+  if (BRANCHES.length > 0) {
+    CURRENT_BRANCH_ID = resolveInitialBranchId();
+    if (CURRENT_BRANCH_ID) {
+      renderBranchIndicator();
+    } else {
+      openBranchPicker();
+    }
+  }
 }
 bootstrap();
 </script>

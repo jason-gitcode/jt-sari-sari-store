@@ -473,6 +473,60 @@ function resolveTenantId() {
 // lookup when path returns null on a non-platform hostname.
 let TENANT_ID = resolveTenantId();
 let IS_CUSTOM_DOMAIN = false;
+// Multi-branch (Pro feature) — see checkout.html for the canonical comment.
+let BRANCHES = [];
+let CURRENT_BRANCH_ID = null;
+const BRANCH_STORAGE_KEY_PREFIX = 'pabilimart-branch-';
+function readSavedBranchId() {
+  try { return localStorage.getItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID) || null; } catch (_) { return null; }
+}
+function writeSavedBranchId(branchId) {
+  try {
+    if (branchId) localStorage.setItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID, branchId);
+    else          localStorage.removeItem(BRANCH_STORAGE_KEY_PREFIX + TENANT_ID);
+  } catch (_) {}
+}
+function getCurrentBranch() {
+  if (!CURRENT_BRANCH_ID || !BRANCHES.length) return null;
+  return BRANCHES.find(b => b.id === CURRENT_BRANCH_ID) || null;
+}
+function effectivePickupAddress() {
+  const b = getCurrentBranch();
+  if (b && b.address) return b.address;
+  return (storeSettingsData && storeSettingsData.pickupAddress) || '';
+}
+function effectiveGcashAccount() {
+  const b = getCurrentBranch();
+  const ss = storeSettingsData || {};
+  return {
+    name:   (b && b.gcashAccountName) || ss.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || 'Store GCash',
+    number: (b && b.gcashNumber)      || ss.gcashNumber      || STORE.gcashNumber       || '—'
+  };
+}
+async function loadCheckoutBranches() {
+  if (!TENANT_ID) return;
+  try {
+    const snap = await db.collection('tenants').doc(TENANT_ID).collection('branches').orderBy('createdAt', 'asc').get();
+    BRANCHES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('[branches] load failed:', e);
+    BRANCHES = [];
+  }
+  const params = new URLSearchParams(location.search);
+  const fromUrl = (params.get('branch') || '').trim().toLowerCase();
+  if (fromUrl && BRANCHES.find(b => b.id === fromUrl)) {
+    CURRENT_BRANCH_ID = fromUrl;
+    writeSavedBranchId(fromUrl);
+  } else {
+    const saved = readSavedBranchId();
+    if (saved && BRANCHES.find(b => b.id === saved)) {
+      CURRENT_BRANCH_ID = saved;
+    } else if (BRANCHES.length > 0) {
+      const dflt = BRANCHES.find(b => b.isDefault === true) || BRANCHES[0];
+      CURRENT_BRANCH_ID = dflt.id;
+    }
+  }
+}
 function tcol(name) {
   if (!TENANT_ID) throw new Error('Cannot read ' + name + ' — no tenant in URL');
   return db.collection('tenants').doc(TENANT_ID).collection(name);
@@ -698,7 +752,8 @@ function applyTenantStoreConfig() {
       : (TENANT_ID === 'jsminimart' ? '/newlogo.jpeg' : null)
   );
   const storeName = storeSettingsData.storeName || STORE.name || '';
-  const pickup = storeSettingsData.pickupAddress || '';
+  // Multi-branch: pickup address uses the active branch override if set.
+  const pickup = effectivePickupAddress();
   const pickupBox = document.getElementById('pickup-info');
   if (pickupBox) {
     // Defensive numeric coercion — Firestore returns numbers, but tolerate
@@ -1120,8 +1175,10 @@ function populateGcashInstructions() {
   // Reuse a single generated ref ID for this checkout session so the
   // displayed "Order No." matches the eventual placed-order's ID.
   if (!gcashOrderRefId) gcashOrderRefId = tcol('orders').doc().id;
-  const account = storeSettingsData.gcashAccountName || STORE.gcashDisplayName || STORE.gcashName || 'Store GCash';
-  const num     = storeSettingsData.gcashNumber || STORE.gcashNumber || '—';
+  // Multi-branch: GCash account uses the active branch override if set.
+  const gcash   = effectiveGcashAccount();
+  const account = gcash.name;
+  const num     = gcash.number;
   // No '#' prefix — GCash's message field rejects special characters,
   // so the customer would have to strip the '#' before pasting otherwise.
   const shortRef = gcashOrderRefId.slice(-6).toUpperCase();
@@ -1417,6 +1474,8 @@ async function placeOrder() {
     total: subtotalAmt + feeAmt,
     // Attach the customer-uploaded GCash receipt screenshot when relevant.
     ...(payMethod === 'gcash' && gcashReceiptData ? { gcashReceipt: gcashReceiptData, gcashReceiptName: (gcashReceiptName || 'receipt.jpg') } : {}),
+    // Multi-branch (Pro): which branch this order belongs to.
+    ...(CURRENT_BRANCH_ID ? { branchId: CURRENT_BRANCH_ID, branchName: (getCurrentBranch() && getCurrentBranch().name) || CURRENT_BRANCH_ID } : {}),
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -1600,6 +1659,9 @@ async function bootstrap() {
     }
     return;
   }
+  // Multi-branch: load branches + resolve active branch BEFORE settings
+  // snapshot so applyTenantStoreConfig sees the right overrides.
+  await loadCheckoutBranches();
   subscribeStoreSettings();
   loadProductsAndRender();
 }
