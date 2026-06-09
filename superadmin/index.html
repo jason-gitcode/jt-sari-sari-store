@@ -813,7 +813,7 @@
       <span>📦 Seed starter pack</span>
     </div>
     <div class="section-card">
-      <div class="desc">Pick <strong>5 random in-stock products with big photos</strong> (1 per random category) in the seed tenant (<code>jsminimart</code>) and write them to root <code>starter_pack/*</code>. Out-of-stock and emoji-only items are skipped. <code>createTenant</code> copies these into every new tenant's catalog. New tenants then add the rest of their own categories from there. Overwrites any existing pack.</div>
+      <div class="desc">Copy a <strong>fixed, hand-picked set of products</strong> (matched by name) from the seed tenant (<code>jsminimart</code>) to root <code>starter_pack/*</code>. Edit <code>STARTER_PACK_NAMES</code> in the code to change the list. <code>createTenant</code> copies these into every new tenant's catalog. New tenants then add the rest of their own categories from there. Overwrites any existing pack.</div>
       <button class="btn btn-primary" id="seed-pack-btn" onclick="runSeedStarterPack()">Seed starter pack</button>
       <div class="form-status" id="seed-pack-status"></div>
     </div>
@@ -1961,71 +1961,48 @@ async function savePlatformBilling() {
 }
 
 // ============================================================
-// SEED STARTER PACK — pulls from jsminimart's products collection and
-// writes one per category to root /starter_pack/*. Only IN-STOCK products
-// that have a real photo are eligible, and within each category the
-// biggest photo wins, so new tenants start with a clean, image-rich
-// catalog. createTenant copies these into every new tenant's catalog.
+// SEED STARTER PACK — copies a FIXED, hand-picked set of products
+// (matched by name) from jsminimart to root /starter_pack/*. createTenant
+// copies these into every new tenant's catalog. Edit STARTER_PACK_NAMES
+// below to change the list.
 // ============================================================
 async function runSeedStarterPack() {
   const SEED_TENANT = 'jsminimart';
-  const TARGET_PRODUCTS = 5;     // 5 products total, 1 per random category
+  // Fixed starter catalog — matched by exact name (case-/whitespace-
+  // insensitive) against the seed store; order is preserved.
+  const STARTER_PACK_NAMES = [
+    'Honey Gold Cereal',
+    'Century Tuna Flakes Hot & Spicy | 95g',
+    "Hershey's Kisses Dark Chocolate",
+    'Ariel Detergent Liquid Refill Sunrise Fresh | 730g',
+    'Eveready Gold Alkaline Battery AA - 2s',
+  ];
   const btn = document.getElementById('seed-pack-btn');
   const status = document.getElementById('seed-pack-status');
-  if (!confirm(`Pick ${TARGET_PRODUCTS} random IN-STOCK products with big photos (1 per random category) in /${SEED_TENANT}/ and write them to /starter_pack/*?\n\nNew tenants will receive these as their starting catalog. Overwrites any existing starter pack.`)) return;
+  if (!confirm(`Overwrite /starter_pack/* with these ${STARTER_PACK_NAMES.length} hand-picked products from /${SEED_TENANT}/?\n\n• ${STARTER_PACK_NAMES.join('\n• ')}\n\nNew tenants will receive these as their starting catalog.`)) return;
   btn.disabled = true; btn.textContent = 'Seeding…';
   status.className = 'form-status'; status.textContent = 'Reading products…';
   try {
     const srcSnap = await db.collection('tenants').doc(SEED_TENANT).collection('products').get();
 
-    // Selection rules: available + not hidden, must carry a real photo
-    // (no emoji-only), and must be IN STOCK in the seed store.
-    const imgSize = (p) => (Array.isArray(p.data.images) && p.data.images[0]) ? p.data.images[0].length : 0;
-    const hasPhoto = (p) => imgSize(p) > 0;
-    const inStock = (p) => {
-      const d = p.data;
-      // Variant products: in stock if ANY variant is unlimited or > 0.
-      if (Array.isArray(d.variants) && d.variants.length > 0) {
-        return d.variants.some(v => v.stock == null || Number(v.stock) > 0);
-      }
-      // Simple products: null/undefined stock = unlimited; else must be > 0.
-      return d.stock == null || Number(d.stock) > 0;
-    };
-    const candidates = srcSnap.docs
-      .map(d => ({ id: d.id, data: d.data() }))
-      .filter(p => p.data.available !== false && p.data.hidden !== true && hasPhoto(p) && inStock(p));
-    if (candidates.length === 0) throw new Error(`No in-stock products with photos to sample from /${SEED_TENANT}/.`);
+    // Match the hand-picked names against the seed store. Normalised compare
+    // (trim + lowercase + collapse whitespace) so minor spacing differences
+    // still match. Order from STARTER_PACK_NAMES is preserved.
+    const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+    const byName = new Map();
+    srcSnap.docs.forEach(d => byName.set(norm(d.data().name), { id: d.id, data: d.data() }));
 
-    const shuffle = arr => {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-    };
-    // Group by category.
-    const byCategory = new Map();
-    candidates.forEach(p => {
-      const cat = p.data.category || 'Uncategorized';
-      if (!byCategory.has(cat)) byCategory.set(cat, []);
-      byCategory.get(cat).push(p);
-    });
-    // Walk random categories until we have TARGET_PRODUCTS, one per
-    // category. Within a category, bias to the BIGGEST photo: take the few
-    // largest images, then pick one at random — keeps each run varied while
-    // guaranteeing a large, card-filling photo.
-    const allCategories = Array.from(byCategory.keys());
-    shuffle(allCategories);
     const picked = [];
-    for (const cat of allCategories) {
-      if (picked.length >= TARGET_PRODUCTS) break;
-      const pool = byCategory.get(cat).slice().sort((a, b) => imgSize(b) - imgSize(a));
-      if (pool.length === 0) continue;
-      const topBig = pool.slice(0, 3); // 3 biggest photos in this category
-      shuffle(topBig);
-      picked.push(topBig[0]);
+    const missing = [];
+    for (const name of STARTER_PACK_NAMES) {
+      const match = byName.get(norm(name));
+      if (match) picked.push(match);
+      else missing.push(name);
     }
-    const pickedWithImages = picked.length; // all picks carry a photo by construction
-    status.textContent = `Picked ${picked.length} in-stock product${picked.length === 1 ? '' : 's'} with big photos across ${picked.length} of ${byCategory.size} categor${byCategory.size === 1 ? 'y' : 'ies'}. Clearing old pack…`;
+    if (picked.length === 0) {
+      throw new Error(`None of the ${STARTER_PACK_NAMES.length} named products were found in /${SEED_TENANT}/. Check the exact names. Missing: ${missing.join(' · ')}`);
+    }
+    status.textContent = `Matched ${picked.length}/${STARTER_PACK_NAMES.length} named products${missing.length ? ` (NOT found: ${missing.join(', ')})` : ''}. Clearing old pack…`;
 
     // Wipe existing
     const existingSnap = await db.collection('starter_pack').get();
@@ -2058,7 +2035,7 @@ async function runSeedStarterPack() {
     }
 
     status.className = 'form-status success';
-    status.textContent = `✅ Seeded ${picked.length} in-stock products to /starter_pack/* — all with big photos.`;
+    status.textContent = `✅ Seeded ${picked.length}/${STARTER_PACK_NAMES.length} named products to /starter_pack/*${missing.length ? ` — NOT found (skipped): ${missing.join(', ')}` : '.'}`;
     btn.textContent = 'Re-seed pack';
     btn.disabled = false;
   } catch (err) {
