@@ -578,10 +578,12 @@
       -webkit-appearance: none;
       padding: 6px 28px 6px 10px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       background: var(--surface);
-      color: var(--ink);
-      font-size: 12px;
+      /* Match the Sign Out button (.btn-ghost) exactly so the header
+         controls read as one uniform set. */
+      color: var(--ink-soft);
+      font-size: var(--fs-sm);
       font-family: inherit;
       font-weight: 500;
       cursor: pointer;
@@ -593,7 +595,7 @@
     }
     .branch-filter-wrap select:focus { outline: none; border-color: var(--accent); }
     @media (max-width: 480px) {
-      .branch-filter-wrap select { max-width: 110px; font-size: 11px; }
+      .branch-filter-wrap select { max-width: 110px; }
     }
     /* Storefront link is a normal-flow flex child. brand has flex:1 and eats
        the slack, so the Storefront button + header-actions sit together as
