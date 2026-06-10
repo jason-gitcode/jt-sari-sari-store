@@ -1567,7 +1567,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
   const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
   const feeOn        = storeSettingsData.deliveryFeeEnabled !== false;
-  const freeDelOn    = storeSettingsData.freeDeliveryEnabled !== false;
+  const freeDelOn    = storeSettingsData.freeDeliveryEnabled === true;
   const threshold    = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   const schedulesOn  = storeSettingsData.schedulesEnabled === true;
   const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
@@ -2462,7 +2462,7 @@ function cartTotal() {
 function deliveryFee() {
   const feeOn = storeSettingsData.deliveryFeeEnabled !== false;
   if (!feeOn) return 0;
-  const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+  const freeOn = storeSettingsData.freeDeliveryEnabled === true;
   const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   if (freeOn && cartTotal() >= threshold) return 0;
   const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;

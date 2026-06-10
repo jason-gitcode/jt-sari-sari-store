@@ -853,7 +853,7 @@ function cartTotal() {
 function deliveryFee() {
   const feeOn = storeSettingsData.deliveryFeeEnabled !== false;
   if (!feeOn) return 0;
-  const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+  const freeOn = storeSettingsData.freeDeliveryEnabled === true;
   const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
   if (freeOn && cartTotal() >= threshold) return 0;
   const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
@@ -915,7 +915,7 @@ function init() {
           <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
         </div>
         ${(() => {
-          const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+          const freeOn = storeSettingsData.freeDeliveryEnabled === true;
           const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
           if (!freeOn || fee === 0 || subtotal >= threshold) return '';
           return `<div class="free-delivery-nudge">
@@ -1313,7 +1313,7 @@ function refreshTotals() {
   // Hide free-delivery nudge for pickup (irrelevant) — show otherwise
   const nudge = card.querySelector('.free-delivery-nudge');
   if (nudge) {
-    const freeOn = storeSettingsData.freeDeliveryEnabled !== false;
+    const freeOn = storeSettingsData.freeDeliveryEnabled === true;
     nudge.style.display = (!freeOn || isPickup || fee === 0) ? 'none' : '';
   }
 }

@@ -357,7 +357,8 @@ exports.createTenant = onCall(async (request) => {
     deliveryFeeEnabled: true,
     deliveryFee: 45,
     // Free delivery promotion + delivery areas list — both toggleable.
-    freeDeliveryEnabled: true,
+    // Free-delivery-on-large-orders is off by default so every order pays the fee.
+    freeDeliveryEnabled: false,
     freeDeliveryThreshold: 400,
     deliveryAreasEnabled: true,
     deliveryAreas: [],
