@@ -2056,11 +2056,11 @@
       </div>
       <div class="field">
         <label for="auth-password">Password</label>
-        <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+        <input id="auth-password" class="input" type="password" autocomplete="new-password" placeholder="Create a password (6+ characters)" />
       </div>
-      <button type="button" id="email-auth-btn" class="btn btn-primary" onclick="emailAuthSubmit()">Sign in</button>
+      <button type="button" id="email-auth-btn" class="btn btn-primary btn-create" onclick="emailAuthSubmit()">Create account</button>
       <div class="auth-links">
-        <button type="button" class="link-btn" id="auth-toggle-mode" onclick="toggleAuthMode()">New here? Create an account</button>
+        <button type="button" class="link-btn" id="auth-toggle-mode" onclick="toggleAuthMode()">Have an account? Sign in</button>
         <button type="button" class="link-btn" onclick="sendReset()">Forgot password?</button>
       </div>
 
@@ -2735,7 +2735,7 @@ function signOut() {
 // email/password owners are routed to step-verify before they can
 // create or manage a store. Magic-link + Google users are pre-verified.
 // ============================================================
-let authMode = 'signin'; // 'signin' | 'signup'
+let authMode = 'signup'; // 'signin' | 'signup'
 function toggleAuthMode() {
   authMode = (authMode === 'signin') ? 'signup' : 'signin';
   const btn = document.getElementById('email-auth-btn');
