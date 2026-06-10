@@ -711,6 +711,55 @@
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+
+    /* ---------- Mobile bottom navigation (shown ≤600px via media query) ----------
+       Primary nav in the thumb zone on phones; the top .tabs strip is hidden
+       there. Reports / Billing / Settings live behind the "More" sheet. */
+    .bottom-nav {
+      display: none;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      padding-bottom: env(safe-area-inset-bottom);
+      box-shadow: 0 -2px 12px rgba(0,0,0,.07);
+    }
+    .bn-item {
+      flex: 1 1 0; min-width: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 8px 2px 7px; min-height: 56px;
+      background: transparent; border: 0; cursor: pointer;
+      color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1;
+    }
+    .bn-item .bn-ico { font-size: 20px; line-height: 1; position: relative; }
+    .bn-item.active { color: var(--accent); }
+    .bn-item.active .bn-label { font-weight: 600; }
+    .bn-badge {
+      position: absolute; top: -7px; left: 100%; transform: translateX(-45%);
+      min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+      border-radius: 8px; background: var(--danger); color: #fff;
+      font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+    }
+    .more-sheet-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 85;
+      background: rgba(0,0,0,.35);
+    }
+    .more-sheet-backdrop.open { display: block; }
+    .more-sheet {
+      display: none; position: fixed; left: 8px; right: 8px;
+      bottom: calc(66px + env(safe-area-inset-bottom)); z-index: 86;
+      flex-direction: column; gap: 2px;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 14px; padding: 6px; box-shadow: 0 10px 34px rgba(0,0,0,.20);
+    }
+    .more-sheet.open { display: flex; }
+    .more-sheet-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; padding: 14px 16px; border-radius: 10px;
+      background: transparent; border: 0; cursor: pointer; text-align: left;
+      font-size: 15px; color: var(--ink);
+    }
+    .more-sheet-item:active { background: var(--surface-2); }
+    .more-sheet-item.active { background: var(--surface-2); color: var(--accent); font-weight: 600; }
     /* Each tab panel is its OWN scroll container (body is position:fixed at
        the root). `overscroll-behavior: none` kills BOTH scroll-chaining to
        the parent AND the iOS boundary rubber-band on the container itself.
@@ -2196,12 +2245,12 @@
       .storefront-btn span { display: none; }
       .storefront-btn { padding: 7px 11px; }
       .container { padding: 14px 12px 20px; }
-      /* Wrap tabs onto two rows instead of hiding them behind a horizontal
-         scroll — every tab (incl. Reports / Billing / Settings) stays visible
-         with no off-screen scroll the owner can't discover. flex:1 spreads
-         them into a tidy even grid; taller padding meets the 44px tap target. */
-      .tabs { width: 100%; flex-wrap: wrap; }
-      .tab-btn { padding: 10px 12px; flex: 1 1 auto; justify-content: center; min-height: 44px; }
+      /* On phones the top tab strip is replaced by the fixed bottom nav bar
+         (Home / Orders / Products / Suppliers / More). Container gains bottom
+         padding so content never hides behind the fixed bar. */
+      .tabs { display: none; }
+      .bottom-nav { display: flex; }
+      .container { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
       .page-title { font-size: var(--fs-lg); }
       /* Stack the page-header on phones — title + description on top,
          the pill/Delete/Add Product row below — so the product list
@@ -2794,6 +2843,36 @@
       <button class="btn-ghost" onclick="logout()">Sign Out</button>
     </div>
   </header>
+
+  <!-- Mobile bottom navigation — primary nav in the thumb zone on phones.
+       Hidden ≥601px where the top .tabs strip takes over. Active state and
+       the Orders badge / Reports lock are kept in sync from switchTab,
+       updateOrderBadge, and applyReportsTabLock. -->
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
+    <button class="bn-item active" data-tab="home" onclick="switchTab('home')">
+      <span class="bn-ico">🏠</span><span class="bn-label">Home</span>
+    </button>
+    <button class="bn-item" data-tab="orders" onclick="switchTab('orders')">
+      <span class="bn-ico">📋<span class="bn-badge" id="bn-order-badge" style="display:none;"></span></span><span class="bn-label">Orders</span>
+    </button>
+    <button class="bn-item" data-tab="products" onclick="switchTab('products')">
+      <span class="bn-ico">📦</span><span class="bn-label">Products</span>
+    </button>
+    <button class="bn-item" data-tab="suppliers" onclick="switchTab('suppliers')">
+      <span class="bn-ico">🏭</span><span class="bn-label">Suppliers</span>
+    </button>
+    <button class="bn-item" id="bn-more-btn" onclick="toggleMoreMenu()" aria-haspopup="true" aria-expanded="false">
+      <span class="bn-ico">⋯</span><span class="bn-label">More</span>
+    </button>
+  </nav>
+  <div class="more-sheet-backdrop" id="more-sheet-backdrop" onclick="closeMoreMenu()"></div>
+  <div class="more-sheet" id="more-sheet" role="menu" aria-label="More options">
+    <button class="more-sheet-item" data-tab="reports" role="menuitem" onclick="moreMenuGo('reports')">
+      <span>📊 Reports</span><span id="bn-reports-lock" style="display:none;">🔒</span>
+    </button>
+    <button class="more-sheet-item" data-tab="billing" role="menuitem" onclick="moreMenuGo('billing')">💳 Billing</button>
+    <button class="more-sheet-item" data-tab="settings" role="menuitem" onclick="moreMenuGo('settings')">⚙️ Settings</button>
+  </div>
 
   <div class="container">
     <nav class="tabs">
@@ -6942,6 +7021,9 @@ function applyReportsTabLock() {
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const lock = document.getElementById('reports-lock-icon');
   if (lock) lock.style.display = (tier === 'free') ? '' : 'none';
+  // Mirror the lock into the mobile "More" sheet's Reports row.
+  const bnLock = document.getElementById('bn-reports-lock');
+  if (bnLock) bnLock.style.display = (tier === 'free') ? '' : 'none';
 }
 
 // Locked-feature modal — generic across any future Growth+ feature.
@@ -8386,10 +8468,14 @@ function updateOrderBadge() {
   // pending count in the tab badge.
   const src = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : orders;
   const pending = src.filter(o => o.status === 'pending').length;
-  const badge = document.getElementById('order-badge');
-  if (!badge) return;
-  badge.style.display = pending > 0 ? 'inline-flex' : 'none';
-  badge.textContent = pending;
+  const disp = pending > 0 ? 'inline-flex' : 'none';
+  // Two badges in sync: the top tab strip (desktop) and the bottom nav (mobile).
+  ['order-badge', 'bn-order-badge'].forEach(id => {
+    const badge = document.getElementById(id);
+    if (!badge) return;
+    badge.style.display = disp;
+    badge.textContent = pending;
+  });
 }
 
 function renderItemsToBuy(listEl) {
@@ -9035,6 +9121,21 @@ function switchTab(tab, reset = true) {
   const panel = document.getElementById(tab + '-tab');
   if (panel) panel.classList.add('active');
 
+  // Mirror the active state onto the mobile bottom nav. Reports / Billing /
+  // Settings live under "More", so light up the More item for those. Always
+  // close the More sheet on a successful switch. No-ops on desktop (hidden).
+  closeMoreMenu();
+  document.querySelectorAll('.bn-item, .more-sheet-item').forEach(b => b.classList.remove('active'));
+  const bnPrimary = document.querySelector(`.bn-item[data-tab="${tab}"]`);
+  if (bnPrimary) {
+    bnPrimary.classList.add('active');
+  } else {
+    const moreBtn = document.getElementById('bn-more-btn');
+    if (moreBtn) moreBtn.classList.add('active');
+    const moreItem = document.querySelector(`.more-sheet-item[data-tab="${tab}"]`);
+    if (moreItem) moreItem.classList.add('active');
+  }
+
   if (tab === 'home') {
     setHomeGreeting();
     renderDashboard();
@@ -9059,6 +9160,31 @@ function switchTab(tab, reset = true) {
   } else if (tab === 'billing') {
     renderBillingTab();
   }
+}
+
+// Mobile "More" sheet (Reports / Billing / Settings). Reachable only from the
+// bottom nav, so these are no-ops on desktop.
+function toggleMoreMenu() {
+  const sheet = document.getElementById('more-sheet');
+  const backdrop = document.getElementById('more-sheet-backdrop');
+  const btn = document.getElementById('bn-more-btn');
+  if (!sheet || !backdrop) return;
+  const open = !sheet.classList.contains('open');
+  sheet.classList.toggle('open', open);
+  backdrop.classList.toggle('open', open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function closeMoreMenu() {
+  const sheet = document.getElementById('more-sheet');
+  const backdrop = document.getElementById('more-sheet-backdrop');
+  const btn = document.getElementById('bn-more-btn');
+  if (sheet) sheet.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+function moreMenuGo(tab) {
+  closeMoreMenu();
+  switchTab(tab);
 }
 
 // ---------- PRODUCTS ----------
