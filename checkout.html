@@ -526,6 +526,13 @@ function effBranchArr(field) {
   const v = storeSettingsData && storeSettingsData[field];
   return Array.isArray(v) ? v : [];
 }
+// Raw per-branch value (used for enable toggles); branch value if present,
+// else tenant default. Caller applies its own !==false / ===true comparison.
+function effBranchRaw(field) {
+  const b = getCurrentBranch();
+  if (b && b[field] !== undefined) return b[field];
+  return storeSettingsData ? storeSettingsData[field] : undefined;
+}
 async function loadCheckoutBranches() {
   if (!TENANT_ID) return;
   try {
@@ -802,11 +809,11 @@ function applyTenantStoreConfig() {
   if (offlineAddrEl) offlineAddrEl.textContent = pickup || (storeName ? storeName : 'our store');
   const closedHoursEl = document.getElementById('closed-hours');
   if (closedHoursEl) closedHoursEl.textContent = `${fmtHour12Long(getOpenHour())} to ${fmtHour12Long(getCloseHour())}`;
-  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
-  const pickupOn   = storeSettingsData.pickupEnabled   !== false;
-  const gcashOn    = storeSettingsData.payGcashEnabled !== false;
-  const cashOn     = storeSettingsData.payCashEnabled  !== false && pickupOn;
-  const codOn      = storeSettingsData.payCodEnabled   !== false && deliveryOn;
+  const deliveryOn = effBranchRaw('deliveryEnabled') !== false;
+  const pickupOn   = effBranchRaw('pickupEnabled')   !== false;
+  const gcashOn    = effBranchRaw('payGcashEnabled') !== false;
+  const cashOn     = effBranchRaw('payCashEnabled')  !== false && pickupOn;
+  const codOn      = effBranchRaw('payCodEnabled')   !== false && deliveryOn;
   // Force fulfillment to whatever is actually available.
   if (!deliveryOn && pickupOn && fulfillmentMethod !== 'pickup') fulfillmentMethod = 'pickup';
   if (!pickupOn && deliveryOn && fulfillmentMethod !== 'delivery') fulfillmentMethod = 'delivery';
@@ -818,7 +825,7 @@ function applyTenantStoreConfig() {
   if (ffDelBtn)  ffDelBtn.style.display  = deliveryOn ? '' : 'none';
   if (ffPickBtn) ffPickBtn.style.display = pickupOn   ? '' : 'none';
   const sched = document.getElementById('schedule-section');
-  const schedulesOn = storeSettingsData.schedulesEnabled === true;
+  const schedulesOn = effBranchRaw('schedulesEnabled') === true;
   if (!deliveryOn) {
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
@@ -864,9 +871,9 @@ function cartTotal() {
   }, 0);
 }
 function deliveryFee() {
-  const feeOn = storeSettingsData.deliveryFeeEnabled === true;
+  const feeOn = effBranchRaw('deliveryFeeEnabled') === true;
   if (!feeOn) return 0;
-  const freeOn = storeSettingsData.freeDeliveryEnabled === true;
+  const freeOn = effBranchRaw('freeDeliveryEnabled') === true;
   const threshold = effBranchNum('freeDeliveryThreshold', 400);
   if (freeOn && cartTotal() >= threshold) return 0;
   const amt = effBranchNum('deliveryFee', 45);
@@ -928,7 +935,7 @@ function init() {
           <span class="summary-total__amount">${STORE.currency}${grandTotal.toFixed(2)}</span>
         </div>
         ${(() => {
-          const freeOn = storeSettingsData.freeDeliveryEnabled === true;
+          const freeOn = effBranchRaw('freeDeliveryEnabled') === true;
           const threshold = effBranchNum('freeDeliveryThreshold', 400);
           if (!freeOn || fee === 0 || subtotal >= threshold) return '';
           return `<div class="free-delivery-nudge">
@@ -1326,7 +1333,7 @@ function refreshTotals() {
   // Hide free-delivery nudge for pickup (irrelevant) — show otherwise
   const nudge = card.querySelector('.free-delivery-nudge');
   if (nudge) {
-    const freeOn = storeSettingsData.freeDeliveryEnabled === true;
+    const freeOn = effBranchRaw('freeDeliveryEnabled') === true;
     nudge.style.display = (!freeOn || isPickup || fee === 0) ? 'none' : '';
   }
 }
@@ -1339,11 +1346,11 @@ function updatePaymentOptions() {
   const note     = document.getElementById('cod-restricted-note');
   if (!codBtn || !cashBtn || !gcashBtn) return;
 
-  const deliveryEnabled = storeSettingsData.deliveryEnabled !== false;
-  const pickupEnabled   = storeSettingsData.pickupEnabled !== false;
-  const cashAdminOn  = storeSettingsData.payCashEnabled  !== false && pickupEnabled;
-  const gcashAdminOn = storeSettingsData.payGcashEnabled !== false;
-  const codAdminOn   = storeSettingsData.payCodEnabled   !== false && deliveryEnabled;
+  const deliveryEnabled = effBranchRaw('deliveryEnabled') !== false;
+  const pickupEnabled   = effBranchRaw('pickupEnabled') !== false;
+  const cashAdminOn  = effBranchRaw('payCashEnabled')  !== false && pickupEnabled;
+  const gcashAdminOn = effBranchRaw('payGcashEnabled') !== false;
+  const codAdminOn   = effBranchRaw('payCodEnabled')   !== false && deliveryEnabled;
 
   const isPickup = fulfillmentMethod === 'pickup';
 
@@ -1422,7 +1429,7 @@ async function placeOrder() {
       if (!hasError) showToast("Please enter your street.");
       hasError = true;
     }
-    const schedulesOn = storeSettingsData.schedulesEnabled === true;
+    const schedulesOn = effBranchRaw('schedulesEnabled') === true;
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (schedulesOn && hasSlots && !deliverySlot) {
       if (!hasError) showToast("Please select a delivery schedule.");

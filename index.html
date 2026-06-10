@@ -1550,7 +1550,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   if (!tickerOn) {
     // Even when hidden, keep the footer "Delivery Times" + hours in sync
     // since those live OUTSIDE the info-bar (FOOTER block).
-    const schedulesOn  = storeSettingsData.schedulesEnabled === true;
+    const schedulesOn  = effBranchRaw('schedulesEnabled') === true;
     const schedules    = effBranchArr('deliverySchedules');
     const footDel = document.getElementById('footer-delivery-times');
     if (footDel) {
@@ -1564,12 +1564,12 @@ function buildTicker(rainMode, storeClosed, maintenance) {
     if (footDays) footDays.textContent = fmtOpenDaysFooter(getOpenDays());
     return;
   }
-  const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
+  const areasOn      = effBranchRaw('deliveryAreasEnabled') !== false;
   const areas        = effBranchArr('deliveryAreas');
-  const feeOn        = storeSettingsData.deliveryFeeEnabled === true;
-  const freeDelOn    = storeSettingsData.freeDeliveryEnabled === true;
+  const feeOn        = effBranchRaw('deliveryFeeEnabled') === true;
+  const freeDelOn    = effBranchRaw('freeDeliveryEnabled') === true;
   const threshold    = effBranchNum('freeDeliveryThreshold', 400);
-  const schedulesOn  = storeSettingsData.schedulesEnabled === true;
+  const schedulesOn  = effBranchRaw('schedulesEnabled') === true;
   const schedules    = effBranchArr('deliverySchedules');
   const oH = getOpenHour(), cH = getCloseHour();
   const hoursShort = `${fmtHour12Short(oH)}–${fmtHour12Short(cH)}`;
@@ -2460,9 +2460,9 @@ function cartTotal() {
   }, 0);
 }
 function deliveryFee() {
-  const feeOn = storeSettingsData.deliveryFeeEnabled === true;
+  const feeOn = effBranchRaw('deliveryFeeEnabled') === true;
   if (!feeOn) return 0;
-  const freeOn = storeSettingsData.freeDeliveryEnabled === true;
+  const freeOn = effBranchRaw('freeDeliveryEnabled') === true;
   const threshold = effBranchNum('freeDeliveryThreshold', 400);
   if (freeOn && cartTotal() >= threshold) return 0;
   const amt = effBranchNum('deliveryFee', 45);
@@ -2642,6 +2642,13 @@ function effBranchArr(field) {
   if (b && Array.isArray(b[field])) return b[field];
   const v = storeSettingsData && storeSettingsData[field];
   return Array.isArray(v) ? v : [];
+}
+// Raw per-branch value (used for enable toggles); branch value if present,
+// else tenant default. Caller applies its own !==false / ===true comparison.
+function effBranchRaw(field) {
+  const b = (CURRENT_BRANCH_ID && typeof getBranchById === 'function') ? getBranchById(CURRENT_BRANCH_ID) : null;
+  if (b && b[field] !== undefined) return b[field];
+  return storeSettingsData ? storeSettingsData[field] : undefined;
 }
 function getBranchById(branchId) {
   if (!branchId) return null;

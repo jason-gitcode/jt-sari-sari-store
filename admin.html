@@ -3607,6 +3607,9 @@
             <h3>Service &amp; Payment</h3>
             <div class="section-sub">Control whether you offer delivery and which payment methods customers can pick at checkout.</div>
 
+            <div id="svc-branch-notice" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--muted);">📍 You're viewing <strong>All branches</strong>. Delivery &amp; payment settings are configured <strong>per branch</strong> — pick a branch from the selector at the top of the page to edit its settings.</div>
+            <div id="svc-branch-body">
+
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">🛵 Offer delivery <span class="mode-badge off" id="set-delivery-badge">OFF</span></div>
@@ -3794,6 +3797,7 @@
                 <button class="btn-logout-settings" id="areas-save-btn" onclick="saveDeliveryAreas()">Save areas</button>
               </div>
             </div>
+            </div><!-- /#svc-branch-body -->
           </section>
 
           <section class="settings-section" id="set-appearance">
@@ -4154,37 +4158,6 @@
             <label for="branch-form-gcash-number" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">GCash number</label>
             <input id="branch-form-gcash-number" type="tel" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx"
               style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; outline:none; box-sizing:border-box;" />
-          </div>
-        </div>
-        <div style="border-top:1px dashed var(--line); padding-top:14px;">
-          <div style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Delivery overrides for this branch</div>
-          <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">Leave any field blank to use the store-wide setting. These apply only to customers ordering from this branch.</div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-            <div>
-              <label for="branch-form-delivery-fee" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery fee (₱)</label>
-              <input id="branch-form-delivery-fee" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
-                style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
-            </div>
-            <div>
-              <label for="branch-form-free-threshold" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Free delivery over (₱)</label>
-              <input id="branch-form-free-threshold" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
-                style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
-            </div>
-          </div>
-          <div style="margin-bottom:12px;">
-            <label for="branch-form-cod-max" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Max order for COD (₱) — 0 = no limit</label>
-            <input id="branch-form-cod-max" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
-              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
-          </div>
-          <div style="margin-bottom:12px;">
-            <label for="branch-form-areas" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery areas — one per line</label>
-            <textarea id="branch-form-areas" rows="3" placeholder="Leave blank to use store areas"
-              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
-          </div>
-          <div>
-            <label for="branch-form-schedules" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery time windows — one per line, e.g. 10:00-14:00 (24-hour)</label>
-            <textarea id="branch-form-schedules" rows="3" placeholder="Leave blank to use store schedule"
-              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
           </div>
         </div>
         <div style="border-top:1px dashed var(--line); padding-top:14px;">
@@ -5829,7 +5802,7 @@ async function toggleServiceOption(field, value) {
   // Guard: don't let admin disable ALL payment methods
   if (field.startsWith('pay') && value === false) {
     const others = ['payCashEnabled', 'payGcashEnabled', 'payCodEnabled'].filter(k => k !== field);
-    const anyOtherOn = others.some(k => storeSettingsData[k] !== false);
+    const anyOtherOn = others.some(k => svcGet(k) !== false);
     if (!anyOtherOn) {
       alert('At least one payment method must stay enabled. Turn another method on first before disabling this one.');
       // revert the checkbox visual state
@@ -5840,14 +5813,14 @@ async function toggleServiceOption(field, value) {
   // Guard: don't let admin disable both fulfillment methods
   if ((field === 'deliveryEnabled' || field === 'pickupEnabled') && value === false) {
     const other = field === 'deliveryEnabled' ? 'pickupEnabled' : 'deliveryEnabled';
-    if (storeSettingsData[other] === false) {
+    if (svcGet(other) === false) {
       alert('At least one of "Offer delivery" or "Offer pick-up" must stay enabled — otherwise customers can\'t complete an order.');
       syncServiceToggles();
       return;
     }
   }
   try {
-    await tdoc('settings', 'store').set({ [field]: value }, { merge: true });
+    await svcRefFor(field).set({ [field]: value }, { merge: true });
     showToast('Updated.', 'success');
   } catch (err) {
     console.error(err);
@@ -5856,20 +5829,73 @@ async function toggleServiceOption(field, value) {
   }
 }
 
+// ============================================================
+// Per-branch Service & Payment editing (Pro multi-branch)
+// ------------------------------------------------------------
+// When a branch is selected in the header picker (and branches exist), the
+// Service & Payment section reads/writes THAT branch's doc; otherwise it edits
+// the tenant settings/store. "All branches" → the section is grayed out.
+// ============================================================
+const BRANCH_SCOPED_SVC_FIELDS = new Set([
+  'deliveryEnabled','pickupEnabled','payCashEnabled','payGcashEnabled','payCodEnabled',
+  'codMaxAmount','schedulesEnabled','deliverySchedules','deliveryFeeEnabled','deliveryFee',
+  'freeDeliveryEnabled','freeDeliveryThreshold','deliveryAreasEnabled','deliveryAreas'
+]);
+function svcEditingBranchId() {
+  return (Array.isArray(branchesData) && branchesData.length > 0 && SELECTED_BRANCH_FILTER)
+    ? SELECTED_BRANCH_FILTER : null;
+}
+// Read a Service & Payment value from the right source (branch doc when a
+// branch is selected, else settings/store).
+function svcGet(field) {
+  const bid = svcEditingBranchId();
+  if (bid && BRANCH_SCOPED_SVC_FIELDS.has(field)) {
+    return (branchesData.find(x => x.id === bid) || {})[field];
+  }
+  return (storeSettingsData || {})[field];
+}
+// Firestore doc to write a Service & Payment field to.
+function svcRefFor(field) {
+  const bid = svcEditingBranchId();
+  if (bid && BRANCH_SCOPED_SVC_FIELDS.has(field)) return tcol('branches').doc(bid);
+  return tdoc('settings', 'store');
+}
+// True when multi-branch tenant is on "All branches" → Service & Payment is
+// read-only (owner must pick a branch to edit).
+function svcSectionLocked() {
+  return (Array.isArray(branchesData) && branchesData.length > 0 && !SELECTED_BRANCH_FILTER);
+}
+// Disable + dim the Service & Payment section and show a "pick a branch" notice
+// when on "All branches"; restore otherwise.
+function applyServiceBranchGate() {
+  const section = document.getElementById('set-service');
+  if (!section) return;
+  const locked = svcSectionLocked();
+  const notice = document.getElementById('svc-branch-notice');
+  if (notice) notice.style.display = locked ? '' : 'none';
+  const body = document.getElementById('svc-branch-body');
+  if (body) {
+    body.style.opacity = locked ? '0.4' : '';
+    body.style.pointerEvents = locked ? 'none' : '';
+    body.setAttribute('aria-disabled', locked ? 'true' : 'false');
+  }
+}
+
 function syncServiceToggles() {
+  applyServiceBranchGate();
   // Default true if field absent (preserves existing tenants' behaviour)
-  const deliveryOn = storeSettingsData.deliveryEnabled !== false;
-  const pickupOn   = storeSettingsData.pickupEnabled !== false;
+  const deliveryOn = svcGet('deliveryEnabled') !== false;
+  const pickupOn   = svcGet('pickupEnabled') !== false;
   const fields = {
     'set-delivery-enabled':  deliveryOn,
     'set-pickup-enabled':    pickupOn,
-    'set-pay-cash-enabled':  storeSettingsData.payCashEnabled   !== false,
-    'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
-    'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false,
-    'set-schedules-enabled': storeSettingsData.schedulesEnabled === true,
-    'set-del-fee-enabled':   storeSettingsData.deliveryFeeEnabled === true,
-    'set-free-del-enabled':  storeSettingsData.freeDeliveryEnabled === true,
-    'set-areas-enabled':     storeSettingsData.deliveryAreasEnabled !== false,
+    'set-pay-cash-enabled':  svcGet('payCashEnabled')   !== false,
+    'set-pay-gcash-enabled': svcGet('payGcashEnabled')  !== false,
+    'set-pay-cod-enabled':   svcGet('payCodEnabled')    !== false,
+    'set-schedules-enabled': svcGet('schedulesEnabled') === true,
+    'set-del-fee-enabled':   svcGet('deliveryFeeEnabled') === true,
+    'set-free-del-enabled':  svcGet('freeDeliveryEnabled') === true,
+    'set-areas-enabled':     svcGet('deliveryAreasEnabled') !== false,
     'set-ticker-enabled':    storeSettingsData.tickerEnabled !== false,
     'set-logo-enabled':      storeSettingsData.logoEnabled === true
   };
@@ -6003,7 +6029,7 @@ function renderSchedulesEditor() {
   if (!list) return;
   if (scheduleRows === null) {
     // First render after settings snapshot: seed from doc, or defaults.
-    const fromDoc = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : null;
+    const fromDoc = Array.isArray(svcGet('deliverySchedules')) ? svcGet('deliverySchedules') : null;
     scheduleRows = (fromDoc && fromDoc.length > 0) ? fromDoc.map(s => ({ start: s.start || '', end: s.end || '' })) : getDefaultSchedules();
   }
   list.innerHTML = scheduleRows.map((s, i) => `
@@ -6055,7 +6081,7 @@ function updateScheduleRow(idx, key, val) {
 function syncCodLimitEditor() {
   const input = document.getElementById('cod-limit-amount');
   if (!input || document.activeElement === input) return;
-  const val = (typeof storeSettingsData.codMaxAmount === 'number') ? storeSettingsData.codMaxAmount : 0;
+  const val = (typeof svcGet('codMaxAmount') === 'number') ? svcGet('codMaxAmount') : 0;
   input.value = String(val);
 }
 
@@ -6072,7 +6098,7 @@ async function saveCodMaxAmount() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ codMaxAmount: n }, { merge: true });
+    await svcRefFor('codMaxAmount').set({ codMaxAmount: n }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = n === 0 ? '✅ Saved — no COD limit.' : `✅ Saved — COD allowed up to ₱${n}.`;
   } catch (err) {
@@ -6090,7 +6116,7 @@ async function saveCodMaxAmount() {
 function syncDeliveryFeeEditor() {
   const input = document.getElementById('del-fee-amount');
   if (!input || document.activeElement === input) return;
-  const val = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  const val = (typeof svcGet('deliveryFee') === 'number') ? svcGet('deliveryFee') : 45;
   input.value = String(val);
 }
 
@@ -6107,7 +6133,7 @@ async function saveDeliveryFeeAmount() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ deliveryFee: n }, { merge: true });
+    await svcRefFor('deliveryFee').set({ deliveryFee: n }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved.';
   } catch (err) {
@@ -6125,7 +6151,7 @@ async function saveDeliveryFeeAmount() {
 function syncFreeDeliveryEditor() {
   const input = document.getElementById('free-del-threshold');
   if (!input || document.activeElement === input) return;
-  const val = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  const val = (typeof svcGet('freeDeliveryThreshold') === 'number') ? svcGet('freeDeliveryThreshold') : 400;
   input.value = String(val);
 }
 
@@ -6142,7 +6168,7 @@ async function saveFreeDeliveryThreshold() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ freeDeliveryThreshold: n }, { merge: true });
+    await svcRefFor('freeDeliveryThreshold').set({ freeDeliveryThreshold: n }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved.';
   } catch (err) {
@@ -6163,7 +6189,7 @@ function renderAreasEditor() {
   const list = document.getElementById('areas-list');
   if (!list) return;
   if (areaRows === null) {
-    const fromDoc = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
+    const fromDoc = Array.isArray(svcGet('deliveryAreas')) ? svcGet('deliveryAreas') : [];
     areaRows = fromDoc.length > 0 ? [...fromDoc] : [''];
   }
   list.innerHTML = areaRows.map((a, i) => `
@@ -6205,7 +6231,7 @@ async function saveDeliveryAreas() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ deliveryAreas: cleaned }, { merge: true });
+    await svcRefFor('deliveryAreas').set({ deliveryAreas: cleaned }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved.';
   } catch (err) {
@@ -6247,7 +6273,7 @@ async function saveDeliverySchedules() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.textContent = 'Saving...';
   try {
-    await tdoc('settings', 'store').set({ deliverySchedules: cleaned }, { merge: true });
+    await svcRefFor('deliverySchedules').set({ deliverySchedules: cleaned }, { merge: true });
     status.style.color = '#16a34a';
     status.textContent = '✅ Saved.';
   } catch (err) {
@@ -7721,6 +7747,11 @@ async function onBranchFilterChange(value) {
   if (typeof renderProducts === 'function') renderProducts();
   // Suppliers list scopes to the selected branch too.
   if (typeof renderSuppliers === 'function') renderSuppliers();
+  // Service & Payment is per-branch — reset cached editor rows so they re-seed
+  // from the newly selected branch (or store), then re-sync the whole section.
+  scheduleRows = null;
+  areaRows = null;
+  if (typeof syncServiceToggles === 'function') syncServiceToggles();
 }
 
 // Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
@@ -7741,6 +7772,8 @@ function subscribeToBranches() {
     if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof updateOrderBadge === 'function') updateOrderBadge();
+    // Reflect saved per-branch Service & Payment edits in the Settings tab.
+    if (typeof syncServiceToggles === 'function') syncServiceToggles();
   }, err => {
     console.warn('[branches] listener:', err);
   });
@@ -7870,11 +7903,6 @@ function openBranchFormModal(mode, branchId) {
     addrInput.value = '';
     gcashNameInput.value = '';
     gcashNumInput.value = '';
-    document.getElementById('branch-form-delivery-fee').value = '';
-    document.getElementById('branch-form-free-threshold').value = '';
-    document.getElementById('branch-form-cod-max').value = '';
-    document.getElementById('branch-form-areas').value = '';
-    document.getElementById('branch-form-schedules').value = '';
     defaultInput.checked = (branchesData.length === 0); // first branch defaults to isDefault
     if (idHint) idHint.style.display = '';
   } else {
@@ -7887,11 +7915,6 @@ function openBranchFormModal(mode, branchId) {
     addrInput.value = b.address || '';
     gcashNameInput.value = b.gcashAccountName || '';
     gcashNumInput.value = b.gcashNumber || '';
-    document.getElementById('branch-form-delivery-fee').value = (typeof b.deliveryFee === 'number') ? b.deliveryFee : '';
-    document.getElementById('branch-form-free-threshold').value = (typeof b.freeDeliveryThreshold === 'number') ? b.freeDeliveryThreshold : '';
-    document.getElementById('branch-form-cod-max').value = (typeof b.codMaxAmount === 'number') ? b.codMaxAmount : '';
-    document.getElementById('branch-form-areas').value = Array.isArray(b.deliveryAreas) ? b.deliveryAreas.join('\n') : '';
-    document.getElementById('branch-form-schedules').value = Array.isArray(b.deliverySchedules) ? b.deliverySchedules.map(s => `${s.start}-${s.end}`).join('\n') : '';
     defaultInput.checked = b.isDefault === true;
     if (idHint) idHint.style.display = 'none';
   }
@@ -7989,10 +8012,6 @@ async function saveBranchForm() {
   const gcashNumber = (gcashNumInput.value || '').trim();
   const isDefault = defaultInput.checked;
 
-  // Per-branch delivery overrides — blank fields inherit the tenant default.
-  const ovr = parseBranchOverrides(statusEl);
-  if (!ovr) return;
-
   // Validation
   if (!BRANCH_ID_REGEX.test(branchId)) {
     statusEl.textContent = 'Branch URL ID: lowercase letters/numbers/hyphens, 2–32 chars, no leading/trailing hyphens.';
@@ -8035,11 +8054,6 @@ async function saveBranchForm() {
       address: address || null,
       gcashAccountName: gcashAccountName || null,
       gcashNumber: gcashNumber || null,
-      deliveryFee: ovr.deliveryFee,
-      freeDeliveryThreshold: ovr.freeDeliveryThreshold,
-      codMaxAmount: ovr.codMaxAmount,
-      deliveryAreas: ovr.deliveryAreas,
-      deliverySchedules: ovr.deliverySchedules,
       isDefault,
       active: true,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -8048,6 +8062,14 @@ async function saveBranchForm() {
     if (branchFormMode === 'add') {
       baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       baseData.createdBy = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
+      // Seed Service & Payment settings from the current store config so the
+      // new branch starts as a full, independent copy. After creation these
+      // are edited from the main Settings tab via the branch picker.
+      const seed = storeSettingsData || {};
+      ['deliveryEnabled','pickupEnabled','payCashEnabled','payGcashEnabled','payCodEnabled',
+       'codMaxAmount','schedulesEnabled','deliverySchedules','deliveryFeeEnabled','deliveryFee',
+       'freeDeliveryEnabled','freeDeliveryThreshold','deliveryAreasEnabled','deliveryAreas'
+      ].forEach(f => { if (seed[f] !== undefined) baseData[f] = seed[f]; });
     }
 
     // If isDefault was just set, transactionally unset any other default
