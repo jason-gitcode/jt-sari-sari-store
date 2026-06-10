@@ -811,7 +811,7 @@ function applyTenantStoreConfig() {
   if (ffPickBtn) ffPickBtn.style.display = pickupOn   ? '' : 'none';
 
   const sched = document.getElementById('schedule-section');
-  const schedulesOn = storeSettingsData.schedulesEnabled !== false;
+  const schedulesOn = storeSettingsData.schedulesEnabled === true;
   if (!deliveryOn) {
     // No delivery → hide address + schedule sections; always show pickup-info.
     const addr = document.getElementById('delivery-address-section');
@@ -1437,7 +1437,7 @@ async function placeOrder() {
     }
     // Only require a slot if the tenant has the schedule picker enabled
     // AND has at least one slot configured.
-    const schedulesOn = storeSettingsData.schedulesEnabled !== false;
+    const schedulesOn = storeSettingsData.schedulesEnabled === true;
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (schedulesOn && hasSlots && !deliverySlot) {
       if (!hasError) showToast("Please select a delivery schedule.");

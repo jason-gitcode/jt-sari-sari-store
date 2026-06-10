@@ -805,7 +805,7 @@ function applyTenantStoreConfig() {
   if (ffDelBtn)  ffDelBtn.style.display  = deliveryOn ? '' : 'none';
   if (ffPickBtn) ffPickBtn.style.display = pickupOn   ? '' : 'none';
   const sched = document.getElementById('schedule-section');
-  const schedulesOn = storeSettingsData.schedulesEnabled !== false;
+  const schedulesOn = storeSettingsData.schedulesEnabled === true;
   if (!deliveryOn) {
     const addr = document.getElementById('delivery-address-section');
     if (addr) addr.style.display = 'none';
@@ -1409,7 +1409,7 @@ async function placeOrder() {
       if (!hasError) showToast("Please enter your street.");
       hasError = true;
     }
-    const schedulesOn = storeSettingsData.schedulesEnabled !== false;
+    const schedulesOn = storeSettingsData.schedulesEnabled === true;
     const hasSlots = scheduleSlotsFromSettings().length > 0;
     if (schedulesOn && hasSlots && !deliverySlot) {
       if (!hasError) showToast("Please select a delivery schedule.");

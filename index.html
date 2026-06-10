@@ -1550,7 +1550,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   if (!tickerOn) {
     // Even when hidden, keep the footer "Delivery Times" + hours in sync
     // since those live OUTSIDE the info-bar (FOOTER block).
-    const schedulesOn  = storeSettingsData.schedulesEnabled !== false;
+    const schedulesOn  = storeSettingsData.schedulesEnabled === true;
     const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
     const footDel = document.getElementById('footer-delivery-times');
     if (footDel) {
@@ -1569,7 +1569,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
   const feeOn        = storeSettingsData.deliveryFeeEnabled !== false;
   const freeDelOn    = storeSettingsData.freeDeliveryEnabled !== false;
   const threshold    = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
-  const schedulesOn  = storeSettingsData.schedulesEnabled !== false;
+  const schedulesOn  = storeSettingsData.schedulesEnabled === true;
   const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
   const oH = getOpenHour(), cH = getCloseHour();
   const hoursShort = `${fmtHour12Short(oH)}–${fmtHour12Short(cH)}`;
