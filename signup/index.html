@@ -2091,9 +2091,8 @@
     <div class="step-title">Check your email</div>
     <div class="step-body">
       <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
-        We sent a link to <strong id="verify-email"></strong>. Tap it to continue — it'll bring you straight to your store setup. Opening it on your phone works too.
+        We sent a link to <strong id="verify-email"></strong>. Tap it to continue — it'll bring you straight to your store setup. Opening it on your phone works too; this page will move along on its own once you do.
       </p>
-      <button type="button" class="btn btn-primary" onclick="checkVerified()">I've already tapped the link — continue</button>
       <div class="auth-links">
         <button type="button" class="link-btn" onclick="resendVerification()">Resend link</button>
         <button type="button" class="link-btn" onclick="signOut()">Use a different account</button>
@@ -2685,8 +2684,35 @@ function scrollToPricing() {
 // instead of letting them see the hero / pricing / FAQ. Subsequent
 // calls (signin → details, submit → success, etc.) are user-initiated
 // and SHOULD snap the now-collapsed card back into view.
+// While the user sits on "Check your email," quietly poll for verification so
+// THIS tab advances on its own the moment they tap the link — on this device
+// (cross-tab) or another (e.g. email opened on their phone). Replaces the old
+// manual "I've verified — continue" button.
+let _verifyPollTimer = null;
+function stopVerifyPolling() {
+  if (_verifyPollTimer) { clearInterval(_verifyPollTimer); _verifyPollTimer = null; }
+}
+function startVerifyPolling() {
+  stopVerifyPolling();
+  _verifyPollTimer = setInterval(async () => {
+    const u = auth.currentUser;
+    if (!u) { stopVerifyPolling(); return; }
+    try {
+      await u.reload();
+      const fresh = auth.currentUser;
+      if (fresh && fresh.emailVerified) {
+        stopVerifyPolling();
+        await fresh.getIdToken(true); // push email_verified=true to the callables
+        proceedVerifiedUser(fresh);
+      }
+    } catch (_) { /* transient — keep polling */ }
+  }, 4000);
+}
+
 let _showStepFiredOnce = false;
 function showStep(id) {
+  // Auto-advance polling runs only on the verify step.
+  if (id === 'step-verify') startVerifyPolling(); else stopVerifyPolling();
   ['step-signin', 'step-verify', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
@@ -2896,25 +2922,6 @@ async function resendVerification() {
     showNotice('Sent', `We re-sent the sign-in link to ${u.email}.`);
   } catch (err) {
     showNotice('Could not resend', authError(err));
-  }
-}
-
-async function checkVerified() {
-  const u = auth.currentUser;
-  if (!u) { showStep('step-signin'); return; }
-  try {
-    await u.reload();
-    const fresh = auth.currentUser;
-    if (fresh && fresh.emailVerified) {
-      // Force a token refresh so the email_verified=true claim reaches the
-      // Cloud Functions (the cached token still says false otherwise).
-      await fresh.getIdToken(true);
-      proceedVerifiedUser(fresh);
-    } else {
-      showNotice('Not yet verified', 'Open the verification link in your email, then tap "I\'ve verified" again.');
-    }
-  } catch (err) {
-    showNotice('Something went wrong', authError(err));
   }
 }
 
