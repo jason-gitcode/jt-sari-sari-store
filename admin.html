@@ -2196,8 +2196,12 @@
       .storefront-btn span { display: none; }
       .storefront-btn { padding: 7px 11px; }
       .container { padding: 14px 12px 20px; }
-      .tabs { width: 100%; overflow-x: auto; }
-      .tab-btn { padding: 6px 12px; }
+      /* Wrap tabs onto two rows instead of hiding them behind a horizontal
+         scroll — every tab (incl. Reports / Billing / Settings) stays visible
+         with no off-screen scroll the owner can't discover. flex:1 spreads
+         them into a tidy even grid; taller padding meets the 44px tap target. */
+      .tabs { width: 100%; flex-wrap: wrap; }
+      .tab-btn { padding: 10px 12px; flex: 1 1 auto; justify-content: center; min-height: 44px; }
       .page-title { font-size: var(--fs-lg); }
       /* Stack the page-header on phones — title + description on top,
          the pill/Delete/Add Product row below — so the product list
