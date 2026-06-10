@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 
 initializeApp();
 
@@ -530,6 +531,14 @@ exports.deleteTenant = onCall(async (request) => {
   }
 
   const tref = db.collection('tenants').doc(slug);
+
+  // Capture the owner email(s) BEFORE deleting the doc — we need them to also
+  // remove the owner's Firebase Auth login. With MAX_TENANTS_PER_EMAIL = 1 the
+  // owner has no other store, so the account is safe to delete outright.
+  const tsnap = await tref.get();
+  const tdata = tsnap.exists ? (tsnap.data() || {}) : {};
+  const ownerEmails = Array.isArray(tdata.ownerEmails) ? tdata.ownerEmails : [];
+
   // recursiveDelete handles arbitrary nesting and large subcollections
   // server-side; far more reliable than client-side per-doc loops.
   await db.recursiveDelete(tref);
@@ -541,7 +550,27 @@ exports.deleteTenant = onCall(async (request) => {
     console.error('public directory remove failed for tenant', slug, err);
   }
 
-  return { slug, deleted: true };
+  // Delete the owner's Firebase Auth account(s). Best-effort: a failure here
+  // must NOT undo the (already completed) tenant deletion, so each lookup is
+  // wrapped individually. A superadmin login is never deleted, even if one
+  // somehow appears as an owner.
+  const authDeleted = [];
+  const authFailed = [];
+  for (const raw of ownerEmails) {
+    const email = String(raw || '').trim().toLowerCase();
+    if (!email || SUPERADMIN_EMAILS.has(email)) continue;
+    try {
+      const user = await getAuth().getUserByEmail(email);
+      await getAuth().deleteUser(user.uid);
+      authDeleted.push(email);
+    } catch (err) {
+      if (err && err.code === 'auth/user-not-found') continue; // already gone
+      console.error('auth user delete failed for', email, err);
+      authFailed.push(email);
+    }
+  }
+
+  return { slug, deleted: true, authDeleted, authFailed };
 });
 
 // ============================================================

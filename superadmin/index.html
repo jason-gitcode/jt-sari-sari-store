@@ -1484,8 +1484,14 @@ async function confirmDelete() {
   btn.textContent = 'Deleting…';
   try {
     showStatus(status, 'Deleting tenant on the server…', '');
-    await deleteTenantFn({ slug });
-    showStatus(status, `✅ Deleted tenant ${slug}.`, 'success');
+    const res = await deleteTenantFn({ slug });
+    const r = (res && res.data) || {};
+    const nDeleted = Array.isArray(r.authDeleted) ? r.authDeleted.length : 0;
+    const failed = Array.isArray(r.authFailed) ? r.authFailed : [];
+    let msg = `✅ Deleted tenant ${slug}.`;
+    if (nDeleted > 0) msg += ` Removed ${nDeleted} owner login${nDeleted === 1 ? '' : 's'} from Authentication.`;
+    if (failed.length > 0) msg += ` ⚠️ Could not delete login(s): ${failed.join(', ')} — remove manually in Firebase Auth.`;
+    showStatus(status, msg, failed.length > 0 ? 'error' : 'success');
     setTimeout(() => {
       closeDeleteModal();
       loadTenants();
