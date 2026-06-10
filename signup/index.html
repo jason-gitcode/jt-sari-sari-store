@@ -2088,12 +2088,12 @@
 
   <!-- VERIFY EMAIL (email/password owners awaiting verification) -->
   <div id="step-verify" class="hidden">
-    <div class="step-title">Verify your email</div>
+    <div class="step-title">Check your email</div>
     <div class="step-body">
       <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
-        We sent a verification link to <strong id="verify-email"></strong>. Open it on this device, then tap below.
+        We sent a link to <strong id="verify-email"></strong>. Tap it to continue — it'll bring you straight to your store setup. Opening it on your phone works too.
       </p>
-      <button type="button" class="btn btn-primary" onclick="checkVerified()">I've verified — continue</button>
+      <button type="button" class="btn btn-primary" onclick="checkVerified()">I've already tapped the link — continue</button>
       <div class="auth-links">
         <button type="button" class="link-btn" onclick="resendVerification()">Resend link</button>
         <button type="button" class="link-btn" onclick="signOut()">Use a different account</button>
@@ -2796,9 +2796,19 @@ async function emailAuthSubmit() {
   btn.disabled = true; btn.textContent = 'Please wait…';
   try {
     if (authMode === 'signup') {
-      const cred = await auth.createUserWithEmailAndPassword(email, pw);
-      await cred.user.sendEmailVerification({ url: window.location.origin + '/auth/?verified=1' });
-      // onAuthStateChanged routes the (unverified) user to step-verify.
+      await auth.createUserWithEmailAndPassword(email, pw);
+      // Send a SIGN-IN link (not a bare verification link). Clicking it signs
+      // the user in on whatever device opens it AND marks the email verified,
+      // so they land straight on the store-setup form — even when they open the
+      // email on their phone. The completeMagicLink handler on /signup/ does the
+      // sign-in; onAuthStateChanged then routes to step-details. The password
+      // they just set still works for all future logins.
+      await auth.sendSignInLinkToEmail(email, {
+        url: window.location.origin + '/signup/',
+        handleCodeInApp: true,
+      });
+      window.localStorage.setItem(MAGIC_LINK_KEY, email);
+      // onAuthStateChanged routes the (still-unverified) user to step-verify.
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
       // onAuthStateChanged routes: verified → details, unverified → step-verify.
@@ -2876,8 +2886,14 @@ async function resendVerification() {
   const u = auth.currentUser;
   if (!u) { showStep('step-signin'); return; }
   try {
-    await u.sendEmailVerification({ url: window.location.origin + '/auth/?verified=1' });
-    showNotice('Sent', `We re-sent the verification link to ${u.email}.`);
+    // Re-send the same SIGN-IN link the signup step uses (lands on the store
+    // form, signed in, on any device) — not a bare verification link.
+    await auth.sendSignInLinkToEmail(u.email, {
+      url: window.location.origin + '/signup/',
+      handleCodeInApp: true,
+    });
+    window.localStorage.setItem(MAGIC_LINK_KEY, u.email);
+    showNotice('Sent', `We re-sent the sign-in link to ${u.email}.`);
   } catch (err) {
     showNotice('Could not resend', authError(err));
   }
