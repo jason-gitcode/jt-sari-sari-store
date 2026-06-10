@@ -2333,6 +2333,7 @@ auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(err => {
 const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
 const getMyTenant  = functions.httpsCallable('getMyTenant');
+const sendStoreSignInLink = functions.httpsCallable('sendStoreSignInLink');
 
 // ============================================================
 // Store finder — discover existing storefronts by name
@@ -2823,17 +2824,20 @@ async function emailAuthSubmit() {
   try {
     if (authMode === 'signup') {
       await auth.createUserWithEmailAndPassword(email, pw);
-      // Send a SIGN-IN link (not a bare verification link). Clicking it signs
-      // the user in on whatever device opens it AND marks the email verified,
-      // so they land straight on the store-setup form — even when they open the
-      // email on their phone. The completeMagicLink handler on /signup/ does the
-      // sign-in; onAuthStateChanged then routes to step-details. The password
-      // they just set still works for all future logins.
-      await auth.sendSignInLinkToEmail(email, {
-        url: window.location.origin + '/signup/',
-        handleCodeInApp: true,
-      });
+      // Branded sign-in link via our Cloud Function (Resend, from
+      // noreply@mail.pabilimart.com). Clicking it signs the user in on whatever
+      // device opens it AND marks the email verified, so they land straight on
+      // the store-setup form. completeMagicLink on /signup/ does the sign-in;
+      // onAuthStateChanged then routes to step-details. The password still works.
       window.localStorage.setItem(MAGIC_LINK_KEY, email);
+      try {
+        await sendStoreSignInLink({ email });
+      } catch (sendErr) {
+        // Account already created (onAuthStateChanged shows step-verify); let
+        // them retry from there rather than blocking signup.
+        console.error('sendStoreSignInLink failed:', sendErr);
+        showNotice('Account created', 'We hit a snag sending your link. On the next screen, tap "Resend link".');
+      }
       // onAuthStateChanged routes the (still-unverified) user to step-verify.
     } else {
       await auth.signInWithEmailAndPassword(email, pw);
@@ -2912,16 +2916,12 @@ async function resendVerification() {
   const u = auth.currentUser;
   if (!u) { showStep('step-signin'); return; }
   try {
-    // Re-send the same SIGN-IN link the signup step uses (lands on the store
-    // form, signed in, on any device) — not a bare verification link.
-    await auth.sendSignInLinkToEmail(u.email, {
-      url: window.location.origin + '/signup/',
-      handleCodeInApp: true,
-    });
+    // Re-send the same branded sign-in link the signup step uses.
     window.localStorage.setItem(MAGIC_LINK_KEY, u.email);
+    await sendStoreSignInLink({ email: u.email });
     showNotice('Sent', `We re-sent the sign-in link to ${u.email}.`);
   } catch (err) {
-    showNotice('Could not resend', authError(err));
+    showNotice('Could not resend', (err && err.message) ? err.message : 'Please try again in a moment.');
   }
 }
 
