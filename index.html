@@ -1551,7 +1551,7 @@ function buildTicker(rainMode, storeClosed, maintenance) {
     // Even when hidden, keep the footer "Delivery Times" + hours in sync
     // since those live OUTSIDE the info-bar (FOOTER block).
     const schedulesOn  = storeSettingsData.schedulesEnabled === true;
-    const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
+    const schedules    = effBranchArr('deliverySchedules');
     const footDel = document.getElementById('footer-delivery-times');
     if (footDel) {
       footDel.textContent = (schedulesOn && schedules.length > 0)
@@ -1565,12 +1565,12 @@ function buildTicker(rainMode, storeClosed, maintenance) {
     return;
   }
   const areasOn      = storeSettingsData.deliveryAreasEnabled !== false;
-  const areas        = Array.isArray(storeSettingsData.deliveryAreas) ? storeSettingsData.deliveryAreas : [];
+  const areas        = effBranchArr('deliveryAreas');
   const feeOn        = storeSettingsData.deliveryFeeEnabled === true;
   const freeDelOn    = storeSettingsData.freeDeliveryEnabled === true;
-  const threshold    = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  const threshold    = effBranchNum('freeDeliveryThreshold', 400);
   const schedulesOn  = storeSettingsData.schedulesEnabled === true;
-  const schedules    = Array.isArray(storeSettingsData.deliverySchedules) ? storeSettingsData.deliverySchedules : [];
+  const schedules    = effBranchArr('deliverySchedules');
   const oH = getOpenHour(), cH = getCloseHour();
   const hoursShort = `${fmtHour12Short(oH)}–${fmtHour12Short(cH)}`;
   const hoursLong  = `${fmtHour12Long(oH)} – ${fmtHour12Long(cH)}`;
@@ -2463,9 +2463,9 @@ function deliveryFee() {
   const feeOn = storeSettingsData.deliveryFeeEnabled === true;
   if (!feeOn) return 0;
   const freeOn = storeSettingsData.freeDeliveryEnabled === true;
-  const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  const threshold = effBranchNum('freeDeliveryThreshold', 400);
   if (freeOn && cartTotal() >= threshold) return 0;
-  const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  const amt = effBranchNum('deliveryFee', 45);
   return amt;
 }
 function cartCount() {
@@ -2628,6 +2628,21 @@ function writeSavedBranchId(branchId) {
   } catch (_) { /* ignore — quota / disabled storage */ }
 }
 
+// Per-branch delivery economics on the storefront — branch override if the
+// customer has a branch selected, else the tenant default. Mirrors the
+// checkout helpers so ticker/nudge numbers match what checkout will charge.
+function effBranchNum(field, dflt) {
+  const b = (CURRENT_BRANCH_ID && typeof getBranchById === 'function') ? getBranchById(CURRENT_BRANCH_ID) : null;
+  if (b && typeof b[field] === 'number') return b[field];
+  const v = storeSettingsData && storeSettingsData[field];
+  return (typeof v === 'number') ? v : dflt;
+}
+function effBranchArr(field) {
+  const b = (CURRENT_BRANCH_ID && typeof getBranchById === 'function') ? getBranchById(CURRENT_BRANCH_ID) : null;
+  if (b && Array.isArray(b[field])) return b[field];
+  const v = storeSettingsData && storeSettingsData[field];
+  return Array.isArray(v) ? v : [];
+}
 function getBranchById(branchId) {
   if (!branchId) return null;
   return BRANCHES.find(b => b.id === branchId) || null;
@@ -2672,6 +2687,9 @@ async function setCurrentBranch(branchId, opts) {
     if (typeof renderProducts === 'function') renderProducts();
     if (typeof renderCategories === 'function') renderCategories();
     if (typeof renderCart === 'function') renderCart();
+    // Ticker shows branch-specific delivery areas + free-delivery threshold,
+    // so refresh it when the customer switches branch.
+    if (typeof buildTicker === 'function') buildTicker(lastRainMode, storeClosedMode, maintenanceMode);
   }
 }
 

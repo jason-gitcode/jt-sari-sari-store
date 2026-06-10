@@ -4157,6 +4157,37 @@
           </div>
         </div>
         <div style="border-top:1px dashed var(--line); padding-top:14px;">
+          <div style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px;">Delivery overrides for this branch</div>
+          <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">Leave any field blank to use the store-wide setting. These apply only to customers ordering from this branch.</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label for="branch-form-delivery-fee" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery fee (₱)</label>
+              <input id="branch-form-delivery-fee" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
+                style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
+            </div>
+            <div>
+              <label for="branch-form-free-threshold" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Free delivery over (₱)</label>
+              <input id="branch-form-free-threshold" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
+                style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label for="branch-form-cod-max" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Max order for COD (₱) — 0 = no limit</label>
+            <input id="branch-form-cod-max" type="number" min="0" max="100000" step="1" inputmode="numeric" placeholder="store default"
+              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
+          </div>
+          <div style="margin-bottom:12px;">
+            <label for="branch-form-areas" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery areas — one per line</label>
+            <textarea id="branch-form-areas" rows="3" placeholder="Leave blank to use store areas"
+              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+          </div>
+          <div>
+            <label for="branch-form-schedules" style="display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px;">Delivery time windows — one per line, e.g. 10:00-14:00 (24-hour)</label>
+            <textarea id="branch-form-schedules" rows="3" placeholder="Leave blank to use store schedule"
+              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+          </div>
+        </div>
+        <div style="border-top:1px dashed var(--line); padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer;">
             <input type="checkbox" id="branch-form-default" />
             <span>Make this the default branch (shown first to customers who haven't picked one)</span>
@@ -7837,6 +7868,11 @@ function openBranchFormModal(mode, branchId) {
     addrInput.value = '';
     gcashNameInput.value = '';
     gcashNumInput.value = '';
+    document.getElementById('branch-form-delivery-fee').value = '';
+    document.getElementById('branch-form-free-threshold').value = '';
+    document.getElementById('branch-form-cod-max').value = '';
+    document.getElementById('branch-form-areas').value = '';
+    document.getElementById('branch-form-schedules').value = '';
     defaultInput.checked = (branchesData.length === 0); // first branch defaults to isDefault
     if (idHint) idHint.style.display = '';
   } else {
@@ -7849,6 +7885,11 @@ function openBranchFormModal(mode, branchId) {
     addrInput.value = b.address || '';
     gcashNameInput.value = b.gcashAccountName || '';
     gcashNumInput.value = b.gcashNumber || '';
+    document.getElementById('branch-form-delivery-fee').value = (typeof b.deliveryFee === 'number') ? b.deliveryFee : '';
+    document.getElementById('branch-form-free-threshold').value = (typeof b.freeDeliveryThreshold === 'number') ? b.freeDeliveryThreshold : '';
+    document.getElementById('branch-form-cod-max').value = (typeof b.codMaxAmount === 'number') ? b.codMaxAmount : '';
+    document.getElementById('branch-form-areas').value = Array.isArray(b.deliveryAreas) ? b.deliveryAreas.join('\n') : '';
+    document.getElementById('branch-form-schedules').value = Array.isArray(b.deliverySchedules) ? b.deliverySchedules.map(s => `${s.start}-${s.end}`).join('\n') : '';
     defaultInput.checked = b.isDefault === true;
     if (idHint) idHint.style.display = 'none';
   }
@@ -7872,6 +7913,63 @@ function closeBranchFormBackdrop(e) {
   closeBranchFormModal();
 }
 
+// Normalize an "H:MM" / "HH:MM" string to "HH:MM" 24-hour, or null if invalid.
+function normHHMM(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+// Reads the 5 per-branch delivery override inputs. Each returns a value
+// (override) or null (inherit the tenant default). Returns null + shows a
+// message on a validation error.
+function parseBranchOverrides(statusEl) {
+  const readNum = (id) => {
+    const raw = (document.getElementById(id).value || '').trim();
+    if (raw === '') return { ok: true, val: null };
+    const n = Number(raw);
+    if (!isFinite(n) || n < 0 || n > 100000) return { ok: false, val: null };
+    return { ok: true, val: n };
+  };
+  const fee = readNum('branch-form-delivery-fee');
+  if (!fee.ok) { statusEl.textContent = 'Delivery fee must be a number between 0 and 100000.'; return null; }
+  const thr = readNum('branch-form-free-threshold');
+  if (!thr.ok) { statusEl.textContent = 'Free-delivery threshold must be a number between 0 and 100000.'; return null; }
+  const cod = readNum('branch-form-cod-max');
+  if (!cod.ok) { statusEl.textContent = 'COD max must be a number between 0 and 100000.'; return null; }
+
+  const areasRaw = (document.getElementById('branch-form-areas').value || '').trim();
+  let areas = null;
+  if (areasRaw) {
+    areas = areasRaw.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    if (areas.length === 0) areas = null;
+  }
+
+  const schedRaw = (document.getElementById('branch-form-schedules').value || '').trim();
+  let schedules = null;
+  if (schedRaw) {
+    schedules = [];
+    const lines = schedRaw.split('\n').map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const m = line.match(/^(.+?)\s*-\s*(.+)$/);
+      const start = m && normHHMM(m[1]);
+      const end = m && normHHMM(m[2]);
+      if (!start || !end) { statusEl.textContent = `Time window "${line}" must look like 10:00-14:00 (24-hour).`; return null; }
+      schedules.push({ start, end });
+    }
+    if (schedules.length === 0) schedules = null;
+  }
+
+  return {
+    deliveryFee: fee.val,
+    freeDeliveryThreshold: thr.val,
+    codMaxAmount: cod.val,
+    deliveryAreas: areas,
+    deliverySchedules: schedules
+  };
+}
+
 async function saveBranchForm() {
   const idInput = document.getElementById('branch-form-id');
   const nameInput = document.getElementById('branch-form-name');
@@ -7888,6 +7986,10 @@ async function saveBranchForm() {
   const gcashAccountName = (gcashNameInput.value || '').trim();
   const gcashNumber = (gcashNumInput.value || '').trim();
   const isDefault = defaultInput.checked;
+
+  // Per-branch delivery overrides — blank fields inherit the tenant default.
+  const ovr = parseBranchOverrides(statusEl);
+  if (!ovr) return;
 
   // Validation
   if (!BRANCH_ID_REGEX.test(branchId)) {
@@ -7931,6 +8033,11 @@ async function saveBranchForm() {
       address: address || null,
       gcashAccountName: gcashAccountName || null,
       gcashNumber: gcashNumber || null,
+      deliveryFee: ovr.deliveryFee,
+      freeDeliveryThreshold: ovr.freeDeliveryThreshold,
+      codMaxAmount: ovr.codMaxAmount,
+      deliveryAreas: ovr.deliveryAreas,
+      deliverySchedules: ovr.deliverySchedules,
       isDefault,
       active: true,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -11386,7 +11493,9 @@ function toggleBudgetSkipped() {
 // unchanged — they're shared with the per-item analytics drill-down.
 function renderInventoryReport() {
   if (!document.getElementById('inventory-section')) return;
-  const fil  = filterOrdersForReport(orders || []);
+  // Branch filter: scope to the selected branch ("All branches" = full rollup).
+  const branchScoped = (typeof ordersForActiveBranch === 'function') ? ordersForActiveBranch() : (orders || []);
+  const fil  = filterOrdersForReport(branchScoped);
   const conf = fil.filter(o => o.status === 'confirmed');
   renderTopItems(conf);
   if (dashSelectedItem) renderItemDetail(dashSelectedItem);

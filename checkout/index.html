@@ -503,6 +503,20 @@ function effectiveGcashAccount() {
     number: (b && b.gcashNumber)      || ss.gcashNumber      || STORE.gcashNumber       || '—'
   };
 }
+// Per-branch delivery economics — branch override if set, else tenant default.
+// (fee, free-delivery threshold, COD limit, areas, schedules)
+function effBranchNum(field, dflt) {
+  const b = getCurrentBranch();
+  if (b && typeof b[field] === 'number') return b[field];
+  const v = storeSettingsData && storeSettingsData[field];
+  return (typeof v === 'number') ? v : dflt;
+}
+function effBranchArr(field) {
+  const b = getCurrentBranch();
+  if (b && Array.isArray(b[field])) return b[field];
+  const v = storeSettingsData && storeSettingsData[field];
+  return Array.isArray(v) ? v : [];
+}
 async function loadCheckoutBranches() {
   if (!TENANT_ID) return;
   try {
@@ -577,9 +591,8 @@ function fmtTime12Short(t) {
 }
 
 function scheduleSlotsFromSettings() {
-  const arr = (Array.isArray(storeSettingsData.deliverySchedules) && storeSettingsData.deliverySchedules.length > 0)
-    ? storeSettingsData.deliverySchedules
-    : DEFAULT_DELIVERY_SCHEDULES;
+  const effSched = effBranchArr('deliverySchedules');
+  const arr = (effSched.length > 0) ? effSched : DEFAULT_DELIVERY_SCHEDULES;
   return arr.map(s => ({
     id:    `${s.start}-${s.end}`,
     label: `${fmtTime12Short(s.start)} – ${fmtTime12Short(s.end)}`,
@@ -865,9 +878,9 @@ function deliveryFee() {
   const feeOn = storeSettingsData.deliveryFeeEnabled === true;
   if (!feeOn) return 0;
   const freeOn = storeSettingsData.freeDeliveryEnabled === true;
-  const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+  const threshold = effBranchNum('freeDeliveryThreshold', 400);
   if (freeOn && cartTotal() >= threshold) return 0;
-  const amt = (typeof storeSettingsData.deliveryFee === 'number') ? storeSettingsData.deliveryFee : 45;
+  const amt = effBranchNum('deliveryFee', 45);
   return amt;
 }
 
@@ -927,7 +940,7 @@ function init() {
         </div>
         ${(() => {
           const freeOn = storeSettingsData.freeDeliveryEnabled === true;
-          const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
+          const threshold = effBranchNum('freeDeliveryThreshold', 400);
           if (!freeOn || fee === 0 || subtotal >= threshold) return '';
           return `<div class="free-delivery-nudge">
             <div class="free-delivery-nudge-track"><div class="free-delivery-nudge-fill" style="width:${Math.min(100,(subtotal/threshold)*100).toFixed(1)}%"></div></div>
@@ -1364,8 +1377,8 @@ function updatePaymentOptions() {
   cashBtn.classList.toggle('disabled', !isPickup || !cashAdminOn);
   // Per-tenant COD limit: number > 0 = max cart total for COD; 0 or missing = no limit.
   // Default 200 preserves existing tenants' behaviour from before this was configurable.
-  const codLimitRaw = storeSettingsData.codMaxAmount;
-  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 0;
+  const codLimitEff = effBranchNum('codMaxAmount', 0);
+  const codLimit = (codLimitEff >= 0) ? codLimitEff : 0;
   const codAllowedByTotal = (codLimit === 0) || (total < codLimit);
   const codAllowedByFulfill = !isPickup;
   const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);
