@@ -13,7 +13,22 @@
   }
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>JS Mini Mart</title>
+<title>Pabili Mart</title>
+<!-- Link-preview (OpenGraph/Twitter) defaults. These are NEUTRAL platform
+     defaults; the storefrontMeta Cloud Function rewrites the content per tenant
+     (by slug) at request time so Messenger/Facebook/etc. unfurl the actual store
+     name. Crawlers don't run JS, so these MUST live in the served HTML. -->
+<meta name="description" content="Order from your neighborhood store, carinderia, or café — delivered or for pickup." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Pabili Mart" />
+<meta property="og:title" content="Pabili Mart" />
+<meta property="og:description" content="Order from your neighborhood store, carinderia, or café — delivered or for pickup." />
+<meta property="og:image" content="https://pabilimart.com/og-default.png" />
+<meta property="og:url" content="https://pabilimart.com/" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Pabili Mart" />
+<meta name="twitter:description" content="Order from your neighborhood store, carinderia, or café — delivered or for pickup." />
+<meta name="twitter:image" content="https://pabilimart.com/og-default.png" />
 <!-- Resolve all relative URLs from the site root so /jsminimart/, /tenant1/, etc.
      still pull /logo.PNG, /sw.js, etc. without hitting tenant-prefixed 404s. -->
 <base href="/">
@@ -21,7 +36,7 @@
 <meta name="theme-color" content="#2563eb" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="JS Mini Mart" />
+<meta name="apple-mobile-web-app-title" content="Pabili Mart" />
 <!-- Tab favicon is added dynamically by the IIFE below — only the seed
      tenant gets /newlogo.jpeg up front. Non-jsminimart tenants either
      get their uploaded custom logo (after settings snapshot) or no

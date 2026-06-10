@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -2125,4 +2125,130 @@ exports.reactivateSubscription = onCall(async (request) => {
     reactivatedAt: FieldValue.serverTimestamp()
   });
   return { ok: true };
+});
+
+// ============================================================
+// storefrontMeta — per-tenant link-preview (OpenGraph) SSR.
+// ------------------------------------------------------------
+// Wired to the storefront `**` Hosting rewrite. Link-unfurl crawlers
+// (Messenger/Facebook/Twitter/etc.) do NOT run JS, so they only ever see the
+// static index.html — whose meta tags would otherwise show the seed tenant
+// ("Pabili Mart" default). This function resolves the tenant from the request
+// (path slug, or custom-domain host), looks up its storeName, and returns
+// index.html with the <title> + OG/Twitter tags rewritten to that store.
+//
+// Robustness: this is the storefront's main entry, so it must NEVER break the
+// page. Any error / unknown tenant → return the canonical index.html unchanged.
+// The full HTML is served (not just meta) so the SPA hydrates normally.
+//
+// Cost/latency: responses are CDN-cached per path (s-maxage), so after the
+// first hit per slug the CDN serves it with no function invocation. The
+// canonical index.html is fetched from the Hosting origin (static files bypass
+// this rewrite, so no recursion and no duplicate file to keep in sync) and
+// memoized per warm instance with a short TTL.
+// ============================================================
+const SHELL_URL = 'https://jt-sari-sari-store.web.app/index.html';
+const OG_DESCRIPTION = 'Order from your neighborhood store, carinderia, or café — delivered or for pickup.';
+const META_SLUG_BLOCKLIST = new Set([
+  'admin', 'checkout', 'signup', 'auth', 'superadmin',
+  'assets', 'static', 'public', 'api', 'index.html', 'favicon.ico'
+]);
+
+let __shellCache = { html: null, at: 0 };
+async function getShellHtml() {
+  const now = Date.now();
+  if (__shellCache.html && (now - __shellCache.at) < 600000) return __shellCache.html; // 10-min TTL
+  const res = await fetch(SHELL_URL, { redirect: 'follow' });
+  if (!res.ok) throw new Error('shell fetch ' + res.status);
+  const html = await res.text();
+  __shellCache = { html, at: now };
+  return html;
+}
+
+// Escape for an HTML attribute value (and text). Quotes + angle brackets + amp.
+function escAttr(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Resolve the tenant slug for an incoming storefront request.
+async function resolveSlugForRequest(host, pathname) {
+  // 1. Path-based: pabilimart.com/{slug}/... — slug is the first segment.
+  const parts = String(pathname || '').split('/').filter(Boolean);
+  const first = (parts[0] || '').toLowerCase();
+  if (first && !META_SLUG_BLOCKLIST.has(first)) return first;
+  // 2. Custom domain: resolve host → slug via public/customDomains.
+  const h = String(host || '').toLowerCase().replace(/:\d+$/, '');
+  const isPlatform = !h || h.endsWith('.web.app') || h.endsWith('.firebaseapp.com')
+    || h === 'pabilimart.com' || h === 'www.pabilimart.com'
+    || h === 'jsminimart.com' || h === 'www.jsminimart.com'
+    || h === 'localhost' || h === '127.0.0.1';
+  if (!isPlatform) {
+    try {
+      const snap = await db.collection('public').doc('customDomains').get();
+      const map = (snap.exists ? (snap.data() || {}).domains : {}) || {};
+      if (map[h]) return String(map[h]).toLowerCase();
+    } catch (_) { /* fall through */ }
+  }
+  return null;
+}
+
+// Look up the public-facing store name for a slug. Prefers the freshest source
+// (settings/store), falling back to the tenant root doc.
+async function lookupStoreName(slug) {
+  try {
+    const ss = await db.collection('tenants').doc(slug).collection('settings').doc('store').get();
+    if (ss.exists && ss.data() && ss.data().storeName) return String(ss.data().storeName);
+  } catch (_) { /* ignore */ }
+  try {
+    const t = await db.collection('tenants').doc(slug).get();
+    if (t.exists && t.data() && t.data().storeName) return String(t.data().storeName);
+  } catch (_) { /* ignore */ }
+  // Seed tenant predates the SaaS schema — its name was never written to
+  // settings/store; the client hardcodes it (STORE.name in index.html). Mirror
+  // that here so jsminimart's links unfurl as "JS Mini Mart", not the default.
+  if (slug === 'jsminimart') return 'JS Mini Mart';
+  return null;
+}
+
+exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10, invoker: 'public' }, async (req, res) => {
+  let html = null;
+  try {
+    html = await getShellHtml();
+  } catch (e) {
+    // Can't even fetch the shell — minimal safe page rather than a 500.
+    console.error('storefrontMeta shell fetch failed:', e);
+    res.set('Cache-Control', 'no-store');
+    res.status(200).type('html').send('<!DOCTYPE html><meta http-equiv="refresh" content="0">');
+    return;
+  }
+  try {
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const pathname = (req.path || req.url || '/').split('?')[0];
+    const slug = await resolveSlugForRequest(host, pathname);
+    const name = slug ? await lookupStoreName(slug) : null;
+    if (name) {
+      const title = escAttr(name);
+      const desc = escAttr(`Order online from ${name} — delivery or pick-up from your neighborhood store. Powered by Pabili Mart.`);
+      const canonical = escAttr('https://pabilimart.com' + pathname);
+      html = html
+        .replace(/<title>[^<]*<\/title>/i, `<title>${title}</title>`)
+        .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/i, `$1${title}$2`)
+        .replace(/(<meta\s+name="twitter:title"\s+content=")[^"]*(")/i, `$1${title}$2`)
+        .replace(/(<meta\s+property="og:description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
+        .replace(/(<meta\s+name="twitter:description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
+        .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
+        .replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i, `$1${canonical}$2`);
+    }
+    // CDN-cache per path so warm previews + repeat loads skip the function.
+    // Short window so a store rename / new tenant reflects quickly.
+    res.set('Cache-Control', 'public, max-age=600, s-maxage=600');
+    res.status(200).type('html').send(html);
+  } catch (e) {
+    // Injection failed — serve the unmodified shell so the store never breaks.
+    console.error('storefrontMeta inject failed:', e);
+    res.set('Cache-Control', 'no-store');
+    res.status(200).type('html').send(html);
+  }
 });

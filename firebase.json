@@ -60,7 +60,7 @@
       { "source": "/checkout", "destination": "/checkout/index.html" },
       { "source": "/checkout/", "destination": "/checkout/index.html" },
       { "source": "/checkout/**", "destination": "/checkout/index.html" },
-      { "source": "**", "destination": "/index.html" }
+      { "source": "**", "function": { "functionId": "storefrontMeta", "region": "asia-southeast1" } }
     ],
     "headers": [
       {
