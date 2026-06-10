@@ -7719,6 +7719,8 @@ async function onBranchFilterChange(value) {
   if (typeof renderRestockingReport === 'function') renderRestockingReport();
   // Phase 3: Products tab scopes to the selected branch.
   if (typeof renderProducts === 'function') renderProducts();
+  // Suppliers list scopes to the selected branch too.
+  if (typeof renderSuppliers === 'function') renderSuppliers();
 }
 
 // Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
@@ -8148,11 +8150,17 @@ function escText(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;')
 function renderSuppliers() {
   const list = document.getElementById('suppliers-list');
   if (!list) return;
-  if (suppliers.length === 0) {
+  // Branch filter: "All branches" shows every supplier; a selected branch shows
+  // only that branch's suppliers (branch-less / unassigned ones live under All).
+  const src = (typeof SELECTED_BRANCH_FILTER !== 'undefined' && SELECTED_BRANCH_FILTER)
+    ? suppliers.filter(s => s.branchId === SELECTED_BRANCH_FILTER)
+    : suppliers;
+  if (src.length === 0) {
+    const branchEmpty = (typeof SELECTED_BRANCH_FILTER !== 'undefined' && SELECTED_BRANCH_FILTER);
     list.innerHTML = `<div class="suppliers-empty">
       <div style="font-size:48px;margin-bottom:12px;">🏭</div>
-      <div style="font-size:14px;">No suppliers yet.</div>
-      <div style="font-size:12px;margin-top:4px;">Click "+ Add Supplier" above to add your first one.</div>
+      <div style="font-size:14px;">${branchEmpty ? 'No suppliers for this branch yet.' : 'No suppliers yet.'}</div>
+      <div style="font-size:12px;margin-top:4px;">Click "+ Add Supplier" above to add ${branchEmpty ? 'one for this branch' : 'your first one'}.</div>
     </div>`;
     return;
   }
@@ -8168,12 +8176,13 @@ function renderSuppliers() {
           </tr>
         </thead>
         <tbody>
-          ${suppliers.map(s => `
+          ${src.map(s => `
             <tr>
               <td>
                 <button class="name-link" onclick="openSupplierView('${escAttr(s.id)}')">
                   ${escText(s.businessName || '(unnamed)')}
                 </button>
+                ${(Array.isArray(branchesData) && branchesData.length > 0 && s.branchId) ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">📍 ${escText((branchesData.find(b => b.id === s.branchId) || {}).name || s.branchId)}</div>` : ''}
               </td>
               <td>${s.contactPerson ? escText(s.contactPerson) : '<span class="row-muted">—</span>'}</td>
               <td>${s.contactNumber ? escText(s.contactNumber) : '<span class="row-muted">—</span>'}</td>
@@ -8371,6 +8380,17 @@ function renderSupplierFormBody(s) {
           <input type="text" class="supp-input" data-field="contactPerson" value="${escAttr(s.contactPerson)}" placeholder="e.g. Maria Santos" />
         </div>
       </div>
+      ${(Array.isArray(branchesData) && branchesData.length > 0) ? `
+      <div class="supp-row">
+        <div class="supp-cell">
+          <label class="supp-label">Branch</label>
+          <select class="supp-input" data-field="branchId">
+            <option value="">— No specific branch (shows under All) —</option>
+            ${branchesData.map(b => `<option value="${escAttr(b.id)}" ${s.branchId === b.id ? 'selected' : ''}>${escText(b.name || b.id)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="supp-cell"></div>
+      </div>` : ''}
       <div class="supp-row">
         <div class="supp-cell">
           <label class="supp-label">Contact numbers</label>
@@ -8519,7 +8539,9 @@ function editFromView() {
 let currentEditSupplierId = null; // null when adding a new supplier
 function openSupplierAdd() {
   currentEditSupplierId = null;
-  const blank = { businessName: '', contactPerson: '', contactNumber: '', contactNumber2: '', email: '', website: '', address: '', schedule: '', categories: [] };
+  const blank = { businessName: '', contactPerson: '', contactNumber: '', contactNumber2: '', email: '', website: '', address: '', schedule: '', categories: [],
+    // New suppliers default to the branch currently being viewed (if any).
+    branchId: (typeof SELECTED_BRANCH_FILTER !== 'undefined' && SELECTED_BRANCH_FILTER) ? SELECTED_BRANCH_FILTER : '' };
   document.getElementById('edit-modal-title').textContent = 'Add Supplier';
   document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(blank);
   document.getElementById('edit-modal-delete-btn').style.display = 'none';
