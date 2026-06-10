@@ -1339,7 +1339,7 @@ function updatePaymentOptions() {
   // Cash on Delivery is for delivery only, only if admin allows, and only
   // under the per-tenant cart-total limit (0 = no limit).
   const codLimitRaw = storeSettingsData.codMaxAmount;
-  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 200;
+  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 0;
   const codAllowedByTotal = (codLimit === 0) || (total < codLimit);
   const codAllowedByFulfill = !isPickup;
   const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);

@@ -1365,7 +1365,7 @@ function updatePaymentOptions() {
   // Per-tenant COD limit: number > 0 = max cart total for COD; 0 or missing = no limit.
   // Default 200 preserves existing tenants' behaviour from before this was configurable.
   const codLimitRaw = storeSettingsData.codMaxAmount;
-  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 200;
+  const codLimit = (typeof codLimitRaw === 'number' && codLimitRaw >= 0) ? codLimitRaw : 0;
   const codAllowedByTotal = (codLimit === 0) || (total < codLimit);
   const codAllowedByFulfill = !isPickup;
   const codDisabled = !(codAllowedByTotal && codAllowedByFulfill && codAdminOn);

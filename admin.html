@@ -5883,7 +5883,7 @@ function updateScheduleRow(idx, key, val) {
 function syncCodLimitEditor() {
   const input = document.getElementById('cod-limit-amount');
   if (!input || document.activeElement === input) return;
-  const val = (typeof storeSettingsData.codMaxAmount === 'number') ? storeSettingsData.codMaxAmount : 200;
+  const val = (typeof storeSettingsData.codMaxAmount === 'number') ? storeSettingsData.codMaxAmount : 0;
   input.value = String(val);
 }
 
