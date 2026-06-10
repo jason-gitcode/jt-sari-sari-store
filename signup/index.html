@@ -2882,16 +2882,16 @@ async function submitMagicLink() {
   const btn = document.getElementById('magic-send-btn');
   btn.disabled = true; btn.textContent = 'Sending…';
   try {
-    await auth.sendSignInLinkToEmail(email, {
-      url: window.location.origin + '/signup/',
-      handleCodeInApp: true,
-    });
+    // Branded send via our Cloud Function (Resend, from noreply@mail.pabilimart.com)
+    // instead of Firebase's built-in email. completeMagicLink on /signup/ still
+    // does the actual sign-in via signInWithEmailLink.
     window.localStorage.setItem(MAGIC_LINK_KEY, email);
+    await sendStoreSignInLink({ email });
     document.getElementById('magic-sent-to').textContent = email;
     document.getElementById('magic-form-state').hidden = true;
     document.getElementById('magic-success-state').hidden = false;
   } catch (err) {
-    showNotice('Could not send link', authError(err));
+    showNotice('Could not send link', (err && err.message) ? err.message : 'Please try again in a moment.');
   } finally {
     btn.disabled = false; btn.textContent = 'Send link';
   }

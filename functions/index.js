@@ -2323,9 +2323,23 @@ const SIGNIN_CONTINUE_URL = 'https://pabilimart.com/signup/';
 const MAIL_FROM = 'Pabili Mart <noreply@mail.pabilimart.com>';
 const SIGNIN_COOLDOWN_MS = 30 * 1000;   // min gap between sends to one email
 const SIGNIN_DAILY_CAP = 8;             // max sends per email per 24h
+const SIGNIN_IP_HOURLY_CAP = 15;        // max unauthenticated (magic-link) sends per IP per hour
 
-function signInEmailHtml(link) {
-  const href = escAttr(link);
+// Two flavors: 'verify' (new email/password account confirming) and 'signin'
+// (passwordless magic-link — could be a new OR returning owner).
+function emailCopy(isSignin) {
+  return isSignin
+    ? { subject: 'Your Pabili Mart sign-in link', heading: 'Sign in to Pabili Mart',
+        body: 'Tap the button below to securely sign in and continue to your store.',
+        cta: 'Sign in →',
+        textLead: 'Open this link to securely sign in to Pabili Mart:' }
+    : { subject: 'Verify your email for Pabili Mart', heading: 'Confirm your email',
+        body: 'Tap the button below to verify your email and finish setting up your store — it brings you straight to your store setup.',
+        cta: 'Verify &amp; continue →',
+        textLead: 'Open this link to verify your email and finish setting up your store:' };
+}
+function signInEmailHtml(link, isSignin) {
+  const href = escAttr(link); const c = emailCopy(isSignin);
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;"><tr><td align="center">
@@ -2334,12 +2348,12 @@ function signInEmailHtml(link) {
         <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">🛒 Pabili Mart</div>
       </td></tr>
       <tr><td style="padding:32px;">
-        <h1 style="margin:0 0 12px;font-size:20px;color:#111827;">Confirm your email</h1>
-        <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4b5563;">Tap the button below to verify your email and finish setting up your store — it brings you straight to your store setup.</p>
+        <h1 style="margin:0 0 12px;font-size:20px;color:#111827;">${c.heading}</h1>
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#4b5563;">${c.body}</p>
         <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:#2563eb;">
-          <a href="${href}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Verify &amp; continue →</a>
+          <a href="${href}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${c.cta}</a>
         </td></tr></table>
-        <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#9ca3af;">This link is unique to you — please don't share it. If you didn't sign up for Pabili Mart, you can safely ignore this email.</p>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#9ca3af;">This link is unique to you — please don't share it. If you didn't request this, you can safely ignore this email.</p>
       </td></tr>
       <tr><td style="padding:18px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
         <div style="font-size:12px;color:#9ca3af;">Pabili Mart · Your neighborhood store, online.</div>
@@ -2348,8 +2362,9 @@ function signInEmailHtml(link) {
   </td></tr></table>
 </body></html>`;
 }
-function signInEmailText(link) {
-  return `Confirm your email for Pabili Mart\n\nOpen this link to verify your email and finish setting up your store:\n${link}\n\nThis link is unique to you — please don't share it. If you didn't sign up for Pabili Mart, ignore this email.`;
+function signInEmailText(link, isSignin) {
+  const c = emailCopy(isSignin);
+  return `${c.heading}\n\n${c.textLead}\n${link}\n\nThis link is unique to you — please don't share it. If you didn't request this, ignore this email.`;
 }
 
 exports.sendStoreSignInLink = onCall({ region: 'asia-southeast1', secrets: ['RESEND_API_KEY'], maxInstances: 10 }, async (request) => {
@@ -2357,17 +2372,19 @@ exports.sendStoreSignInLink = onCall({ region: 'asia-southeast1', secrets: ['RES
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
     throw new HttpsError('invalid-argument', 'Enter a valid email address.');
   }
-  // Guard 1: you can only request a link for your OWN signed-in email.
+  // Self-authed (email/password verify/resend) vs unauthenticated (passwordless
+  // magic-link). A signed-in user may ONLY request their own email's link; the
+  // magic-link case has no account yet, so it's allowed but throttled harder.
   const authEmail = request.auth && request.auth.token ? String(request.auth.token.email || '').toLowerCase() : '';
-  if (!authEmail || authEmail !== email) {
+  const isSelfAuthed = !!authEmail && authEmail === email;
+  if (authEmail && !isSelfAuthed) {
     throw new HttpsError('permission-denied', 'You can only request a link for your own account.');
   }
-  // Guard 2: per-email throttle (cooldown + daily cap).
-  const throttleRef = db.collection('_signinLinkThrottle').doc(Buffer.from(email).toString('hex'));
   const now = Date.now();
+  // Per-email throttle (cooldown + daily cap) — applies to every request.
+  const emailRef = db.collection('_signinLinkThrottle').doc(Buffer.from(email).toString('hex'));
   await db.runTransaction(async (tx) => {
-    const snap = await tx.get(throttleRef);
-    const d = snap.exists ? (snap.data() || {}) : {};
+    const d = (await tx.get(emailRef)).data() || {};
     if (typeof d.lastSentAt === 'number' && now - d.lastSentAt < SIGNIN_COOLDOWN_MS) {
       throw new HttpsError('resource-exhausted', 'Please wait a few seconds before requesting another link.');
     }
@@ -2377,8 +2394,29 @@ exports.sendStoreSignInLink = onCall({ region: 'asia-southeast1', secrets: ['RES
     if (count >= SIGNIN_DAILY_CAP) {
       throw new HttpsError('resource-exhausted', 'Too many link requests today. Please try again later.');
     }
-    tx.set(throttleRef, { lastSentAt: now, windowStart, count: count + 1 }, { merge: true });
+    tx.set(emailRef, { lastSentAt: now, windowStart, count: count + 1 }, { merge: true });
   });
+  // Per-IP throttle — only for the unauthenticated magic-link path (the authed
+  // path is already gated to the user's own email). Limits scripted abuse from
+  // a single source across many different emails.
+  if (!isSelfAuthed) {
+    const xff = (request.rawRequest && request.rawRequest.headers && request.rawRequest.headers['x-forwarded-for']) || '';
+    const ip = (Array.isArray(xff) ? xff[0] : String(xff)).split(',')[0].trim()
+      || (request.rawRequest && request.rawRequest.ip) || '';
+    if (ip) {
+      const ipRef = db.collection('_signinLinkIpThrottle').doc(Buffer.from(ip).toString('hex'));
+      await db.runTransaction(async (tx) => {
+        const d = (await tx.get(ipRef)).data() || {};
+        let windowStart = typeof d.windowStart === 'number' ? d.windowStart : now;
+        let count = typeof d.count === 'number' ? d.count : 0;
+        if (now - windowStart > 3600 * 1000) { windowStart = now; count = 0; } // 1-hour window
+        if (count >= SIGNIN_IP_HOURLY_CAP) {
+          throw new HttpsError('resource-exhausted', 'Too many requests. Please try again later.');
+        }
+        tx.set(ipRef, { windowStart, count: count + 1 }, { merge: true });
+      });
+    }
+  }
   // Generate the Firebase sign-in link (continue → /signup/).
   let link;
   try {
@@ -2387,7 +2425,8 @@ exports.sendStoreSignInLink = onCall({ region: 'asia-southeast1', secrets: ['RES
     console.error('generateSignInWithEmailLink failed:', err);
     throw new HttpsError('internal', 'Could not generate your sign-in link.');
   }
-  // Send via Resend.
+  // Send via Resend. Magic-link gets "sign in" copy; verify gets "confirm email".
+  const isSignin = !isSelfAuthed;
   let res;
   try {
     res = await fetch('https://api.resend.com/emails', {
@@ -2395,8 +2434,8 @@ exports.sendStoreSignInLink = onCall({ region: 'asia-southeast1', secrets: ['RES
       headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: MAIL_FROM, to: [email],
-        subject: 'Verify your email for Pabili Mart',
-        html: signInEmailHtml(link), text: signInEmailText(link)
+        subject: emailCopy(isSignin).subject,
+        html: signInEmailHtml(link, isSignin), text: signInEmailText(link, isSignin)
       })
     });
   } catch (err) {
