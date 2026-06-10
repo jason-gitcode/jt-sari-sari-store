@@ -2108,26 +2108,19 @@
       .dash-chart-box { padding: 14px 14px; }
       .dash-chart-box h3 { font-size: var(--fs-base); margin-bottom: 10px; }
       .settings-grid { grid-template-columns: 1fr; }
-      /* Settings sub-nav on phones/tablets: collapse the multi-row wrapped
-         list into a single horizontally-scrollable row of compact box
-         buttons. Active = black tile (matches the Home page's preset
-         buttons), inactive = white tile with border — same font size,
-         weight, padding, and radius as `.dash-preset-btn` so the two
-         scrollable rows feel like one design system. */
+      /* Settings sub-nav on phones/tablets: wrap all sections onto multiple
+         rows so every section is visible (no hidden horizontal scroll).
+         Active = black tile (matches the Home page's preset buttons),
+         inactive = white tile with border — same font size, weight, padding,
+         and radius as `.dash-preset-btn` so the two rows feel like one design
+         system. Not sticky on mobile, so a long settings page keeps its
+         reading room instead of a tall pinned nav. */
       .settings-nav {
-        position: sticky; top: 0; z-index: 5;
-        background: var(--bg);
-        display: flex; flex-direction: row; flex-wrap: nowrap;
+        display: flex; flex-direction: row; flex-wrap: wrap;
         gap: 6px;
         padding: 2px 0 4px;
         margin: 0;
-        overflow-x: auto; overflow-y: hidden;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x proximity;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
       }
-      .settings-nav::-webkit-scrollbar { display: none; }
       .settings-nav button {
         flex-shrink: 0;
         padding: 6px 12px;
@@ -2282,30 +2275,21 @@
          preset bar and Settings sub-nav. Buttons stop wrapping and the
          row scrolls horizontally instead. */
       .orders-filter {
-        flex-wrap: nowrap;
-        overflow-x: auto; overflow-y: hidden;
-        overscroll-behavior-x: none;
+        flex-wrap: wrap;
         gap: 6px;
         padding-bottom: 4px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
       }
-      .orders-filter::-webkit-scrollbar { display: none; }
-      .orders-filter-btn { flex-shrink: 0; white-space: nowrap; }
-      /* Home filter bar — single horizontally scrollable row.
-         The buttons keep their existing rectangle design; the bar just
-         stops wrapping. Date range chases the presets on the same line. */
+      .orders-filter-btn { white-space: nowrap; }
+      /* Home / Reports period filter — wrap every preset onto multiple rows
+         so all ranges are visible (no hidden horizontal scroll). Buttons keep
+         their existing rectangle design; any custom date-range inputs wrap
+         onto the next line. */
       .dash-filter-bar {
-        flex-wrap: nowrap;
-        overflow-x: auto; overflow-y: hidden;
-        overscroll-behavior-x: contain;
+        flex-wrap: wrap;
         gap: 6px;
-        padding-bottom: 10px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        padding-bottom: 4px;
       }
-      .dash-filter-bar::-webkit-scrollbar { display: none; }
-      .dash-preset-btn { flex-shrink: 0; white-space: nowrap; }
+      .dash-preset-btn { white-space: nowrap; }
       .dash-date-range {
         margin-left: 0; width: auto;
         flex-shrink: 0; flex-wrap: nowrap;
