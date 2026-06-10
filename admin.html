@@ -8214,7 +8214,7 @@ function deleteBranch(branchId) {
   if (!b) return;
   confirmDestructive({
     title: 'Delete this branch?',
-    message: `<strong>${escSupportText(b.name || b.id)}</strong> will be removed. Any future orders placed via <code>?branch=${escSupportText(b.id)}</code> will fall back to your default branch. Existing orders are preserved unchanged.`,
+    message: `<strong>${escSupportText(b.name || b.id)}</strong> will be removed. Customers who had picked this branch will be sent to your default branch instead. Existing orders are preserved unchanged.`,
     confirmLabel: 'Delete branch',
     onConfirm: async () => {
       try {
