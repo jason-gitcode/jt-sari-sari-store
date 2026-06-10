@@ -561,6 +561,9 @@ async function loadCheckoutBranches() {
       CURRENT_BRANCH_ID = dflt.id;
     }
   }
+  // Branches loaded + branch resolved — re-derive modes/hours so the branch's
+  // operating state replaces any tenant fallback the settings listener used.
+  if (typeof deriveCheckoutModes === 'function') deriveCheckoutModes();
 }
 function tcol(name) {
   if (!TENANT_ID) throw new Error('Cannot read ' + name + ' — no tenant in URL');
@@ -625,9 +628,19 @@ function getManilaHour() {
   return manilaDate.getHours();
 }
 
-function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
-function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
-function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+// Operating modes + hours source (Phase 3, per-branch): the customer's picked
+// branch, else the DEFAULT branch, else null → tenant settings/store fallback.
+function opBranch() {
+  if (!Array.isArray(BRANCHES) || !BRANCHES.length) return null;
+  if (CURRENT_BRANCH_ID) {
+    const b = BRANCHES.find(x => x.id === CURRENT_BRANCH_ID);
+    if (b) return b;
+  }
+  return BRANCHES.find(x => x.isDefault === true) || BRANCHES[0];
+}
+function getOpenHour()  { const b = opBranch(); const v = b ? b.storeOpenHour  : storeSettingsData.storeOpenHour;  return (typeof v === 'number') ? v : 6; }
+function getCloseHour() { const b = opBranch(); const v = b ? b.storeCloseHour : storeSettingsData.storeCloseHour; return (typeof v === 'number') ? v : 16; }
+function getOpenDays()  { const b = opBranch(); const v = b ? b.openDays : storeSettingsData.openDays; return Array.isArray(v) ? v : [0,1,2,3,4,5,6]; }
 function getManilaDayIdx() {
   const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd);
@@ -670,9 +683,14 @@ function getCurrentPeriodId() {
 
 let storeSettingsData = {};
 function getEffectiveStoreClosed() {
-  if (storeSettingsData.storeClosedSource === 'manual'
-      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
-    return storeSettingsData.storeClosed === true;
+  // Manual-override trio from the active branch (Phase 3) when one applies,
+  // else settings/store.
+  const b = opBranch();
+  const src    = b ? b.storeClosedSource   : storeSettingsData.storeClosedSource;
+  const pid    = b ? b.storeClosedPeriodId : storeSettingsData.storeClosedPeriodId;
+  const closed = b ? b.storeClosed         : storeSettingsData.storeClosed;
+  if (src === 'manual' && pid === getCurrentPeriodId()) {
+    return closed === true;
   }
   return isStoreHoursClosed();
 }
@@ -730,14 +748,22 @@ function updateWeatherWarning() {
   }
 }
 
+// Derive operating modes from the active source (picked/default branch, else
+// tenant) and refresh the checkout gating. Called from the settings listener
+// AND after branches load (in case the listener fired first).
+function deriveCheckoutModes() {
+  const b = opBranch();
+  rainMode        = (b ? b.rainMode : storeSettingsData.rainMode) === true;
+  maintenanceMode = (b ? b.maintenanceMode : storeSettingsData.maintenanceMode) === true;
+  offlineMode     = (b ? b.offlineMode : storeSettingsData.offlineMode) === true;
+  storeClosed     = getEffectiveStoreClosed();
+  updateWeatherWarning();
+}
+
 function subscribeStoreSettings() {
 tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
-  rainMode        = storeSettingsData.rainMode === true;
-  maintenanceMode = storeSettingsData.maintenanceMode === true;
-  offlineMode     = storeSettingsData.offlineMode === true;
-  storeClosed     = getEffectiveStoreClosed();
-  updateWeatherWarning();
+  deriveCheckoutModes();
   applyTenantStoreConfig();
 });
 }

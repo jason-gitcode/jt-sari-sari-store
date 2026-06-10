@@ -3429,6 +3429,10 @@
             <h3>Operating Modes</h3>
             <div class="section-sub">Control how the storefront behaves for customers right now.</div>
 
+            <div id="modes-branch-notice" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--muted);">📍 You're viewing <strong>All branches</strong>. Operating modes are set <strong>per branch</strong> — pick a branch from the selector at the top of the page to control its storefront.</div>
+            <div id="modes-branch-context" style="display:none; margin-bottom:14px; padding:12px 14px; background:rgba(22,163,74,0.08); border:1px solid rgba(22,163,74,0.2); border-radius:8px; font-size:13px; color:var(--ink);"></div>
+            <div id="modes-branch-body">
+
             <div class="setting-row">
               <div class="setting-info">
                 <div class="setting-title">🔒 Store Closed <span class="mode-badge off" id="set-store-badge">OFF</span></div>
@@ -3480,6 +3484,7 @@
                 </label>
               </div>
             </div>
+            </div><!-- /#modes-branch-body -->
           </section>
 
           <section class="settings-section" id="set-store-info">
@@ -3530,7 +3535,7 @@
                 </div>
               </div>
             </div>
-            <div id="si-branch-notice" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--muted);">📍 You're viewing <strong>All branches</strong>. Pickup address &amp; GCash are configured <strong>per branch</strong> — pick a branch from the selector at the top of the page to edit them. (Operating hours below are store-wide.)</div>
+            <div id="si-branch-notice" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--muted);">📍 You're viewing <strong>All branches</strong>. Pickup address, GCash &amp; operating hours are configured <strong>per branch</strong> — pick a branch from the selector at the top of the page to edit them.</div>
             <div id="si-branch-context" style="display:none; margin-bottom:14px; padding:12px 14px; background:rgba(22,163,74,0.08); border:1px solid rgba(22,163,74,0.2); border-radius:8px; font-size:13px; color:var(--ink);"></div>
             <div id="si-branch-body">
             <div class="setting-row">
@@ -3576,7 +3581,6 @@
                 <input type="tel" id="si-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
               </div>
             </div>
-            </div><!-- /#si-branch-body -->
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Operating hours (Manila time)</div>
@@ -3597,6 +3601,7 @@
                 </div>
               </div>
             </div>
+            </div><!-- /#si-branch-body -->
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-desc" id="si-status" style="font-size:12px;color:var(--muted);min-height:18px;"></div>
@@ -4645,10 +4650,8 @@ let offlineModeActive = false;
 
 tdoc('settings', 'store').onSnapshot(snap => {
   storeSettingsData = snap.exists ? snap.data() : {};
-  rainModeActive = storeSettingsData.rainMode === true;
-  maintenanceModeActive = storeSettingsData.maintenanceMode === true;
-  offlineModeActive = storeSettingsData.offlineMode === true;
-  storeClosedActive = getEffectiveStoreClosed();
+  // Modes/hours may be per-branch (Phase 3) — derive from the active source.
+  recomputeOperatingState();
   syncOperatingModeToggles();
   syncStoreInfoForm();
   syncServiceToggles();
@@ -5880,7 +5883,7 @@ function applyServiceBranchGate() {
 // address under `address` (not `pickupAddress`) — aliased here so the rest of
 // the Store Info code can keep using `pickupAddress` uniformly.
 // ============================================================
-const BRANCH_SCOPED_SI_FIELDS = new Set(['pickupAddress','pickupLat','pickupLng','gcashAccountName','gcashNumber']);
+const BRANCH_SCOPED_SI_FIELDS = new Set(['pickupAddress','pickupLat','pickupLng','gcashAccountName','gcashNumber','storeOpenHour','storeCloseHour','openDays']);
 const SI_BRANCH_FIELD_ALIAS = { pickupAddress: 'address' }; // Store Info field → branch doc field
 function siEditingBranchId() {
   return (Array.isArray(branchesData) && branchesData.length > 0 && SELECTED_BRANCH_FILTER)
@@ -5918,7 +5921,55 @@ function applyStoreInfoBranchGate() {
     const bid = siEditingBranchId();
     const b = bid ? (branchesData.find(x => x.id === bid) || null) : null;
     ctx.style.display = b ? '' : 'none';
-    if (b) ctx.innerHTML = `📍 Editing pickup &amp; GCash for branch <strong>${escSupportText(b.name || b.id)}</strong>. Operating hours below stay store-wide.`;
+    if (b) ctx.innerHTML = `📍 Editing pickup, GCash &amp; hours for branch <strong>${escSupportText(b.name || b.id)}</strong>.`;
+  }
+}
+
+// ============================================================
+// Per-branch Operating Modes + hours (Pro multi-branch) — Phase 3
+// ------------------------------------------------------------
+// Store Closed / Rain / Maintenance / Offline + the storeClosed manual-override
+// trio + operating hours all route to the picked branch's doc when a branch is
+// selected, else settings/store. "All branches" grays the Operating Modes
+// section out. Mirrors the svc*/si* pattern. NOTE: hours are EDITED in Store
+// Info (siGet/saveStoreInfo) but READ by the operating logic here via
+// opBranchObj so isStoreHoursClosed / getCurrentPeriodId reflect the branch.
+// ============================================================
+function opBranchObj() {
+  const bid = (Array.isArray(branchesData) && branchesData.length > 0 && SELECTED_BRANCH_FILTER) ? SELECTED_BRANCH_FILTER : null;
+  return bid ? (branchesData.find(x => x.id === bid) || null) : null;
+}
+function opRef() {
+  const b = opBranchObj();
+  return b ? tcol('branches').doc(b.id) : tdoc('settings', 'store');
+}
+// Re-derive the 4 operating-mode state vars from the active source (picked
+// branch, else tenant). Call after any picker change / settings or branches
+// snapshot so the toggles + badges reflect the right doc.
+function recomputeOperatingState() {
+  const b = opBranchObj();
+  rainModeActive        = (b ? b.rainMode : storeSettingsData.rainMode) === true;
+  maintenanceModeActive = (b ? b.maintenanceMode : storeSettingsData.maintenanceMode) === true;
+  offlineModeActive     = (b ? b.offlineMode : storeSettingsData.offlineMode) === true;
+  storeClosedActive     = getEffectiveStoreClosed();
+}
+// Gray out the Operating Modes toggles + show the "pick a branch" notice on
+// "All branches"; show a branch-context line when a branch is picked.
+function applyOperatingModeBranchGate() {
+  const notice = document.getElementById('modes-branch-notice');
+  const body = document.getElementById('modes-branch-body');
+  const ctx = document.getElementById('modes-branch-context');
+  const locked = (Array.isArray(branchesData) && branchesData.length > 0 && !SELECTED_BRANCH_FILTER);
+  if (notice) notice.style.display = locked ? '' : 'none';
+  if (body) {
+    body.style.opacity = locked ? '0.4' : '';
+    body.style.pointerEvents = locked ? 'none' : '';
+    body.setAttribute('aria-disabled', locked ? 'true' : 'false');
+  }
+  if (ctx) {
+    const b = opBranchObj();
+    ctx.style.display = b ? '' : 'none';
+    if (b) ctx.innerHTML = `📍 These modes apply to branch <strong>${escSupportText(b.name || b.id)}</strong> only.`;
   }
 }
 
@@ -6457,14 +6508,18 @@ function syncStoreInfoForm() {
     siPickupLng = savedLng;
   }
   siRenderPickupMapAndStatus();
-  const openH  = (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6;
-  const closeH = (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16;
+  // Hours are branch-scoped too (Phase 3) — read via siGet.
+  const siOpenH = siGet('storeOpenHour');
+  const siCloseH = siGet('storeCloseHour');
+  const openH  = (typeof siOpenH  === 'number') ? siOpenH  : 6;
+  const closeH = (typeof siCloseH === 'number') ? siCloseH : 16;
   const oh = document.getElementById('si-open-hour');
   const ch = document.getElementById('si-close-hour');
   if (oh && document.activeElement !== oh) oh.value = String(openH);
   if (ch && document.activeElement !== ch) ch.value = String(closeH);
   // Open days: default to all 7 days if missing.
-  const days = Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6];
+  const siDays = siGet('openDays');
+  const days = Array.isArray(siDays) ? siDays : [0,1,2,3,4,5,6];
   const open = new Set(days);
   document.querySelectorAll('#si-day-row input[data-day-idx]').forEach(cb => {
     const idx = Number(cb.dataset.dayIdx);
@@ -6527,44 +6582,44 @@ async function saveStoreInfo() {
     .map(cb => Number(cb.dataset.dayIdx))
     .sort((a, b) => a - b);
   if (openDays.length === 0) { status.textContent = 'Select at least one open day.'; status.style.color = '#dc2626'; return; }
+  // On "All branches" everything in Store Info is per-branch now — nothing to save.
+  if (locked) { status.textContent = 'Pick a branch from the selector above to edit its info.'; status.style.color = '#dc2626'; return; }
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    // Hours always go to the tenant doc.
-    const tenantPayload = { storeOpenHour, storeCloseHour, openDays };
-    // Pickup/GCash + pin go to the branch doc (branch picked) or the tenant
-    // doc (single-branch / non-Pro). Skipped entirely on "All branches".
-    let branchPayload = null;
-    if (!locked) {
-      if (branchMode) {
-        branchPayload = {
-          address: pickupAddress || null,
-          gcashAccountName: gcashAccountName || null,
-          gcashNumber: gcashNumber || null
-        };
-        if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
-          branchPayload.pickupLat = siPickupLat;
-          branchPayload.pickupLng = siPickupLng;
-        } else if (siPickupCleared) {
-          branchPayload.pickupLat = firebase.firestore.FieldValue.delete();
-          branchPayload.pickupLng = firebase.firestore.FieldValue.delete();
-        }
-      } else {
-        tenantPayload.pickupAddress = pickupAddress;
-        tenantPayload.gcashAccountName = gcashAccountName;
-        tenantPayload.gcashNumber = gcashNumber;
-        if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
-          tenantPayload.pickupLat = siPickupLat;
-          tenantPayload.pickupLng = siPickupLng;
-        } else if (siPickupCleared) {
-          // Explicit removal — actually delete the fields, don't just write null.
-          tenantPayload.pickupLat = firebase.firestore.FieldValue.delete();
-          tenantPayload.pickupLng = firebase.firestore.FieldValue.delete();
-        }
+    // Branch picked → write everything (pickup/GCash/pin + hours) to the branch
+    // doc; single-branch / non-Pro → write to settings/store. Pickup address is
+    // `address` on the branch doc; `pickupAddress` on the tenant doc.
+    if (branchMode) {
+      const branchPayload = {
+        address: pickupAddress || null,
+        gcashAccountName: gcashAccountName || null,
+        gcashNumber: gcashNumber || null,
+        storeOpenHour, storeCloseHour, openDays
+      };
+      if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+        branchPayload.pickupLat = siPickupLat;
+        branchPayload.pickupLng = siPickupLng;
+      } else if (siPickupCleared) {
+        branchPayload.pickupLat = firebase.firestore.FieldValue.delete();
+        branchPayload.pickupLng = firebase.firestore.FieldValue.delete();
       }
+      await tcol('branches').doc(siEditingBranchId()).set(branchPayload, { merge: true });
+    } else {
+      const tenantPayload = {
+        pickupAddress, gcashAccountName, gcashNumber,
+        storeOpenHour, storeCloseHour, openDays
+      };
+      if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+        tenantPayload.pickupLat = siPickupLat;
+        tenantPayload.pickupLng = siPickupLng;
+      } else if (siPickupCleared) {
+        // Explicit removal — actually delete the fields, don't just write null.
+        tenantPayload.pickupLat = firebase.firestore.FieldValue.delete();
+        tenantPayload.pickupLng = firebase.firestore.FieldValue.delete();
+      }
+      await tdoc('settings', 'store').set(tenantPayload, { merge: true });
     }
-    await tdoc('settings', 'store').set(tenantPayload, { merge: true });
-    if (branchPayload) await tcol('branches').doc(siEditingBranchId()).set(branchPayload, { merge: true });
     // After a successful save, reset the cleared flag so a later snapshot
     // resync doesn't keep showing "Pin will be removed."
     siPickupCleared = false;
@@ -6582,6 +6637,7 @@ async function saveStoreInfo() {
 }
 
 function syncOperatingModeToggles() {
+  applyOperatingModeBranchGate();
   const setStore = document.getElementById('set-store-closed');
   const setRain  = document.getElementById('set-rain-mode');
   const setMaint = document.getElementById('set-maint-mode');
@@ -6609,7 +6665,7 @@ function syncOperatingModeToggles() {
 async function toggleRainMode() {
   rainModeActive = !rainModeActive;
   try {
-    await tdoc('settings', 'store').set({ rainMode: rainModeActive }, { merge: true });
+    await opRef().set({ rainMode: rainModeActive }, { merge: true });
   } catch (e) {
     console.error('Rain mode error:', e);
     showToast('Error updating rain mode', 'error');
@@ -6619,7 +6675,7 @@ async function toggleRainMode() {
 async function toggleOfflineMode() {
   offlineModeActive = !offlineModeActive;
   try {
-    await tdoc('settings', 'store').set({ offlineMode: offlineModeActive }, { merge: true });
+    await opRef().set({ offlineMode: offlineModeActive }, { merge: true });
   } catch (e) {
     console.error('Offline mode error:', e);
     showToast('Error updating offline mode', 'error');
@@ -6630,7 +6686,7 @@ async function toggleOfflineMode() {
 async function toggleMaintenanceMode() {
   maintenanceModeActive = !maintenanceModeActive;
   try {
-    await tdoc('settings', 'store').set({ maintenanceMode: maintenanceModeActive }, { merge: true });
+    await opRef().set({ maintenanceMode: maintenanceModeActive }, { merge: true });
   } catch (e) {
     console.error('Maintenance mode error:', e);
     showToast('Error updating maintenance mode', 'error');
@@ -6644,9 +6700,12 @@ async function toggleMaintenanceMode() {
 // because the stored period id no longer matches the current one.
 let storeSettingsData = {};
 
-function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
-function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
-function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+// Operating logic reads hours from the picked branch (Phase 3) when one is
+// selected, else settings/store — so isStoreHoursClosed / getCurrentPeriodId
+// match whatever the owner is currently editing.
+function getOpenHour()  { const b = opBranchObj(); const v = b ? b.storeOpenHour  : storeSettingsData.storeOpenHour;  return (typeof v === 'number') ? v : 6; }
+function getCloseHour() { const b = opBranchObj(); const v = b ? b.storeCloseHour : storeSettingsData.storeCloseHour; return (typeof v === 'number') ? v : 16; }
+function getOpenDays()  { const b = opBranchObj(); const v = b ? b.openDays : storeSettingsData.openDays; return Array.isArray(v) ? v : [0,1,2,3,4,5,6]; }
 function getManilaDayIdx() {
   // 0 = Sunday, 6 = Saturday (matches JS Date.getDay() convention).
   const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
@@ -6692,10 +6751,16 @@ function getCurrentPeriodId() {
 }
 
 function getEffectiveStoreClosed() {
+  // Read the manual-override trio from the picked branch (Phase 3) when one is
+  // selected, else settings/store. A branch without its own override falls
+  // through to its hours — tenant overrides never bleed onto a branch.
+  const b = opBranchObj();
+  const src    = b ? b.storeClosedSource   : storeSettingsData.storeClosedSource;
+  const pid    = b ? b.storeClosedPeriodId : storeSettingsData.storeClosedPeriodId;
+  const closed = b ? b.storeClosed         : storeSettingsData.storeClosed;
   // Manual override applies ONLY when its period id matches the current period
-  if (storeSettingsData.storeClosedSource === 'manual'
-      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
-    return storeSettingsData.storeClosed === true;
+  if (src === 'manual' && pid === getCurrentPeriodId()) {
+    return closed === true;
   }
   return isStoreHoursClosed();
 }
@@ -6703,7 +6768,7 @@ function getEffectiveStoreClosed() {
 async function toggleStoreClosed() {
   const newClosed = !getEffectiveStoreClosed();
   try {
-    await tdoc('settings', 'store').set({
+    await opRef().set({
       storeClosed: newClosed,
       storeClosedSource: 'manual',
       storeClosedPeriodId: getCurrentPeriodId()
@@ -7845,6 +7910,10 @@ async function onBranchFilterChange(value) {
   siPickupLng = null;
   siPickupCleared = false;
   if (typeof syncStoreInfoForm === 'function') syncStoreInfoForm();
+  // Operating modes + hours are per-branch too (Phase 3) — re-derive the
+  // mode state from the newly selected branch (or store) and re-sync toggles.
+  if (typeof recomputeOperatingState === 'function') recomputeOperatingState();
+  if (typeof syncOperatingModeToggles === 'function') syncOperatingModeToggles();
 }
 
 // Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
@@ -7865,9 +7934,12 @@ function subscribeToBranches() {
     if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof updateOrderBadge === 'function') updateOrderBadge();
-    // Reflect saved per-branch Service & Payment + Store Info edits in Settings.
+    // Reflect saved per-branch Service & Payment + Store Info + Operating Mode
+    // edits in Settings.
     if (typeof syncServiceToggles === 'function') syncServiceToggles();
     if (typeof syncStoreInfoForm === 'function') syncStoreInfoForm();
+    if (typeof recomputeOperatingState === 'function') recomputeOperatingState();
+    if (typeof syncOperatingModeToggles === 'function') syncOperatingModeToggles();
   }, err => {
     console.warn('[branches] listener:', err);
   });
@@ -8093,6 +8165,11 @@ async function saveBranchForm() {
       if (seed.gcashNumber !== undefined) baseData.gcashNumber = seed.gcashNumber;
       if (typeof seed.pickupLat === 'number') baseData.pickupLat = seed.pickupLat;
       if (typeof seed.pickupLng === 'number') baseData.pickupLng = seed.pickupLng;
+      // Phase 3: seed operating hours + the boolean modes (rain/maintenance/
+      // offline). The storeClosed manual-override trio is NOT seeded — a new
+      // branch starts in pure auto mode (derives closed-state from its hours).
+      ['storeOpenHour','storeCloseHour','openDays','rainMode','maintenanceMode','offlineMode']
+        .forEach(f => { if (seed[f] !== undefined) baseData[f] = seed[f]; });
     }
 
     // If isDefault was just set, transactionally unset any other default

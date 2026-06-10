@@ -1433,9 +1433,22 @@ function getManilaHour() {
 
 let storeSettingsData = {};
 
-function getOpenHour()  { return (typeof storeSettingsData.storeOpenHour  === 'number') ? storeSettingsData.storeOpenHour  : 6; }
-function getCloseHour() { return (typeof storeSettingsData.storeCloseHour === 'number') ? storeSettingsData.storeCloseHour : 16; }
-function getOpenDays()  { return Array.isArray(storeSettingsData.openDays) ? storeSettingsData.openDays : [0,1,2,3,4,5,6]; }
+// Operating modes + hours source (Phase 3, per-branch): the active branch if
+// the customer picked one, else the DEFAULT branch (so a multi-branch
+// storefront shows coherent state before a pick), else null → tenant
+// settings/store fallback (single-branch / non-Pro).
+function opBranch() {
+  if (!Array.isArray(BRANCHES) || !BRANCHES.length) return null;
+  if (CURRENT_BRANCH_ID) {
+    const b = BRANCHES.find(x => x.id === CURRENT_BRANCH_ID);
+    if (b) return b;
+  }
+  return BRANCHES.find(x => x.isDefault === true) || BRANCHES[0];
+}
+
+function getOpenHour()  { const b = opBranch(); const v = b ? b.storeOpenHour  : storeSettingsData.storeOpenHour;  return (typeof v === 'number') ? v : 6; }
+function getCloseHour() { const b = opBranch(); const v = b ? b.storeCloseHour : storeSettingsData.storeCloseHour; return (typeof v === 'number') ? v : 16; }
+function getOpenDays()  { const b = opBranch(); const v = b ? b.openDays : storeSettingsData.openDays; return Array.isArray(v) ? v : [0,1,2,3,4,5,6]; }
 function getManilaDayIdx() {
   const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Manila' }).format(new Date());
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(wd);
@@ -1520,9 +1533,15 @@ function getCurrentPeriodId() {
 }
 let lastRainMode = false;
 function getEffectiveStoreClosed() {
-  if (storeSettingsData.storeClosedSource === 'manual'
-      && storeSettingsData.storeClosedPeriodId === getCurrentPeriodId()) {
-    return storeSettingsData.storeClosed === true;
+  // Manual-override trio from the active branch (Phase 3) when one applies,
+  // else settings/store. A branch without its own override falls through to
+  // its hours — tenant overrides never bleed onto a branch.
+  const b = opBranch();
+  const src    = b ? b.storeClosedSource   : storeSettingsData.storeClosedSource;
+  const pid    = b ? b.storeClosedPeriodId : storeSettingsData.storeClosedPeriodId;
+  const closed = b ? b.storeClosed         : storeSettingsData.storeClosed;
+  if (src === 'manual' && pid === getCurrentPeriodId()) {
+    return closed === true;
   }
   return isStoreHoursClosed();
 }
@@ -1686,17 +1705,26 @@ function applyRainMode(active) {
   buildTicker(active, storeClosedMode, maintenanceMode);
 }
 
-function subscribeStoreSettings() {
-tdoc('settings', 'store').onSnapshot(snap => {
-  storeSettingsData = snap.exists ? snap.data() : {};
-  const rainMode    = storeSettingsData.rainMode === true;
-  maintenanceMode   = storeSettingsData.maintenanceMode === true;
-  offlineMode       = storeSettingsData.offlineMode === true;
-  storeClosedMode   = getEffectiveStoreClosed();
-  lastRainMode      = rainMode;
+// Derive the operating modes from the active source (picked/default branch,
+// else tenant) and apply them to the rain overlay, ticker, and status pill.
+// Called from the settings/store listener AND whenever the customer switches
+// branch (so per-branch modes/hours take effect immediately on switch).
+function deriveAndApplyModes() {
+  const b = opBranch();
+  const rainMode  = (b ? b.rainMode : storeSettingsData.rainMode) === true;
+  maintenanceMode = (b ? b.maintenanceMode : storeSettingsData.maintenanceMode) === true;
+  offlineMode     = (b ? b.offlineMode : storeSettingsData.offlineMode) === true;
+  storeClosedMode = getEffectiveStoreClosed();
+  lastRainMode    = rainMode;
   applyRainMode(rainMode);
   buildTicker(rainMode, storeClosedMode, maintenanceMode);
   updateStatusPill();
+}
+
+function subscribeStoreSettings() {
+tdoc('settings', 'store').onSnapshot(snap => {
+  storeSettingsData = snap.exists ? snap.data() : {};
+  deriveAndApplyModes();
   // Re-check every minute so the pill flips on its own at open/close time
   // without needing a settings change to fire.
   if (!window.__statusPillTimer) window.__statusPillTimer = setInterval(updateStatusPill, 60000);
@@ -2694,9 +2722,10 @@ async function setCurrentBranch(branchId, opts) {
     if (typeof renderProducts === 'function') renderProducts();
     if (typeof renderCategories === 'function') renderCategories();
     if (typeof renderCart === 'function') renderCart();
-    // Ticker shows branch-specific delivery areas + free-delivery threshold,
-    // so refresh it when the customer switches branch.
-    if (typeof buildTicker === 'function') buildTicker(lastRainMode, storeClosedMode, maintenanceMode);
+    // Modes + hours are per-branch (Phase 3) and the ticker shows branch-specific
+    // delivery areas + threshold — re-derive everything for the new branch so
+    // the rain overlay, ticker, closed-state, and status pill all switch.
+    if (typeof deriveAndApplyModes === 'function') deriveAndApplyModes();
   }
 }
 
@@ -2884,6 +2913,10 @@ async function bootstrap() {
     } else {
       openBranchPicker();
     }
+    // Branches are now loaded — re-derive operating modes/hours so the active
+    // (or default) branch's state replaces the tenant fallback the settings
+    // listener used while BRANCHES was still empty.
+    if (typeof deriveAndApplyModes === 'function') deriveAndApplyModes();
   }
 }
 bootstrap();
