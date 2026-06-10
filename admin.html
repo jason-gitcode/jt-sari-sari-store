@@ -2305,6 +2305,9 @@
       /* Orders filter — same single-row scrollable pattern as the Home
          preset bar and Settings sub-nav. Buttons stop wrapping and the
          row scrolls horizontally instead. */
+      /* Orders + Settings rows anchor their own "More" dropdown, same as the
+         period filter. */
+      .orders-filter, .settings-nav { position: relative; }
       .orders-filter {
         flex-wrap: wrap;
         gap: 6px;
@@ -2334,7 +2337,7 @@
         box-shadow: 0 12px 32px rgba(0,0,0,.18);
       }
       .dash-more-panel.open { display: flex; }
-      .dash-more-panel .dash-preset-btn { text-align: left; }
+      .dash-more-panel button { text-align: left; }
       .dash-date-range {
         margin-left: 0; width: auto;
         flex-wrap: nowrap;
@@ -2966,13 +2969,16 @@
           <div class="page-subtitle">Manage incoming orders, refunds, and your shopping list.</div>
         </div>
       </div>
-      <div class="orders-filter">
+      <div class="orders-filter" id="orders-filter">
         <button class="orders-filter-btn active" data-filter="all"          onclick="setOrdersFilter('all')">All</button>
         <button class="orders-filter-btn"        data-filter="pending"      onclick="setOrdersFilter('pending')">Pending</button>
         <button class="orders-filter-btn"        data-filter="items-to-buy" onclick="setOrdersFilter('items-to-buy')">🛒 Items to Buy</button>
-        <button class="orders-filter-btn"        data-filter="confirmed"    onclick="setOrdersFilter('confirmed')">Confirmed</button>
-        <button class="orders-filter-btn"        data-filter="cancelled"    onclick="setOrdersFilter('cancelled')">Cancelled</button>
-        <button class="orders-filter-btn"        data-filter="refunded"     onclick="setOrdersFilter('refunded')">Refunded</button>
+        <button type="button" class="dash-more-btn" id="orders-more-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleFilterMore('orders-more-panel','orders-more-btn')"><span class="dash-more-label">More</span><span class="dash-more-caret" aria-hidden="true">▾</span></button>
+        <div class="dash-more-panel" id="orders-more-panel">
+          <button class="orders-filter-btn"        data-filter="confirmed"    onclick="setOrdersFilter('confirmed')">Confirmed</button>
+          <button class="orders-filter-btn"        data-filter="cancelled"    onclick="setOrdersFilter('cancelled')">Cancelled</button>
+          <button class="orders-filter-btn"        data-filter="refunded"     onclick="setOrdersFilter('refunded')">Refunded</button>
+        </div>
       </div>
       <div class="orders-list" id="orders-list"></div>
     </div>
@@ -3388,16 +3394,19 @@
       </div>
 
       <div class="settings-grid">
-        <aside class="settings-nav">
+        <aside class="settings-nav" id="settings-nav">
           <button class="active" data-settings-nav="modes" onclick="goToSettingsSection('modes')">Operating Modes</button>
           <button data-settings-nav="store-info" onclick="goToSettingsSection('store-info')">Store Info</button>
-          <button data-settings-nav="service" onclick="goToSettingsSection('service')">Service &amp; Payment</button>
-          <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
-          <button data-settings-nav="custom-domain" onclick="goToSettingsSection('custom-domain')">Custom Domain <span id="custom-domain-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
-          <button data-settings-nav="branches" onclick="goToSettingsSection('branches')">Branches <span id="branches-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
-          <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
-          <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
-          <button data-settings-nav="account" onclick="goToSettingsSection('account')">Account</button>
+          <button type="button" class="dash-more-btn" id="settings-more-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleFilterMore('settings-more-panel','settings-more-btn')"><span class="dash-more-label">More</span><span class="dash-more-caret" aria-hidden="true">▾</span></button>
+          <div class="dash-more-panel" id="settings-more-panel">
+            <button data-settings-nav="service" onclick="goToSettingsSection('service')">Service &amp; Payment</button>
+            <button data-settings-nav="appearance" onclick="goToSettingsSection('appearance')">Appearance</button>
+            <button data-settings-nav="custom-domain" onclick="goToSettingsSection('custom-domain')">Custom Domain <span id="custom-domain-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
+            <button data-settings-nav="branches" onclick="goToSettingsSection('branches')">Branches <span id="branches-nav-lock" style="display:none;font-size:11px;margin-left:4px;">🔒</span></button>
+            <button data-settings-nav="notifications" onclick="goToSettingsSection('notifications')">Notifications</button>
+            <button data-settings-nav="inventory" onclick="goToSettingsSection('inventory')">Inventory Alerts</button>
+            <button data-settings-nav="account" onclick="goToSettingsSection('account')">Account</button>
+          </div>
         </aside>
 
         <div class="settings-main">
@@ -8582,6 +8591,8 @@ function setOrdersFilter(filter) {
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
   renderOrders();
+  closePeriodPanels();
+  syncOrdersMoreBtn();
 }
 
 function formatOrderTime(ts) {
@@ -10479,9 +10490,57 @@ function syncPeriodMoreBtn(scope) {
   btn.classList.toggle('active', txt !== 'More');
   if (label) label.textContent = txt;
 }
-// Close any open period dropdown when tapping outside the filter bar.
+// Generic "More" dropdown toggle — the Orders and Settings rows reuse the
+// same popover markup/classes as the period filter.
+function toggleFilterMore(panelId, btnId) {
+  const panel = document.getElementById(panelId);
+  const btn = document.getElementById(btnId);
+  if (!panel) return;
+  const willOpen = !panel.classList.contains('open');
+  closePeriodPanels();
+  if (willOpen) {
+    panel.classList.add('open');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+}
+// Reflect the active Orders filter onto its More button (overflow statuses
+// live in the dropdown, so a hidden selection is never invisible).
+function syncOrdersMoreBtn() {
+  const btn = document.getElementById('orders-more-btn');
+  if (!btn) return;
+  const label = btn.querySelector('.dash-more-label');
+  const active = document.querySelector('.orders-filter-btn.active');
+  const key = active ? active.dataset.filter : null;
+  const inline = ['all', 'pending', 'items-to-buy'];
+  if (!key || inline.includes(key)) {
+    btn.classList.remove('active');
+    if (label) label.textContent = 'More';
+  } else {
+    btn.classList.add('active');
+    if (label) label.textContent = active.textContent.trim();
+  }
+}
+// Reflect the active Settings section onto its More button (driven by both
+// nav clicks and the scroll-spy).
+function syncSettingsMoreBtn() {
+  const btn = document.getElementById('settings-more-btn');
+  if (!btn) return;
+  const label = btn.querySelector('.dash-more-label');
+  const active = document.querySelector('.settings-nav button.active:not(.dash-more-btn)');
+  const key = active ? active.dataset.settingsNav : null;
+  const inline = ['modes', 'store-info'];
+  if (!key || inline.includes(key)) {
+    btn.classList.remove('active');
+    if (label) label.textContent = 'More';
+  } else {
+    btn.classList.add('active');
+    const node = active.childNodes[0];
+    if (label) label.textContent = (node ? node.textContent : active.textContent).trim();
+  }
+}
+// Close any open More dropdown when tapping outside its filter row.
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.dash-filter-bar')) closePeriodPanels();
+  if (!e.target.closest('.dash-filter-bar, .orders-filter, .settings-nav')) closePeriodPanels();
 });
 
 function setDashPreset(preset, doRender = true) {
@@ -12192,6 +12251,9 @@ function goToSettingsSection(name) {
     if (isActive) activeBtn = b;
   });
 
+  closePeriodPanels();
+  syncSettingsMoreBtn();
+
   // Center the active chip horizontally in the mobile pill bar.
   // Use scrollTo directly on the nav so we don't accidentally scroll any
   // vertical ancestor — `scrollIntoView({block:'nearest'})` was fighting
@@ -12257,6 +12319,7 @@ function settingsScrollSpyTick() {
     b.classList.toggle('active', isActive);
     if (isActive) activeBtn = b;
   });
+  syncSettingsMoreBtn();
   if (activeBtn && isStackedNav) {
     const navEl = activeBtn.parentElement;
     if (navEl && navEl.scrollWidth > navEl.clientWidth) {
