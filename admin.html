@@ -3530,6 +3530,9 @@
                 </div>
               </div>
             </div>
+            <div id="si-branch-notice" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; font-size:13px; color:var(--muted);">📍 You're viewing <strong>All branches</strong>. Pickup address &amp; GCash are configured <strong>per branch</strong> — pick a branch from the selector at the top of the page to edit them. (Operating hours below are store-wide.)</div>
+            <div id="si-branch-context" style="display:none; margin-bottom:14px; padding:12px 14px; background:rgba(22,163,74,0.08); border:1px solid rgba(22,163,74,0.2); border-radius:8px; font-size:13px; color:var(--ink);"></div>
+            <div id="si-branch-body">
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Pickup address</div>
@@ -3573,6 +3576,7 @@
                 <input type="tel" id="si-gcash-number" maxlength="11" pattern="09[0-9]{9}" inputmode="numeric" style="width:100%;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;" />
               </div>
             </div>
+            </div><!-- /#si-branch-body -->
             <div class="setting-row">
               <div class="setting-info" style="flex:1;">
                 <div class="setting-title">Operating hours (Manila time)</div>
@@ -4143,22 +4147,8 @@
             style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
           <div style="font-size:11px; color:var(--muted); margin-top:6px;">Shown to customers in the branch picker.</div>
         </div>
-        <div>
-          <label for="branch-form-address" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Pickup address</label>
-          <textarea id="branch-form-address" maxlength="300" rows="2" placeholder="Block 123 Lot 4, Pasig City"
-            style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; line-height:1.4; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div>
-            <label for="branch-form-gcash-name" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">GCash account name</label>
-            <input id="branch-form-gcash-name" type="text" maxlength="100" placeholder="Juan Dela Cruz"
-              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;" />
-          </div>
-          <div>
-            <label for="branch-form-gcash-number" style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">GCash number</label>
-            <input id="branch-form-gcash-number" type="tel" maxlength="11" inputmode="numeric" placeholder="09xxxxxxxxx"
-              style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; outline:none; box-sizing:border-box;" />
-          </div>
+        <div style="font-size:12px; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; line-height:1.5;">
+          💡 Pickup address &amp; GCash are now edited per branch from <strong>Settings → Store Info</strong> — pick this branch in the header selector after saving. A new branch starts with a copy of your current store's pickup &amp; GCash, which you can then change.
         </div>
         <div style="border-top:1px dashed var(--line); padding-top:14px;">
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); cursor:pointer;">
@@ -5881,6 +5871,57 @@ function applyServiceBranchGate() {
   }
 }
 
+// ============================================================
+// Per-branch Store Info editing (Pro multi-branch) — Phase 2
+// ------------------------------------------------------------
+// Pickup address + GCash + pickup pin route to the picked branch's doc; "All
+// branches" grays those rows out. Store name, logo, and operating hours stay
+// tenant-level (hours land in Phase 3). The branch doc stores the pickup
+// address under `address` (not `pickupAddress`) — aliased here so the rest of
+// the Store Info code can keep using `pickupAddress` uniformly.
+// ============================================================
+const BRANCH_SCOPED_SI_FIELDS = new Set(['pickupAddress','pickupLat','pickupLng','gcashAccountName','gcashNumber']);
+const SI_BRANCH_FIELD_ALIAS = { pickupAddress: 'address' }; // Store Info field → branch doc field
+function siEditingBranchId() {
+  return (Array.isArray(branchesData) && branchesData.length > 0 && SELECTED_BRANCH_FILTER)
+    ? SELECTED_BRANCH_FILTER : null;
+}
+function siBranchField(field) { return SI_BRANCH_FIELD_ALIAS[field] || field; }
+// Read a Store Info value from the right source (branch doc when a branch is
+// picked, else settings/store), translating the field name for the branch doc.
+function siGet(field) {
+  const bid = siEditingBranchId();
+  if (bid && BRANCH_SCOPED_SI_FIELDS.has(field)) {
+    return (branchesData.find(x => x.id === bid) || {})[siBranchField(field)];
+  }
+  return (storeSettingsData || {})[field];
+}
+// True when a multi-branch tenant is on "All branches" → pickup/GCash are
+// read-only (owner must pick a branch to edit them).
+function siSectionLocked() {
+  return (Array.isArray(branchesData) && branchesData.length > 0 && !SELECTED_BRANCH_FILTER);
+}
+// Gray out the pickup/GCash rows + show the "pick a branch" notice on "All
+// branches"; show a "editing branch X" context line when a branch is picked.
+function applyStoreInfoBranchGate() {
+  const notice = document.getElementById('si-branch-notice');
+  const body = document.getElementById('si-branch-body');
+  const ctx = document.getElementById('si-branch-context');
+  const locked = siSectionLocked();
+  if (notice) notice.style.display = locked ? '' : 'none';
+  if (body) {
+    body.style.opacity = locked ? '0.4' : '';
+    body.style.pointerEvents = locked ? 'none' : '';
+    body.setAttribute('aria-disabled', locked ? 'true' : 'false');
+  }
+  if (ctx) {
+    const bid = siEditingBranchId();
+    const b = bid ? (branchesData.find(x => x.id === bid) || null) : null;
+    ctx.style.display = b ? '' : 'none';
+    if (b) ctx.innerHTML = `📍 Editing pickup &amp; GCash for branch <strong>${escSupportText(b.name || b.id)}</strong>. Operating hours below stay store-wide.`;
+  }
+}
+
 function syncServiceToggles() {
   applyServiceBranchGate();
   // Default true if field absent (preserves existing tenants' behaviour)
@@ -6396,18 +6437,21 @@ function siRemovePin() {
 function syncStoreInfoForm() {
   ensureHourSelectsPopulated();
   ensureDayCheckboxesPopulated();
+  // Gray out pickup/GCash on "All branches"; pick up the branch context line.
+  applyStoreInfoBranchGate();
   const f = (id, val) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ''; };
   // Store name is read-only post-signup; write it into the display div.
   const sn = document.getElementById('si-store-name-display');
   if (sn) sn.textContent = storeSettingsData.storeName || '—';
-  f('si-pickup-address', storeSettingsData.pickupAddress);
-  f('si-gcash-name', storeSettingsData.gcashAccountName);
-  f('si-gcash-number', storeSettingsData.gcashNumber);
-  // Pickup pin — load from settings if present, refresh map + status.
-  // Don't clobber in-progress edits (Use my location / Remove pin) by always
-  // resyncing — only refresh from server when the user hasn't touched it.
-  const savedLat = storeSettingsData.pickupLat;
-  const savedLng = storeSettingsData.pickupLng;
+  // Pickup + GCash are branch-scoped when a branch is picked (else tenant).
+  f('si-pickup-address', siGet('pickupAddress'));
+  f('si-gcash-name', siGet('gcashAccountName'));
+  f('si-gcash-number', siGet('gcashNumber'));
+  // Pickup pin — load from the active source (branch or tenant) if present,
+  // refresh map + status. Don't clobber in-progress edits (Use my location /
+  // Remove pin) by always resyncing — only refresh when untouched.
+  const savedLat = siGet('pickupLat');
+  const savedLng = siGet('pickupLng');
   if (!siPickupCleared && siPickupLat === null && typeof savedLat === 'number' && typeof savedLng === 'number') {
     siPickupLat = savedLat;
     siPickupLng = savedLng;
@@ -6451,15 +6495,30 @@ function syncStoreInfoForm() {
 async function saveStoreInfo() {
   const status = document.getElementById('si-status');
   const btn = document.getElementById('si-save-btn');
+  // Editing context: which doc do pickup/GCash write to?
+  const branchMode = !!siEditingBranchId();   // a branch is picked → its doc
+  const locked = siSectionLocked();           // "All branches" → pickup/GCash grayed
   // Store name is locked after signup; we don't read or write it here.
   const pickupAddress = document.getElementById('si-pickup-address').value.trim();
   const gcashAccountName = document.getElementById('si-gcash-name').value.trim();
   const gcashNumber = document.getElementById('si-gcash-number').value.trim();
+  // Operating hours stay tenant-level (per-branch hours land in Phase 3).
   const storeOpenHour  = parseInt(document.getElementById('si-open-hour').value, 10);
   const storeCloseHour = parseInt(document.getElementById('si-close-hour').value, 10);
-  if (pickupAddress.length < 5) { status.textContent = 'Pickup address must be at least 5 characters.'; status.style.color = '#dc2626'; return; }
-  if (gcashAccountName.length < 2) { status.textContent = 'GCash account name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
-  if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.style.color = '#dc2626'; return; }
+  // Pickup/GCash validation. On "All branches" the inputs are grayed → skip
+  // them entirely (only hours save). With a branch picked, pickup/GCash are
+  // optional (blank → inherit the tenant default, matching the storefront
+  // fallback); the tenant default itself stays required for single-branch.
+  if (!locked) {
+    if (branchMode) {
+      if (pickupAddress && (pickupAddress.length < 5 || pickupAddress.length > 300)) { status.textContent = 'Pickup address must be 5–300 characters (or blank to inherit the store default).'; status.style.color = '#dc2626'; return; }
+      if (gcashNumber && !/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09 (or blank to inherit).'; status.style.color = '#dc2626'; return; }
+    } else {
+      if (pickupAddress.length < 5) { status.textContent = 'Pickup address must be at least 5 characters.'; status.style.color = '#dc2626'; return; }
+      if (gcashAccountName.length < 2) { status.textContent = 'GCash account name must be at least 2 characters.'; status.style.color = '#dc2626'; return; }
+      if (!/^09\d{9}$/.test(gcashNumber)) { status.textContent = 'GCash number must be 11 digits and start with 09.'; status.style.color = '#dc2626'; return; }
+    }
+  }
   if (!Number.isInteger(storeOpenHour) || storeOpenHour < 0 || storeOpenHour > 23) { status.textContent = 'Opening hour invalid.'; status.style.color = '#dc2626'; return; }
   if (!Number.isInteger(storeCloseHour) || storeCloseHour < 0 || storeCloseHour > 23) { status.textContent = 'Closing hour invalid.'; status.style.color = '#dc2626'; return; }
   if (storeOpenHour === storeCloseHour) { status.textContent = 'Opening and closing hour must differ.'; status.style.color = '#dc2626'; return; }
@@ -6471,21 +6530,48 @@ async function saveStoreInfo() {
   btn.disabled = true; btn.textContent = 'Saving...';
   status.style.color = 'var(--muted)'; status.textContent = 'Saving...';
   try {
-    const payload = { pickupAddress, gcashAccountName, gcashNumber, storeOpenHour, storeCloseHour, openDays };
-    if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
-      payload.pickupLat = siPickupLat;
-      payload.pickupLng = siPickupLng;
-    } else if (siPickupCleared) {
-      // Explicit removal — actually delete the fields, don't just write null.
-      payload.pickupLat = firebase.firestore.FieldValue.delete();
-      payload.pickupLng = firebase.firestore.FieldValue.delete();
+    // Hours always go to the tenant doc.
+    const tenantPayload = { storeOpenHour, storeCloseHour, openDays };
+    // Pickup/GCash + pin go to the branch doc (branch picked) or the tenant
+    // doc (single-branch / non-Pro). Skipped entirely on "All branches".
+    let branchPayload = null;
+    if (!locked) {
+      if (branchMode) {
+        branchPayload = {
+          address: pickupAddress || null,
+          gcashAccountName: gcashAccountName || null,
+          gcashNumber: gcashNumber || null
+        };
+        if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+          branchPayload.pickupLat = siPickupLat;
+          branchPayload.pickupLng = siPickupLng;
+        } else if (siPickupCleared) {
+          branchPayload.pickupLat = firebase.firestore.FieldValue.delete();
+          branchPayload.pickupLng = firebase.firestore.FieldValue.delete();
+        }
+      } else {
+        tenantPayload.pickupAddress = pickupAddress;
+        tenantPayload.gcashAccountName = gcashAccountName;
+        tenantPayload.gcashNumber = gcashNumber;
+        if (typeof siPickupLat === 'number' && typeof siPickupLng === 'number') {
+          tenantPayload.pickupLat = siPickupLat;
+          tenantPayload.pickupLng = siPickupLng;
+        } else if (siPickupCleared) {
+          // Explicit removal — actually delete the fields, don't just write null.
+          tenantPayload.pickupLat = firebase.firestore.FieldValue.delete();
+          tenantPayload.pickupLng = firebase.firestore.FieldValue.delete();
+        }
+      }
     }
-    await tdoc('settings', 'store').set(payload, { merge: true });
+    await tdoc('settings', 'store').set(tenantPayload, { merge: true });
+    if (branchPayload) await tcol('branches').doc(siEditingBranchId()).set(branchPayload, { merge: true });
     // After a successful save, reset the cleared flag so a later snapshot
     // resync doesn't keep showing "Pin will be removed."
     siPickupCleared = false;
     status.style.color = '#16a34a';
-    status.textContent = '✅ Saved. Storefront will pick up changes immediately.';
+    status.textContent = branchMode
+      ? '✅ Saved to this branch. Storefront will pick up changes immediately.'
+      : '✅ Saved. Storefront will pick up changes immediately.';
   } catch (err) {
     console.error(err);
     status.style.color = '#dc2626';
@@ -7752,6 +7838,13 @@ async function onBranchFilterChange(value) {
   scheduleRows = null;
   areaRows = null;
   if (typeof syncServiceToggles === 'function') syncServiceToggles();
+  // Store Info pickup/GCash are per-branch too — reset the in-progress pin
+  // state so syncStoreInfoForm reloads the newly selected branch's pin, then
+  // re-sync the form (re-routes pickup/GCash reads + gray-out).
+  siPickupLat = null;
+  siPickupLng = null;
+  siPickupCleared = false;
+  if (typeof syncStoreInfoForm === 'function') syncStoreInfoForm();
 }
 
 // Returns the orders list filtered by SELECTED_BRANCH_FILTER. When the
@@ -7772,8 +7865,9 @@ function subscribeToBranches() {
     if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof updateOrderBadge === 'function') updateOrderBadge();
-    // Reflect saved per-branch Service & Payment edits in the Settings tab.
+    // Reflect saved per-branch Service & Payment + Store Info edits in Settings.
     if (typeof syncServiceToggles === 'function') syncServiceToggles();
+    if (typeof syncStoreInfoForm === 'function') syncStoreInfoForm();
   }, err => {
     console.warn('[branches] listener:', err);
   });
@@ -7886,23 +7980,19 @@ function openBranchFormModal(mode, branchId) {
   const title = document.getElementById('branch-form-title');
   const idInput = document.getElementById('branch-form-id');
   const nameInput = document.getElementById('branch-form-name');
-  const addrInput = document.getElementById('branch-form-address');
-  const gcashNameInput = document.getElementById('branch-form-gcash-name');
-  const gcashNumInput = document.getElementById('branch-form-gcash-number');
   const defaultInput = document.getElementById('branch-form-default');
   const statusEl = document.getElementById('branch-form-status');
   const idHint = document.getElementById('branch-form-id-hint');
 
   statusEl.textContent = '';
 
+  // Pickup address + GCash are no longer edited here — they're per-branch in
+  // Settings → Store Info (seeded from the store config on add).
   if (branchFormMode === 'add') {
     title.textContent = 'Add branch';
     idInput.value = '';
     idInput.disabled = false;
     nameInput.value = '';
-    addrInput.value = '';
-    gcashNameInput.value = '';
-    gcashNumInput.value = '';
     defaultInput.checked = (branchesData.length === 0); // first branch defaults to isDefault
     if (idHint) idHint.style.display = '';
   } else {
@@ -7912,9 +8002,6 @@ function openBranchFormModal(mode, branchId) {
     idInput.value = b.id;
     idInput.disabled = true; // ID is immutable post-create
     nameInput.value = b.name || '';
-    addrInput.value = b.address || '';
-    gcashNameInput.value = b.gcashAccountName || '';
-    gcashNumInput.value = b.gcashNumber || '';
     defaultInput.checked = b.isDefault === true;
     if (idHint) idHint.style.display = 'none';
   }
@@ -7938,81 +8025,18 @@ function closeBranchFormBackdrop(e) {
   closeBranchFormModal();
 }
 
-// Normalize an "H:MM" / "HH:MM" string to "HH:MM" 24-hour, or null if invalid.
-function normHHMM(s) {
-  const m = String(s || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  const h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
-  if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
-  return String(h).padStart(2, '0') + ':' + m[2];
-}
-// Reads the 5 per-branch delivery override inputs. Each returns a value
-// (override) or null (inherit the tenant default). Returns null + shows a
-// message on a validation error.
-function parseBranchOverrides(statusEl) {
-  const readNum = (id) => {
-    const raw = (document.getElementById(id).value || '').trim();
-    if (raw === '') return { ok: true, val: null };
-    const n = Number(raw);
-    if (!isFinite(n) || n < 0 || n > 100000) return { ok: false, val: null };
-    return { ok: true, val: n };
-  };
-  const fee = readNum('branch-form-delivery-fee');
-  if (!fee.ok) { statusEl.textContent = 'Delivery fee must be a number between 0 and 100000.'; return null; }
-  const thr = readNum('branch-form-free-threshold');
-  if (!thr.ok) { statusEl.textContent = 'Free-delivery threshold must be a number between 0 and 100000.'; return null; }
-  const cod = readNum('branch-form-cod-max');
-  if (!cod.ok) { statusEl.textContent = 'COD max must be a number between 0 and 100000.'; return null; }
-
-  const areasRaw = (document.getElementById('branch-form-areas').value || '').trim();
-  let areas = null;
-  if (areasRaw) {
-    areas = areasRaw.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 50);
-    if (areas.length === 0) areas = null;
-  }
-
-  const schedRaw = (document.getElementById('branch-form-schedules').value || '').trim();
-  let schedules = null;
-  if (schedRaw) {
-    schedules = [];
-    const lines = schedRaw.split('\n').map(l => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      const m = line.match(/^(.+?)\s*-\s*(.+)$/);
-      const start = m && normHHMM(m[1]);
-      const end = m && normHHMM(m[2]);
-      if (!start || !end) { statusEl.textContent = `Time window "${line}" must look like 10:00-14:00 (24-hour).`; return null; }
-      schedules.push({ start, end });
-    }
-    if (schedules.length === 0) schedules = null;
-  }
-
-  return {
-    deliveryFee: fee.val,
-    freeDeliveryThreshold: thr.val,
-    codMaxAmount: cod.val,
-    deliveryAreas: areas,
-    deliverySchedules: schedules
-  };
-}
-
 async function saveBranchForm() {
   const idInput = document.getElementById('branch-form-id');
   const nameInput = document.getElementById('branch-form-name');
-  const addrInput = document.getElementById('branch-form-address');
-  const gcashNameInput = document.getElementById('branch-form-gcash-name');
-  const gcashNumInput = document.getElementById('branch-form-gcash-number');
   const defaultInput = document.getElementById('branch-form-default');
   const statusEl = document.getElementById('branch-form-status');
   const btn = document.getElementById('branch-form-save-btn');
 
   const branchId = (idInput.value || '').trim().toLowerCase();
   const name = (nameInput.value || '').trim();
-  const address = (addrInput.value || '').trim();
-  const gcashAccountName = (gcashNameInput.value || '').trim();
-  const gcashNumber = (gcashNumInput.value || '').trim();
   const isDefault = defaultInput.checked;
 
-  // Validation
+  // Validation (pickup address + GCash moved to Store Info — not validated here)
   if (!BRANCH_ID_REGEX.test(branchId)) {
     statusEl.textContent = 'Branch URL ID: lowercase letters/numbers/hyphens, 2–32 chars, no leading/trailing hyphens.';
     return;
@@ -8023,14 +8047,6 @@ async function saveBranchForm() {
   }
   if (name.length < 2 || name.length > 60) {
     statusEl.textContent = 'Branch name must be 2–60 characters.';
-    return;
-  }
-  if (address.length > 0 && (address.length < 5 || address.length > 300)) {
-    statusEl.textContent = 'Pickup address must be 5–300 characters (or blank).';
-    return;
-  }
-  if (gcashNumber && !/^09\d{9}$/.test(gcashNumber)) {
-    statusEl.textContent = 'GCash number must be 11 digits starting with 09.';
     return;
   }
   if (branchFormMode === 'add' && branchesData.some(b => b.id === branchId)) {
@@ -8048,12 +8064,12 @@ async function saveBranchForm() {
 
   try {
     const ref = tcol('branches').doc(branchId);
+    // Edit mode only touches id/name/default/active — pickup address + GCash
+    // are owned by Store Info now, so we must NOT include them here or we'd
+    // wipe what the owner set via the branch picker.
     const baseData = {
       id: branchId,
       name,
-      address: address || null,
-      gcashAccountName: gcashAccountName || null,
-      gcashNumber: gcashNumber || null,
       isDefault,
       active: true,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -8062,14 +8078,21 @@ async function saveBranchForm() {
     if (branchFormMode === 'add') {
       baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
       baseData.createdBy = (firebase.auth().currentUser && firebase.auth().currentUser.email) || null;
-      // Seed Service & Payment settings from the current store config so the
-      // new branch starts as a full, independent copy. After creation these
-      // are edited from the main Settings tab via the branch picker.
+      // Seed Service & Payment AND Store Info (pickup address + GCash + pin)
+      // from the current store config so the new branch starts as a full,
+      // independent copy. After creation these are edited from the Settings tab
+      // via the branch picker (Service & Payment + Store Info sections).
       const seed = storeSettingsData || {};
       ['deliveryEnabled','pickupEnabled','payCashEnabled','payGcashEnabled','payCodEnabled',
        'codMaxAmount','schedulesEnabled','deliverySchedules','deliveryFeeEnabled','deliveryFee',
        'freeDeliveryEnabled','freeDeliveryThreshold','deliveryAreasEnabled','deliveryAreas'
       ].forEach(f => { if (seed[f] !== undefined) baseData[f] = seed[f]; });
+      // Pickup address is stored as `address` on the branch doc.
+      if (seed.pickupAddress !== undefined) baseData.address = seed.pickupAddress;
+      if (seed.gcashAccountName !== undefined) baseData.gcashAccountName = seed.gcashAccountName;
+      if (seed.gcashNumber !== undefined) baseData.gcashNumber = seed.gcashNumber;
+      if (typeof seed.pickupLat === 'number') baseData.pickupLat = seed.pickupLat;
+      if (typeof seed.pickupLng === 'number') baseData.pickupLng = seed.pickupLng;
     }
 
     // If isDefault was just set, transactionally unset any other default

@@ -779,12 +779,13 @@ function applyTenantStoreConfig() {
     // Defensive numeric coercion — Firestore returns numbers, but tolerate
     // string-typed coords just in case an older record / future import path
     // wrote them differently.
-    const latNum = (typeof storeSettingsData.pickupLat === 'number')
-      ? storeSettingsData.pickupLat
-      : parseFloat(storeSettingsData.pickupLat);
-    const lngNum = (typeof storeSettingsData.pickupLng === 'number')
-      ? storeSettingsData.pickupLng
-      : parseFloat(storeSettingsData.pickupLng);
+    // Multi-branch: use the active branch's pin if it has one, else the
+    // tenant default (mirrors effectivePickupAddress for the text).
+    const pinBranch = getCurrentBranch();
+    const rawLat = (pinBranch && pinBranch.pickupLat !== undefined) ? pinBranch.pickupLat : storeSettingsData.pickupLat;
+    const rawLng = (pinBranch && pinBranch.pickupLng !== undefined) ? pinBranch.pickupLng : storeSettingsData.pickupLng;
+    const latNum = (typeof rawLat === 'number') ? rawLat : parseFloat(rawLat);
+    const lngNum = (typeof rawLng === 'number') ? rawLng : parseFloat(rawLng);
     const hasPin = Number.isFinite(latNum) && Number.isFinite(lngNum) && (latNum !== 0 || lngNum !== 0);
     let pinHtml = '';
     if (hasPin) {
