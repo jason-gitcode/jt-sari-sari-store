@@ -368,9 +368,14 @@
   /* Live Open/Closed status pill under the store name. Pulsing green dot
      when open; static red when closed. State = getEffectiveStoreClosed()
      so it can never disagree with the ticker/checkout. */
+  /* Pill + branch chip share one centered row under the store name. */
+  .brand-meta {
+    display: flex; align-items: center; justify-content: center;
+    flex-wrap: wrap; gap: 6px; margin-top: 4px;
+  }
   .store-status {
     display: inline-flex; align-items: center; gap: 5px;
-    margin-top: 4px; padding: 2px 9px;
+    padding: 2px 9px;
     border-radius: 999px;
     font-size: 11px; font-weight: 600; line-height: 1.4;
     border: 1px solid transparent; white-space: nowrap;
@@ -1142,13 +1147,15 @@
     </a>
     <div class="brand-text">
       <h1 id="store-name">JS Mini Mart</h1>
-      <span class="store-status" id="store-status" hidden>
-        <span class="store-status-dot" aria-hidden="true"></span><span id="store-status-text">Open now</span>
-      </span>
       <small id="store-tag" style="display:none;"></small>
-      <button type="button" class="branch-indicator" id="branch-indicator" onclick="reopenBranchPicker()" aria-label="Change branch">
-        <span aria-hidden="true">📍</span><span id="branch-indicator-name">Branch</span><span style="opacity:.55;">· change</span>
-      </button>
+      <div class="brand-meta">
+        <span class="store-status" id="store-status" hidden>
+          <span class="store-status-dot" aria-hidden="true"></span><span id="store-status-text">Open</span>
+        </span>
+        <button type="button" class="branch-indicator" id="branch-indicator" onclick="reopenBranchPicker()" aria-label="Change branch">
+          <span aria-hidden="true">📍</span><span id="branch-indicator-name">Branch</span><span style="opacity:.55;">· change</span>
+        </button>
+      </div>
     </div>
     <button class="cart-btn" onclick="openCart()">
       🛒 <span class="label">Cart</span>
@@ -1571,7 +1578,7 @@ function updateStatusPill() {
   el.hidden = false;
   el.classList.toggle('open', isOpen);
   el.classList.toggle('closed', !isOpen);
-  txt.textContent = isOpen ? 'Open now' : 'Closed';
+  txt.textContent = isOpen ? 'Open' : 'Closed';
 }
 
 function buildTicker(rainMode, storeClosed, maintenance) {

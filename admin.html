@@ -4425,7 +4425,10 @@ let _destructivePending = null;
 function confirmDestructive({ title, message, confirmLabel, onConfirm }) {
   _destructivePending = onConfirm || null;
   document.getElementById('destructive-confirm-title').textContent = title || 'Confirm';
-  document.getElementById('destructive-confirm-message').textContent = message || 'Are you sure?';
+  // message is rendered as HTML so callers can use <strong>/<code>/<em> for
+  // emphasis. Callers MUST escape any dynamic/user data (e.g. escSupportText)
+  // before interpolating it into the message string.
+  document.getElementById('destructive-confirm-message').innerHTML = message || 'Are you sure?';
   const btn = document.getElementById('destructive-confirm-go-btn');
   btn.textContent = confirmLabel || 'Delete';
   btn.disabled = false;
@@ -7346,9 +7349,9 @@ const LOCKED_FEATURES = {
     blurb: 'Run a chain with multiple physical locations under one admin. Each branch has its own pickup address, GCash account, and customer-facing storefront entry.',
     tier: 'pro',
     unlocksWith: [
-      'Up to 10 branches under one Pabili Mart account',
+      'Up to 5 branches under one Pabili Mart account',
       'Per-branch pickup address + pickup pin',
-      'Per-branch GCash account for receiving orders',
+      'A separate GCash account for every branch',
       'Customers pick which branch they\'re ordering from',
       'One admin dashboard with branch switcher + cross-branch reports'
     ]
@@ -7769,11 +7772,11 @@ async function removeCustomDomain() {
 // holds per-location pickup address + GCash account + isDefault flag.
 // Storefront branch picker + per-branch product/order filtering is Phase 2.
 //
-// Cap: 10 branches per tenant (client-enforced; client-side enforcement is
+// Cap: 5 branches per tenant (client-enforced; client-side enforcement is
 // consistent with the LOCKED_FEATURES pattern we use for tier gating).
 // ============================================================
 
-const MULTI_BRANCH_CAP = 10;
+const MULTI_BRANCH_CAP = 5;
 const BRANCH_ID_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 const RESERVED_BRANCH_IDS = new Set(['default', 'all', 'new', 'edit', 'admin', 'api', '__']);
 
@@ -7968,7 +7971,7 @@ function renderBranchesSection() {
           🔒 Multi-Branch is a <strong>PabiliMart Pro</strong> feature.
         </div>
         <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-          Run a chain with up to 10 physical locations under one admin. Each branch has its own pickup address + GCash account.
+          Run a chain with up to 5 physical locations under one admin. Each branch has its own pickup address + separate GCash account.
         </div>
         <button type="button" class="btn-secondary" onclick="openLockedFeatureModal('multi-branch')">Learn more</button>
       </div>
