@@ -1730,6 +1730,26 @@
     }
     .dash-preset-btn:hover:not(.active) { border-color: var(--line-strong); color: var(--ink); }
     .dash-preset-btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+    /* "More" button + popover for the period filter. Desktop: the panel is
+       display:contents so its children (Last 30 / All Time / date range) lay
+       out inline exactly as before and the More button is hidden. Mobile
+       (<=600px) flips this — the overflow goes into a dropdown — see the
+       media query. */
+    .dash-more-btn {
+      display: none;
+      align-items: center; gap: 4px;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      font-size: var(--fs-sm); font-weight: 500;
+      background: var(--surface); color: var(--ink-soft);
+      cursor: pointer; white-space: nowrap;
+      transition: all .15s;
+    }
+    .dash-more-btn:hover:not(.active) { border-color: var(--line-strong); color: var(--ink); }
+    .dash-more-btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+    .dash-more-caret { font-size: 10px; opacity: .8; }
+    .dash-more-panel { display: contents; }
     .dash-date-range {
       display: flex; align-items: center; gap: 8px;
       margin-left: auto; flex-wrap: wrap;
@@ -1741,7 +1761,7 @@
        typography properties so the dates match the .dash-preset-btn
        look exactly. */
     .dash-date-range input {
-      padding: 6px 10px;
+      padding: 6px 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
       background: var(--surface);
@@ -1754,6 +1774,17 @@
       box-sizing: border-box;
     }
     .dash-date-range input:focus { border-color: var(--accent); color: var(--ink); }
+    /* iOS Safari renders the date VALUE through this pseudo-element and ignores
+       the input's own font-size, so the date boxes show much larger and taller
+       than the Today / Yesterday chips on iPhone. Pin the value to the same
+       size and strip the default margin so the boxes are uniform with the
+       preset buttons. (Desktop already matched; this is the missing mobile half.) */
+    .dash-date-range input::-webkit-date-and-time-value {
+      font-size: var(--fs-sm);
+      line-height: 1.4;
+      margin: 0;
+      text-align: left;
+    }
 
     .dash-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
     .dash-card {
@@ -2285,16 +2316,30 @@
          their existing rectangle design; any custom date-range inputs wrap
          onto the next line. */
       .dash-filter-bar {
+        position: relative;
         flex-wrap: wrap;
         gap: 6px;
         padding-bottom: 4px;
       }
       .dash-preset-btn { white-space: nowrap; }
+      .dash-more-btn { display: inline-flex; }
+      /* Overflow presets + custom range drop into a dropdown anchored to the
+         filter bar; tap "More" to open, tap a preset or outside to close. */
+      .dash-more-panel {
+        display: none;
+        position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+        flex-direction: column; gap: 6px;
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 8px;
+        box-shadow: 0 12px 32px rgba(0,0,0,.18);
+      }
+      .dash-more-panel.open { display: flex; }
+      .dash-more-panel .dash-preset-btn { text-align: left; }
       .dash-date-range {
         margin-left: 0; width: auto;
-        flex-shrink: 0; flex-wrap: nowrap;
+        flex-wrap: nowrap;
       }
-      .dash-date-range input { flex-shrink: 0; }
+      .dash-date-range input { flex: 1 1 auto; min-width: 0; }
       .setting-row { flex-direction: column; align-items: flex-start; }
       .setting-control { align-self: stretch; }
       /* Toggle-bearing rows stay in row layout on phones so the toggle
@@ -2878,16 +2923,19 @@
         </div>
       </div>
 
-      <div class="dash-filter-bar">
+      <div class="dash-filter-bar" id="dash-filter-bar">
         <button class="dash-preset-btn active" data-preset="today"     onclick="setDashPreset('today')">Today</button>
         <button class="dash-preset-btn" data-preset="yesterday" onclick="setDashPreset('yesterday')">Yesterday</button>
         <button class="dash-preset-btn" data-preset="7d"        onclick="setDashPreset('7d')">Last 7 Days</button>
-        <button class="dash-preset-btn" data-preset="30d"        onclick="setDashPreset('30d')">Last 30 Days</button>
-        <button class="dash-preset-btn" data-preset="all"       onclick="setDashPreset('all')">All Time</button>
-        <div class="dash-date-range">
-          <input type="date" id="dash-from" onchange="onDashDateChange()">
-          <span style="color:var(--muted);font-size:12px;">to</span>
-          <input type="date" id="dash-to" onchange="onDashDateChange()">
+        <button type="button" class="dash-more-btn" id="dash-more-btn" aria-haspopup="true" aria-expanded="false" onclick="togglePeriodMore('dash')"><span class="dash-more-label">More</span><span class="dash-more-caret" aria-hidden="true">▾</span></button>
+        <div class="dash-more-panel" id="dash-more-panel">
+          <button class="dash-preset-btn" data-preset="30d"        onclick="setDashPreset('30d')">Last 30 Days</button>
+          <button class="dash-preset-btn" data-preset="all"       onclick="setDashPreset('all')">All Time</button>
+          <div class="dash-date-range">
+            <input type="date" id="dash-from" onchange="onDashDateChange()">
+            <span style="color:var(--muted);font-size:12px;">to</span>
+            <input type="date" id="dash-to" onchange="onDashDateChange()">
+          </div>
         </div>
       </div>
 
@@ -3068,12 +3116,15 @@
         <button class="dash-preset-btn"        data-rpreset="today"     onclick="setReportPreset('today')">Today</button>
         <button class="dash-preset-btn"        data-rpreset="yesterday" onclick="setReportPreset('yesterday')">Yesterday</button>
         <button class="dash-preset-btn"        data-rpreset="7d"        onclick="setReportPreset('7d')">Last 7 Days</button>
-        <button class="dash-preset-btn active" data-rpreset="30d"       onclick="setReportPreset('30d')">Last 30 Days</button>
-        <button class="dash-preset-btn"        data-rpreset="all"       onclick="setReportPreset('all')">All Time</button>
-        <div class="dash-date-range">
-          <input type="date" id="report-from" onchange="onReportDateChange()">
-          <span style="font-size:var(--fs-sm);color:var(--muted);">to</span>
-          <input type="date" id="report-to" onchange="onReportDateChange()">
+        <button type="button" class="dash-more-btn" id="report-more-btn" aria-haspopup="true" aria-expanded="false" onclick="togglePeriodMore('report')"><span class="dash-more-label">More</span><span class="dash-more-caret" aria-hidden="true">▾</span></button>
+        <div class="dash-more-panel" id="report-more-panel">
+          <button class="dash-preset-btn active" data-rpreset="30d"       onclick="setReportPreset('30d')">Last 30 Days</button>
+          <button class="dash-preset-btn"        data-rpreset="all"       onclick="setReportPreset('all')">All Time</button>
+          <div class="dash-date-range">
+            <input type="date" id="report-from" onchange="onReportDateChange()">
+            <span style="font-size:var(--fs-sm);color:var(--muted);">to</span>
+            <input type="date" id="report-to" onchange="onReportDateChange()">
+          </div>
         </div>
       </div>
 
@@ -10388,6 +10439,51 @@ function manilaDateStr(d) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 }
 
+// ---------- Period "More" popover (mobile) ----------
+// On phones the period filter shows Today / Yesterday / Last 7 inline plus a
+// "More" button; Last 30 / All Time / custom range live in a dropdown panel.
+// The More button reflects the current selection when it's one of the hidden
+// options, so the active range is never invisible.
+function togglePeriodMore(scope) {
+  const panel = document.getElementById(scope === 'dash' ? 'dash-more-panel' : 'report-more-panel');
+  const btn   = document.getElementById(scope === 'dash' ? 'dash-more-btn'   : 'report-more-btn');
+  if (!panel) return;
+  const willOpen = !panel.classList.contains('open');
+  closePeriodPanels();
+  if (willOpen) {
+    panel.classList.add('open');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  }
+}
+function closePeriodPanels() {
+  document.querySelectorAll('.dash-more-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.dash-more-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+// Reflect the active range onto the More button: inline presets leave it as a
+// plain "More"; a hidden preset (Last 30 / All Time) or a custom range shows
+// that label and highlights the button so the selection is never invisible.
+function syncPeriodMoreBtn(scope) {
+  const isDash = scope === 'dash';
+  const btn = document.getElementById(isDash ? 'dash-more-btn' : 'report-more-btn');
+  if (!btn) return;
+  const bar = document.getElementById(isDash ? 'dash-filter-bar' : 'report-filter-bar');
+  const label = btn.querySelector('.dash-more-label');
+  const activeBtn = bar ? bar.querySelector('.dash-preset-btn.active') : null;
+  const activePreset = activeBtn ? (activeBtn.dataset.preset || activeBtn.dataset.rpreset) : null;
+  const from = isDash ? dashFromDate : reportFromDate;
+  const to   = isDash ? dashToDate   : reportToDate;
+  let txt = 'More';
+  if (activePreset === '30d') txt = 'Last 30 Days';
+  else if (activePreset === 'all') txt = 'All Time';
+  else if (!activePreset && (from || to)) txt = 'Custom';
+  btn.classList.toggle('active', txt !== 'More');
+  if (label) label.textContent = txt;
+}
+// Close any open period dropdown when tapping outside the filter bar.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.dash-filter-bar')) closePeriodPanels();
+});
+
 function setDashPreset(preset, doRender = true) {
   document.querySelectorAll('.dash-preset-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.preset === preset));
@@ -10411,6 +10507,8 @@ function setDashPreset(preset, doRender = true) {
   if (fromInp) fromInp.value = dashFromDate || '';
   if (toInp)   toInp.value   = dashToDate   || '';
   if (doRender) renderDashboard();
+  closePeriodPanels();
+  syncPeriodMoreBtn('dash');
 }
 
 function onDashDateChange() {
@@ -10418,6 +10516,7 @@ function onDashDateChange() {
   dashToDate   = document.getElementById('dash-to').value   || null;
   document.querySelectorAll('.dash-preset-btn').forEach(b => b.classList.remove('active'));
   renderDashboard();
+  syncPeriodMoreBtn('dash');
 }
 
 function getOrderDateStr(o) {
@@ -10474,6 +10573,8 @@ function setReportPreset(preset, doRender = true) {
     renderSalesReport();
     renderInventoryReport();
   }
+  closePeriodPanels();
+  syncPeriodMoreBtn('report');
 }
 
 function onReportDateChange() {
@@ -10482,6 +10583,7 @@ function onReportDateChange() {
   document.querySelectorAll('[data-rpreset]').forEach(b => b.classList.remove('active'));
   renderSalesReport();
   renderInventoryReport();
+  syncPeriodMoreBtn('report');
 }
 
 function filterOrdersForReport(arr) {
