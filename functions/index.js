@@ -2232,6 +2232,8 @@ exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10
       const title = escAttr(name);
       const desc = escAttr(`Order online from ${name} — delivery or pick-up from your neighborhood store. Powered by Pabili Mart.`);
       const canonical = escAttr('https://pabilimart.com' + pathname);
+      // Per-tenant OG card (name + logo), rendered + CDN-cached by ogImage.
+      const imageUrl = escAttr('https://pabilimart.com/og/' + encodeURIComponent(slug) + '.png');
       html = html
         .replace(/<title>[^<]*<\/title>/i, `<title>${title}</title>`)
         .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/i, `$1${title}$2`)
@@ -2239,7 +2241,9 @@ exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10
         .replace(/(<meta\s+property="og:description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
         .replace(/(<meta\s+name="twitter:description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
         .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/i, `$1${desc}$2`)
-        .replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i, `$1${canonical}$2`);
+        .replace(/(<meta\s+property="og:url"\s+content=")[^"]*(")/i, `$1${canonical}$2`)
+        .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/i, `$1${imageUrl}$2`)
+        .replace(/(<meta\s+name="twitter:image"\s+content=")[^"]*(")/i, `$1${imageUrl}$2`);
     }
     // CDN-cache per path so warm previews + repeat loads skip the function.
     // Short window so a store rename / new tenant reflects quickly.
@@ -2250,5 +2254,52 @@ exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10
     console.error('storefrontMeta inject failed:', e);
     res.set('Cache-Control', 'no-store');
     res.status(200).type('html').send(html);
+  }
+});
+
+// ============================================================
+// ogImage — per-tenant OpenGraph card PNG (name + logo on the brand card).
+// ------------------------------------------------------------
+// Served at /og/{slug}.png (Hosting rewrite). storefrontMeta points each
+// tenant's og:image here. Rendered with satori + resvg (see ogcard.js) and
+// CDN-cached per slug, so it's generated rarely (crawlers cache ~30 days).
+// On any error / unknown tenant → redirect to the static og-default.png so a
+// link always has SOME image.
+// ============================================================
+const OG_DEFAULT_URL = 'https://pabilimart.com/og-default.png';
+
+// The tenant's custom logo data URL, only when the logo feature is on.
+async function lookupLogoDataUrl(slug) {
+  try {
+    const ss = await db.collection('tenants').doc(slug).collection('settings').doc('store').get();
+    const d = ss.exists ? (ss.data() || {}) : {};
+    if (d.logoEnabled === true && typeof d.logoDataUrl === 'string' && d.logoDataUrl.startsWith('data:image/')) {
+      return d.logoDataUrl;
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
+exports.ogImage = onRequest({ region: 'asia-southeast1', maxInstances: 10, memory: '512MiB', invoker: 'public' }, async (req, res) => {
+  try {
+    // /og/{slug}.png → slug
+    const pathname = (req.path || req.url || '/').split('?')[0];
+    const m = pathname.match(/\/og\/([^/]+?)(?:\.png)?$/i);
+    const slug = m ? decodeURIComponent(m[1]).toLowerCase() : null;
+    const name = slug ? await lookupStoreName(slug) : null;
+    if (!slug || !name) { res.redirect(302, OG_DEFAULT_URL); return; }
+
+    const logoDataUrl = await lookupLogoDataUrl(slug);
+    const { renderOgCardPng } = require('./ogcard'); // lazy — only ogImage needs satori/resvg
+    const png = await renderOgCardPng({ name, logoDataUrl });
+
+    // Long CDN cache — the card only changes on rename/logo change, which is
+    // rare and tolerates the same re-scrape delay as the title.
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+    res.set('Content-Type', 'image/png');
+    res.status(200).send(png);
+  } catch (e) {
+    console.error('ogImage render failed:', e);
+    res.redirect(302, OG_DEFAULT_URL);
   }
 });
