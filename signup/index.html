@@ -1209,8 +1209,8 @@
 
   .submit-btn-wrap { margin-top: 30px; }
 
-  /* Success state success-url links */
-  #success-url, #success-admin-url {
+  /* Success state URL boxes */
+  #success-admin-url, .copy-row {
     background: var(--surface-2);
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
@@ -1220,6 +1220,19 @@
     color: var(--accent); font-weight: 600;
     word-break: break-all;
   }
+  /* Storefront row: URL text + copy button sharing one box. */
+  .copy-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; }
+  .copy-row #success-url { flex: 1 1 auto; min-width: 0; }
+  .copy-btn {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); cursor: pointer; color: var(--muted);
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .copy-btn:hover { background: var(--surface-2); color: var(--accent); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
 
   /* ============================================================
      Store finder
@@ -2113,7 +2126,7 @@
           <div class="slug-preview">
             Your store will be at <span class="url-host">https://pabilimart.com/</span><span class="url-slug" id="slug-preview">tindahan-ni-manilyn</span><span class="url-host">/</span>
           </div>
-          <div class="help">Auto-filled from your store name. You can edit it. Lowercase letters, numbers, and hyphens. 3–32 characters.</div>
+          <div class="help">Auto-filled from your store name. You can still edit this, however, this is going to be permanently associated with your account once saved. Lowercase letters, numbers, and hyphens. 3–32 characters.</div>
         </div>
 
         <div class="field">
@@ -2176,10 +2189,14 @@
       </p>
       <p id="success-seeded" style="font-size: 13px; color: var(--muted); margin-bottom: 16px;"></p>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Storefront (share this with customers):</p>
-      <div id="success-url" class="slug-preview" style="display: block; margin-bottom: 14px; user-select: all;">—</div>
+      <div class="copy-row" style="margin-bottom: 14px;">
+        <span id="success-url" style="user-select: all;">—</span>
+        <button type="button" class="copy-btn" id="copy-storefront-btn" onclick="copyStorefrontUrl()" title="Copy storefront link" aria-label="Copy storefront link"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+      </div>
       <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">Admin (manage your products + orders):</p>
       <div id="success-admin-url" class="slug-preview" style="display: block; margin-bottom: 20px; user-select: all;">—</div>
       <a id="open-admin-btn" href="#" class="btn btn-primary" style="text-decoration: none;">Open my admin →</a>
+      <button class="link-btn" id="success-switch-account" onclick="signOut()" style="margin-top:14px;display:none;">Not you? Switch account</button>
     </div>
   </div>
     </div><!-- /.signup-card -->
@@ -2900,22 +2917,13 @@ async function submitForm(e) {
   try {
     const result = await createTenant({ name, slug, pickupAddress, gcashAccountName, gcashNumber, inviteCode, tier: selectedTier });
     const r = result.data;
-    document.getElementById('success-name').textContent = r.name;
-    const seededEl = document.getElementById('success-seeded');
-    if (seededEl) {
-      const seedLine = (r.starterPackCopied > 0)
-        ? `Pre-loaded with ${r.starterPackCopied} starter products — you can edit, hide, or add more in the admin.`
-        : 'Your store starts with an empty catalog. Add products from the admin.';
-      seededEl.textContent = r.trialing
-        ? `🎉 Your 30-day free trial of ${r.tierName} is active. ${seedLine}`
-        : seedLine;
-    }
-    // URLs are display-only text so tenants can read / copy them but the
-    // single "Open my admin" button is the only path to actually navigate.
-    document.getElementById('success-url').textContent = r.url;
-    document.getElementById('success-admin-url').textContent = r.adminUrl;
-    document.getElementById('open-admin-btn').href = r.adminUrl;
-    showStep('step-success');
+    const seedLine = (r.starterPackCopied > 0)
+      ? `Pre-loaded with ${r.starterPackCopied} starter products — you can edit, hide, or add more in the admin.`
+      : 'Your store starts with an empty catalog. Add products from the admin.';
+    const seededText = r.trialing
+      ? `🎉 Your 30-day free trial of ${r.tierName} is active. ${seedLine}`
+      : seedLine;
+    showSuccessStep({ name: r.name, url: r.url, adminUrl: r.adminUrl, seededText, showSwitch: false });
   } catch (err) {
     console.error(err);
     const msg = (err && err.message) ? err.message : 'Something went wrong. Please try again.';
@@ -2923,6 +2931,54 @@ async function submitForm(e) {
     btn.disabled = false;
     btn.textContent = 'Create my store';
   }
+}
+
+// Populate + show the success step. Used after a fresh registration and when
+// an existing owner signs in (so returning users land on the same "store is
+// ready" page with their storefront / admin links).
+function showSuccessStep(opts) {
+  opts = opts || {};
+  document.getElementById('success-name').textContent = opts.name || '';
+  const seededEl = document.getElementById('success-seeded');
+  if (seededEl) {
+    seededEl.textContent = opts.seededText || '';
+    seededEl.style.display = opts.seededText ? '' : 'none';
+  }
+  document.getElementById('success-url').textContent = opts.url || '—';
+  document.getElementById('success-admin-url').textContent = opts.adminUrl || '—';
+  document.getElementById('open-admin-btn').href = opts.adminUrl || '#';
+  const sw = document.getElementById('success-switch-account');
+  if (sw) sw.style.display = opts.showSwitch ? 'block' : 'none';
+  showStep('step-success');
+}
+
+// Copy the storefront URL to the clipboard, with a brief checkmark flash.
+const COPY_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+const CHECK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+function copyStorefrontUrl() {
+  const el = document.getElementById('success-url');
+  const url = el ? el.textContent.trim() : '';
+  if (!url || url === '—') return;
+  const btn = document.getElementById('copy-storefront-btn');
+  const flash = () => {
+    if (!btn) return;
+    btn.innerHTML = CHECK_ICON_SVG;
+    btn.classList.add('copied');
+    btn.title = 'Copied!';
+    setTimeout(() => { btn.innerHTML = COPY_ICON_SVG; btn.classList.remove('copied'); btn.title = 'Copy storefront link'; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(flash).catch(() => fallbackCopyText(url, flash));
+  } else {
+    fallbackCopyText(url, flash);
+  }
+}
+function fallbackCopyText(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); if (cb) cb(); } catch (_) {}
+  document.body.removeChild(ta);
 }
 
 function escText(s) {
@@ -2957,8 +3013,14 @@ async function proceedVerifiedUser(user) {
     const cap = (typeof data?.cap === 'number') ? data.cap : 1;
     // Superadmins can create more, so skip the gate even if they already own.
     if (!data?.isSuperadmin && tenants.length >= cap && tenants.length > 0) {
-      renderAlreadyOwner(user.email, tenants);
-      showStep('step-already-owner');
+      // Existing owner signing in → show the same "store is ready" success
+      // page with their storefront / admin links (plus a Switch account escape).
+      const t = tenants[0];
+      showSuccessStep({
+        name: t.name, url: t.url, adminUrl: t.adminUrl,
+        seededText: 'Welcome back! Manage your products and orders from the admin.',
+        showSwitch: true
+      });
       return;
     }
   } catch (err) {
