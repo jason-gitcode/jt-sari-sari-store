@@ -1750,6 +1750,18 @@
     .dash-more-btn.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
     .dash-more-caret { font-size: 10px; opacity: .8; }
     .dash-more-panel { display: contents; }
+    /* "Go" button submits a custom date range and closes the dropdown. */
+    .period-go-btn {
+      flex: 0 0 auto;
+      padding: 6px 14px;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius-sm);
+      background: var(--ink); color: var(--surface);
+      font-size: var(--fs-sm); font-weight: 600;
+      text-align: center; cursor: pointer; white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .period-go-btn:hover { opacity: .9; }
     .dash-date-range {
       display: flex; align-items: center; gap: 8px;
       margin-left: auto; flex-wrap: wrap;
@@ -2340,9 +2352,9 @@
       .dash-more-panel button { text-align: left; }
       .dash-date-range {
         margin-left: 0; width: auto;
-        flex-wrap: nowrap;
+        flex-wrap: nowrap; gap: 6px; align-items: center;
       }
-      .dash-date-range input { flex: 1 1 auto; min-width: 0; }
+      .dash-date-range input { flex: 1 1 0; min-width: 0; padding: 6px 8px; }
       .setting-row { flex-direction: column; align-items: flex-start; }
       .setting-control { align-self: stretch; }
       /* Toggle-bearing rows stay in row layout on phones so the toggle
@@ -2935,9 +2947,10 @@
           <button class="dash-preset-btn" data-preset="30d"        onclick="setDashPreset('30d')">Last 30 Days</button>
           <button class="dash-preset-btn" data-preset="all"       onclick="setDashPreset('all')">All Time</button>
           <div class="dash-date-range">
-            <input type="date" id="dash-from" onchange="onDashDateChange()">
+            <input type="date" id="dash-from">
             <span style="color:var(--muted);font-size:12px;">to</span>
-            <input type="date" id="dash-to" onchange="onDashDateChange()">
+            <input type="date" id="dash-to">
+            <button type="button" class="period-go-btn" onclick="applyPeriodRange('dash')">Go</button>
           </div>
         </div>
       </div>
@@ -3127,9 +3140,10 @@
           <button class="dash-preset-btn active" data-rpreset="30d"       onclick="setReportPreset('30d')">Last 30 Days</button>
           <button class="dash-preset-btn"        data-rpreset="all"       onclick="setReportPreset('all')">All Time</button>
           <div class="dash-date-range">
-            <input type="date" id="report-from" onchange="onReportDateChange()">
+            <input type="date" id="report-from">
             <span style="font-size:var(--fs-sm);color:var(--muted);">to</span>
-            <input type="date" id="report-to" onchange="onReportDateChange()">
+            <input type="date" id="report-to">
+            <button type="button" class="period-go-btn" onclick="applyPeriodRange('report')">Go</button>
           </div>
         </div>
       </div>
@@ -10542,6 +10556,15 @@ function syncSettingsMoreBtn() {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.dash-filter-bar, .orders-filter, .settings-nav')) closePeriodPanels();
 });
+
+// "Go" button — apply the custom From/To range, then close the dropdown so the
+// dashboard / report is revealed. Custom ranges no longer apply live per
+// keystroke; the owner picks both dates and submits with Go.
+function applyPeriodRange(scope) {
+  if (scope === 'dash') onDashDateChange();
+  else onReportDateChange();
+  closePeriodPanels();
+}
 
 function setDashPreset(preset, doRender = true) {
   document.querySelectorAll('.dash-preset-btn').forEach(b =>
