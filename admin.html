@@ -5695,7 +5695,7 @@ function syncServiceToggles() {
     'set-pay-gcash-enabled': storeSettingsData.payGcashEnabled  !== false,
     'set-pay-cod-enabled':   storeSettingsData.payCodEnabled    !== false,
     'set-schedules-enabled': storeSettingsData.schedulesEnabled === true,
-    'set-del-fee-enabled':   storeSettingsData.deliveryFeeEnabled !== false,
+    'set-del-fee-enabled':   storeSettingsData.deliveryFeeEnabled === true,
     'set-free-del-enabled':  storeSettingsData.freeDeliveryEnabled === true,
     'set-areas-enabled':     storeSettingsData.deliveryAreasEnabled !== false,
     'set-ticker-enabled':    storeSettingsData.tickerEnabled !== false,
@@ -5996,7 +5996,7 @@ function renderAreasEditor() {
   }
   list.innerHTML = areaRows.map((a, i) => `
     <div style="display:flex;gap:6px;align-items:center;">
-      <input type="text" value="${(a || '').replace(/"/g, '&quot;')}" placeholder="e.g. Valle Verde Subdivision" maxlength="120" oninput="updateAreaRow(${i}, this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;" />
+      <input type="text" value="${(a || '').replace(/"/g, '&quot;')}" placeholder="e.g. Smallville Subdivision" maxlength="120" oninput="updateAreaRow(${i}, this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;" />
       <button type="button" onclick="removeAreaRow(${i})" title="Remove" style="padding:4px 8px;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--danger);cursor:pointer;font-size:13px;">×</button>
     </div>
   `).join('');

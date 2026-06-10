@@ -862,7 +862,7 @@ function cartTotal() {
   }, 0);
 }
 function deliveryFee() {
-  const feeOn = storeSettingsData.deliveryFeeEnabled !== false;
+  const feeOn = storeSettingsData.deliveryFeeEnabled === true;
   if (!feeOn) return 0;
   const freeOn = storeSettingsData.freeDeliveryEnabled === true;
   const threshold = (typeof storeSettingsData.freeDeliveryThreshold === 'number') ? storeSettingsData.freeDeliveryThreshold : 400;
@@ -993,7 +993,7 @@ function init() {
       </div>
       <div class="field">
         <label for="cust-subdivision">Subdivision / Barangay</label>
-        <input type="text" id="cust-subdivision" placeholder="e.g. Valle Verde Subdivision" value="${savedAddress?.subdivision || ''}" />
+        <input type="text" id="cust-subdivision" placeholder="e.g. Smallville Subdivision" value="${savedAddress?.subdivision || ''}" />
       </div>
       <div class="field">
         <label for="cust-floor">Floor <span style="font-weight:400;color:var(--muted);">(optional)</span></label>

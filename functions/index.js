@@ -354,7 +354,8 @@ exports.createTenant = onCall(async (request) => {
       { start: '16:00', end: '19:00' }
     ],
     // Delivery fee — toggleable + configurable amount (PHP).
-    deliveryFeeEnabled: true,
+    // Off by default: new stores deliver free until the owner turns the fee on.
+    deliveryFeeEnabled: false,
     deliveryFee: 45,
     // Free delivery promotion + delivery areas list — both toggleable.
     // Free-delivery-on-large-orders is off by default so every order pays the fee.
