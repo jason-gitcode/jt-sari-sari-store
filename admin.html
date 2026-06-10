@@ -4615,8 +4615,8 @@ const TIER_INFO = {
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500,  supplierCap: 100,
             features: ['500 products', '100 suppliers', 'Pabili Mart storefront URL',
                        'Pabili Mart branding', 'Sales reports + analytics'] },
-  pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 10000, supplierCap: 5000,
-            features: ['10,000 products', '5,000 suppliers', 'Custom domain',
+  pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 6000,  supplierCap: 1000,
+            features: ['6,000 products', '1,000 suppliers', 'Custom domain',
                        'Multi-branch support', 'Priority support'] }
 };
 
@@ -6815,9 +6815,9 @@ function renderProductCapStatus() {
   // or a full page reload so tenants near the cap don't lose the nudge.
   const dismissed = sessionStorage.getItem('productCapBannerDismissed') === '1';
 
-  // The Pro tier's 10K is effectively unlimited at small-shop scale;
+  // The Pro tier's 6K is effectively unlimited at small-shop scale;
   // skip the cap warnings and Add disabled state at this scale.
-  if (cap >= 10000) {
+  if (cap >= 6000) {
     pill.textContent = `${count.toLocaleString()} products`;
     pill.className = 'product-cap-pill unlimited';
     pill.title = `${info.name} — effectively unlimited`;
@@ -6839,7 +6839,7 @@ function renderProductCapStatus() {
     if (banner) {
       banner.style.display = dismissed ? 'none' : '';
       if (bannerTitle) bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} products)`;
-      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for 500 products, or Pro (₱499/mo) for 10,000.';
+      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for 500 products, or Pro (₱499/mo) for 6,000.';
       if (bannerCompact) bannerCompact.textContent = 'Limit reached.';
     }
   } else if (pct >= 0.8) {
@@ -6911,7 +6911,7 @@ function renderSupplierCapStatus() {
     if (banner) {
       banner.style.display = dismissed ? 'none' : '';
       if (bannerTitle) bannerTitle.textContent = `You've reached your ${info.name} plan limit (${cap} supplier${cap === 1 ? '' : 's'})`;
-      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for up to 100 suppliers, or Pro (₱499/mo) for 5,000.';
+      if (bannerMsg) bannerMsg.textContent = 'Upgrade to PabiliMart Growth (₱149/mo) for up to 100 suppliers, or Pro (₱499/mo) for 1,000.';
       if (bannerCompact) bannerCompact.textContent = 'Limit reached.';
     }
   } else {
@@ -9893,11 +9893,11 @@ function openAddModal() {
   const info = TIER_INFO[tier] || TIER_INFO.free;
   const cap = info.productCap;
   const count = (products || []).length;
-  if (cap < 10000 && count >= cap) {
+  if (cap < 6000 && count >= cap) {
     if (confirm(
       `You've reached your ${info.name} plan limit of ${cap} products.\n\n` +
       `Upgrade to PabiliMart Growth (₱149/mo) for 500 products,\n` +
-      `or Pro (₱499/mo) for 10,000.\n\n` +
+      `or Pro (₱499/mo) for 6,000.\n\n` +
       `Open the Billing tab now to upgrade?`
     )) {
       switchTab('billing');

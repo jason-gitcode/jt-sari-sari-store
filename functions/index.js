@@ -142,7 +142,7 @@ async function upsertDirectoryEntry(slug, name) {
 const SUBSCRIPTION_TIERS = {
   free:   { name: 'PabiliMart Free',   amount: 0,   productCap: 5 },
   growth: { name: 'PabiliMart Growth', amount: 149, productCap: 500 },
-  pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 10000 }
+  pro:    { name: 'PabiliMart Pro',    amount: 499, productCap: 6000 }
 };
 
 // First month free across all paid tiers + the Free tier is permanently free.
