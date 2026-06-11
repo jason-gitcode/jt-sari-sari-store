@@ -2935,6 +2935,9 @@
           <option value="">All branches</option>
         </select>
       </div>
+      <button class="icon-btn" id="share-qr-btn" onclick="openStoreQRModal()" title="Share store (QR code)" aria-label="Share store QR code">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5" rx="1"></rect><rect x="16" y="3" width="5" height="5" rx="1"></rect><rect x="3" y="16" width="5" height="5" rx="1"></rect><path d="M21 16h-3a2 2 0 0 0-2 2v3"></path><path d="M21 21v.01"></path><path d="M12 7v3a2 2 0 0 1-2 2H7"></path><path d="M3 12h.01"></path><path d="M12 3h.01"></path><path d="M12 16v.01"></path><path d="M16 12h1"></path><path d="M21 12v.01"></path><path d="M12 21v-1"></path></svg>
+      </button>
       <button class="icon-btn" id="theme-toggle" onclick="cycleTheme()" title="Toggle theme" aria-label="Toggle theme">
         <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
       </button>
@@ -4094,6 +4097,35 @@
   </div>
 </div>
 
+<!-- SHARE / QR MODAL — generates a scannable QR of the storefront URL
+     (custom-domain aware) with the store logo in the center. Pure
+     client-side; the QR library is lazy-loaded on first open. -->
+<div class="supp-modal-overlay" id="store-qr-modal" onclick="closeStoreQRBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 420px;">
+    <div class="supp-modal-header">
+      <h2>📱 Share your store</h2>
+      <button type="button" class="close-btn" onclick="closeStoreQRModal()">×</button>
+    </div>
+    <div class="supp-modal-body" style="padding: 24px; text-align:center;">
+      <div style="font-size:13px; color:var(--muted); line-height:1.55; margin-bottom:18px;">
+        I-print at i-display sa tindahan — i-scan ng customers para mag-order online.
+      </div>
+      <div id="store-qr-canvas-wrap" style="display:inline-block; padding:14px; background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 2px 10px rgba(15,23,42,0.06);">
+        <div id="store-qr-loading" style="color:var(--muted); font-size:13px; width:220px; padding:90px 0;">Generating…</div>
+        <canvas id="store-qr-canvas" style="display:none; width:220px; height:auto; border-radius:6px;"></canvas>
+      </div>
+      <div style="margin-top:16px; display:flex; align-items:center; gap:8px; justify-content:center; flex-wrap:wrap;">
+        <code id="store-qr-url" style="font-size:12px; color:var(--ink); background:var(--surface-2); padding:6px 10px; border-radius:6px; word-break:break-all; max-width:100%;">—</code>
+        <button type="button" onclick="copyToClipboard(document.getElementById('store-qr-url').textContent, this)" style="background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer;">Copy link</button>
+      </div>
+    </div>
+    <div class="supp-modal-footer" style="justify-content:flex-end;">
+      <button type="button" class="btn-secondary" onclick="closeStoreQRModal()">Close</button>
+      <button type="button" class="ps-cta-btn" id="store-qr-download-btn" onclick="downloadStoreQR()" style="opacity:0.5; pointer-events:none;">⬇️ Download PNG</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRIORITY SUPPORT MODAL — Pro-tenant ticket submission form. Backend
      enforces the Pro-tier check; this UI is only reachable via the
      "Contact support" CTA in Billing → Priority Support, which is itself
@@ -4627,6 +4659,130 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', resolveTenantHrefs);
 } else {
   resolveTenantHrefs();
+}
+
+// ============================================================
+// Storefront QR / Share — a scannable QR of the storefront URL with the
+// store logo in the center. All client-side; the QR library is lazy-
+// loaded from CDN on first open (bypasses the SW — it's cross-origin).
+// ============================================================
+function storefrontShareUrl() {
+  const cd = (typeof tenantDocData !== 'undefined' && tenantDocData && tenantDocData.customDomain) || null;
+  // Use the live custom domain if the tenant has one; otherwise the
+  // canonical platform path. Absolute URL — the QR is scanned off-device.
+  if (cd && cd.domain && cd.status === 'live') return 'https://' + cd.domain + '/';
+  return 'https://pabilimart.com/' + (TENANT_ID || 'jsminimart') + '/';
+}
+
+let _qrLibPromise = null;
+function loadQRLib() {
+  if (window.qrcode) return Promise.resolve();
+  if (_qrLibPromise) return _qrLibPromise;
+  _qrLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _qrLibPromise = null; reject(new Error('Could not load the QR generator. Check your connection and try again.')); };
+    document.head.appendChild(s);
+  });
+  return _qrLibPromise;
+}
+
+function qrRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function openStoreQRModal() {
+  const url = storefrontShareUrl();
+  document.getElementById('store-qr-url').textContent = url;
+  document.getElementById('store-qr-modal').classList.add('show');
+  const loading = document.getElementById('store-qr-loading');
+  const canvas = document.getElementById('store-qr-canvas');
+  const dlBtn = document.getElementById('store-qr-download-btn');
+  if (loading) { loading.style.display = ''; loading.textContent = 'Generating…'; }
+  if (canvas) canvas.style.display = 'none';
+  if (dlBtn) { dlBtn.style.opacity = '0.5'; dlBtn.style.pointerEvents = 'none'; }
+  loadQRLib()
+    .then(() => renderStoreQR(url))
+    .catch(err => { if (loading) loading.textContent = (err && err.message) ? err.message : 'Failed to generate QR.'; });
+}
+
+function renderStoreQR(url) {
+  const canvas = document.getElementById('store-qr-canvas');
+  const loading = document.getElementById('store-qr-loading');
+  const dlBtn = document.getElementById('store-qr-download-btn');
+  if (!canvas || !window.qrcode) return;
+  // Error-correction H (~30% recovery) so the center logo stays scannable.
+  const qr = window.qrcode(0, 'H');
+  qr.addData(url);
+  qr.make();
+  const count = qr.getModuleCount();
+  const quiet = 4;                 // quiet-zone modules
+  const total = count + quiet * 2;
+  const cell = Math.max(2, Math.floor(1024 / total));
+  const dim = cell * total;        // high-res for print downloads
+  canvas.width = dim; canvas.height = dim;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, dim, dim);
+  ctx.fillStyle = '#0f172a';       // near-black for contrast/scannability
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+    }
+  }
+  const finish = () => {
+    canvas.style.display = '';
+    if (loading) loading.style.display = 'none';
+    if (dlBtn) { dlBtn.style.opacity = '1'; dlBtn.style.pointerEvents = 'auto'; }
+  };
+  const logo = (typeof storeSettingsData !== 'undefined' && storeSettingsData &&
+                storeSettingsData.logoEnabled === true && storeSettingsData.logoDataUrl) || null;
+  if (logo) {
+    const img = new Image();
+    img.onload = () => {
+      const box = Math.round(dim * 0.22);
+      const off = Math.round((dim - box) / 2);
+      const pad = Math.round(box * 0.10);
+      ctx.fillStyle = '#ffffff';
+      qrRoundRect(ctx, off - pad, off - pad, box + pad * 2, box + pad * 2, Math.round(box * 0.18));
+      ctx.fill();
+      ctx.save();
+      qrRoundRect(ctx, off, off, box, box, Math.round(box * 0.16));
+      ctx.clip();
+      ctx.drawImage(img, off, off, box, box);
+      ctx.restore();
+      finish();
+    };
+    img.onerror = finish;   // logo failed → still a valid plain QR
+    img.src = logo;
+  } else {
+    finish();
+  }
+}
+
+function downloadStoreQR() {
+  const canvas = document.getElementById('store-qr-canvas');
+  if (!canvas || !canvas.width) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'pabili-mart-' + (TENANT_ID || 'store') + '-qr.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function closeStoreQRModal() {
+  document.getElementById('store-qr-modal').classList.remove('show');
+}
+function closeStoreQRBackdrop(e) {
+  if (e && e.target !== e.currentTarget) return;
+  closeStoreQRModal();
 }
 
 function fmt(n) {
