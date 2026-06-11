@@ -6944,19 +6944,31 @@ async function login() {
   const err = document.getElementById('login-error');
   err.textContent = '';
   btn.disabled = true;
-  btn.textContent = 'Signing in…';
+  btn.textContent = 'Redirecting to Google…';
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     // Show the Google account chooser instead of silently using the
     // most-recently-used account (helps when multiple admins share a device).
     provider.setCustomParameters({ prompt: 'select_account' });
-    await auth.signInWithPopup(provider);
+    // Full-page REDIRECT, not a popup — popups drop the auth result on the way
+    // back under modern COOP rules, stranding the user. Result handled on return.
+    await auth.signInWithRedirect(provider);
   } catch (e) {
     err.textContent = 'Sign-in failed. Please try again.';
     btn.disabled = false;
     btn.textContent = 'Sign in with Google';
   }
 }
+
+// Surface errors from a returning Google redirect sign-in (success → the
+// onAuthStateChanged gate routes into the admin).
+auth.getRedirectResult().catch(e => {
+  const code = (e && e.code) || '';
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+  console.error('redirect sign-in error:', e);
+  const el = document.getElementById('login-error');
+  if (el) el.textContent = 'Sign-in failed. Please try again.';
+});
 
 // ---- Email + password / magic-link admin sign-in (alongside Google) ----
 // The backend already requires email_verified on every callable, so an

@@ -2733,16 +2733,25 @@ document.getElementById('signin-btn').addEventListener('click', async () => {
     // the most-recently-used account. Lets users sign up multiple stores
     // with different Google accounts from the same browser.
     provider.setCustomParameters({ prompt: 'select_account' });
-    await auth.signInWithPopup(provider);
+    // Full-page REDIRECT, not a popup. Under modern COOP rules the popup can't
+    // hand its result back to this page (it rejects as popup-closed-by-user and
+    // strands the user on the landing page) — especially on mobile/Safari.
+    // The redirect result is picked up on return by getRedirectResult +
+    // onAuthStateChanged below.
+    await auth.signInWithRedirect(provider);
   } catch (err) {
     console.error(err);
-    // User-cancelled popup isn't really an error — the popup-closed-by-user
-    // code fires every time someone hits "Cancel" or closes the OAuth tab.
-    // Swallow it silently. Everything else gets the simple themed notice.
-    const code = (err && err.code) || '';
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-    showNotice('Sign-in failed', 'Please try again.');
+    showNotice('Sign-in failed', (err && err.message) ? err.message : 'Please try again.');
   }
+});
+
+// Complete a returning Google redirect sign-in. Success → onAuthStateChanged
+// routes the user; here we only surface errors.
+auth.getRedirectResult().catch(err => {
+  const code = (err && err.code) || '';
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+  console.error('redirect sign-in error:', err);
+  showNotice('Sign-in failed', (err && err.message) ? err.message : 'Please try again.');
 });
 
 // ============================================================
