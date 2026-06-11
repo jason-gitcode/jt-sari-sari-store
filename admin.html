@@ -4106,6 +4106,13 @@
           <div style="font-size: 11px; color: var(--muted);"><span id="support-ticket-char-count">0</span> / 2000</div>
         </div>
       </div>
+      <div style="margin-bottom: 2px;">
+        <label style="display:block; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Screenshot <span style="text-transform:none; font-weight:400; letter-spacing:0;">— optional</span></label>
+        <input type="file" id="support-ticket-screenshot-input" accept="image/png,image/jpeg,image/jpg,image/heic,image/heif,image/webp" style="display:none;" onchange="handleSupportScreenshotUpload(event)" />
+        <label for="support-ticket-screenshot-input" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:500; padding:8px 14px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink);">📎 Attach screenshot</label>
+        <div id="support-ticket-screenshot-preview"></div>
+        <div style="font-size:11px; color:var(--muted); margin-top:5px;">Attach a photo of the error to help us fix it faster.</div>
+      </div>
     </div>
     <div class="supp-modal-footer">
       <button type="button" class="btn-secondary" onclick="closeSupportTicketModal()">Cancel</button>
@@ -7574,6 +7581,7 @@ function openSupportTicketModal() {
   document.getElementById('support-ticket-message').value = '';
   document.getElementById('support-ticket-char-count').textContent = '0';
   document.getElementById('support-ticket-status').textContent = '';
+  removeSupportScreenshot();
   const email = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'your account email';
   document.getElementById('support-ticket-reply-email').textContent = email;
   document.getElementById('support-ticket-modal').classList.add('show');
@@ -7600,6 +7608,47 @@ function closeSupportTicketSentBackdrop(e) {
   closeSupportTicketSentModal();
 }
 
+// Optional error-screenshot attachment for the support ticket. Compressed
+// client-side to a small JPEG data URL (same approach as the GCash receipt
+// upload) and passed to submitSupportTicket.
+let supportScreenshotData = null;
+let supportScreenshotName = null;
+
+function handleSupportScreenshotUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('support-ticket-status');
+  if (!/^image\//.test(file.type || '')) { statusEl.textContent = 'Please attach an image file.'; return; }
+  if (file.size > 10 * 1024 * 1024) { statusEl.textContent = 'Image too large. Max 10 MB.'; return; }
+  statusEl.textContent = '';
+  supportScreenshotName = file.name || 'screenshot.jpg';
+  compressImageToDataUrl(file, 1100, 0.7, 'image/jpeg')
+    .then(dataUrl => { supportScreenshotData = dataUrl; renderSupportScreenshot(); })
+    .catch(err => { statusEl.textContent = (err && err.message) ? err.message : 'Could not read the image.'; });
+}
+
+function renderSupportScreenshot() {
+  const wrap = document.getElementById('support-ticket-screenshot-preview');
+  if (!wrap) return;
+  if (!supportScreenshotData) { wrap.innerHTML = ''; return; }
+  const safeName = (supportScreenshotName || 'screenshot.jpg')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;">
+      <img src="${supportScreenshotData}" alt="screenshot preview" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--line);" />
+      <span style="font-size:13px;color:var(--ink);">🖼️ ${safeName}</span>
+      <button type="button" onclick="removeSupportScreenshot()" style="background:none;border:0;color:#dc2626;font-size:18px;cursor:pointer;line-height:1;">×</button>
+    </div>`;
+}
+
+function removeSupportScreenshot() {
+  supportScreenshotData = null;
+  supportScreenshotName = null;
+  const input = document.getElementById('support-ticket-screenshot-input');
+  if (input) input.value = '';
+  renderSupportScreenshot();
+}
+
 async function submitSupportTicketForm() {
   const subject = (document.getElementById('support-ticket-subject').value || '').trim();
   const message = (document.getElementById('support-ticket-message').value || '').trim();
@@ -7618,7 +7667,12 @@ async function submitSupportTicketForm() {
   statusEl.textContent = '';
   try {
     const fn = firebase.app().functions('asia-southeast1').httpsCallable('submitSupportTicket');
-    const res = await fn({ tid: TENANT_ID, subject, message });
+    const payload = { tid: TENANT_ID, subject, message };
+    if (supportScreenshotData) {
+      payload.screenshotDataUrl = supportScreenshotData;
+      payload.screenshotName = supportScreenshotName || 'screenshot.jpg';
+    }
+    const res = await fn(payload);
     const ticketId = (res && res.data && res.data.ticketId) || '—';
     closeSupportTicketModal();
     document.getElementById('support-ticket-sent-id').textContent = ticketId;

@@ -1271,6 +1271,18 @@ exports.submitSupportTicket = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Message is too long. Trim to 2000 characters and try again.');
   }
 
+  // Optional error screenshot — compressed client-side to a small JPEG data
+  // URL. Kept well under Firestore's 1 MB doc limit.
+  const screenshotDataUrl = String(data.screenshotDataUrl || '');
+  const screenshotName = String(data.screenshotName || 'screenshot.jpg').slice(0, 200);
+  const hasScreenshot = screenshotDataUrl.startsWith('data:image/');
+  if (screenshotDataUrl && !hasScreenshot) {
+    throw new HttpsError('invalid-argument', 'Screenshot must be an image.');
+  }
+  if (hasScreenshot && screenshotDataUrl.length > 900_000) {
+    throw new HttpsError('invalid-argument', 'Screenshot is too large — it should compress under ~650 KB. Try a smaller crop.');
+  }
+
   // Ownership + tier check.
   const tref = db.collection('tenants').doc(tid);
   const tsnap = await tref.get();
@@ -1314,6 +1326,8 @@ exports.submitSupportTicket = onCall(async (request) => {
       subject,
       message,
       submittedBy: email,
+      screenshot: hasScreenshot ? screenshotDataUrl : null,
+      screenshotName: hasScreenshot ? screenshotName : null,
       submittedAt: FieldValue.serverTimestamp()
     });
   } catch (err) {
@@ -1353,9 +1367,10 @@ exports.submitSupportTicket = onCall(async (request) => {
       `**Ticket:** \`${ticketId}\``,
       '',
       '> ' + message.replace(/\n/g, '\n> '),
+      hasScreenshot ? '📎 _Screenshot attached below._' : '',
       '',
       `_SLA: 4 business hours. Reply via email to ${email}._`
-    ].join('\n');
+    ].filter((line, i, arr) => !(line === '' && arr[i - 1] === '')).join('\n');
 
     try {
       // NOTE: Discord's API treats `allowed_mentions.parse: ['roles']`
@@ -1363,14 +1378,26 @@ exports.submitSupportTicket = onCall(async (request) => {
       // BOTH returns HTTP 400. We use the explicit roles array form so
       // only this specific role ID can be pinged from the content (defense
       // against accidental @everyone if the content ever has it).
-      const res = await fetch(webhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content,
-          allowed_mentions: { roles: [PRIORITY_SUPPORT_ROLE_ID] }
-        })
-      });
+      const payloadJson = { content, allowed_mentions: { roles: [PRIORITY_SUPPORT_ROLE_ID] } };
+      const m = hasScreenshot && screenshotDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      let res;
+      if (m) {
+        // Attach the screenshot as a real Discord file upload (multipart).
+        // Node 22 has global FormData/Blob/Buffer/fetch.
+        const mime = m[1];
+        const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const buf = Buffer.from(m[2], 'base64');
+        const form = new FormData();
+        form.append('payload_json', JSON.stringify(payloadJson));
+        form.append('files[0]', new Blob([buf], { type: mime }), `ticket-${ticketId}.${ext}`);
+        res = await fetch(webhook, { method: 'POST', body: form });
+      } else {
+        res = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadJson)
+        });
+      }
       if (!res.ok) {
         // Log the response body for diagnosis — Discord 400s usually
         // explain what's wrong in the body, otherwise we're flying blind.
