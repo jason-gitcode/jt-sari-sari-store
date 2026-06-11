@@ -4121,10 +4121,10 @@
         <button type="button" onclick="copyToClipboard(document.getElementById('store-qr-url').textContent, this)" style="background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer;">Copy link</button>
       </div>
     </div>
-    <div class="supp-modal-footer" style="justify-content:flex-end; flex-wrap:wrap;">
-      <button type="button" class="btn-secondary" onclick="closeStoreQRModal()">Close</button>
-      <button type="button" class="btn-secondary" id="store-qr-download-btn" onclick="downloadStoreQR()" style="opacity:0.5; pointer-events:none;">⬇️ QR only</button>
-      <button type="button" class="ps-cta-btn" id="store-qr-poster-btn" onclick="downloadStorePoster()">🖼️ Download poster</button>
+    <div class="supp-modal-footer" style="gap:8px; flex-wrap:nowrap;">
+      <button type="button" class="btn-secondary" id="store-qr-download-btn" onclick="downloadStoreQR()" style="flex:1 1 0; min-width:0; padding:10px 6px; font-size:13px; white-space:nowrap; opacity:0.5; pointer-events:none;">⬇️ QR only</button>
+      <button type="button" class="ps-cta-btn" id="store-qr-poster-btn" onclick="downloadStorePoster()" style="flex:1 1 0; min-width:0; padding:10px 6px; font-size:13px; justify-content:center; white-space:nowrap;">🖼️ Poster</button>
+      <button type="button" class="btn-secondary" onclick="closeStoreQRModal()" style="flex:1 1 0; min-width:0; padding:10px 6px; font-size:13px;">Close</button>
     </div>
   </div>
 </div>
@@ -4819,8 +4819,8 @@ function drawQRInto(ctx, qr, x, y, target, logoImg) {
   }
 }
 
-// Centered word-wrapped text (textBaseline must be 'top'). Returns next y.
-function _qrWrapText(ctx, text, cx, top, maxWidth, lineHeight) {
+// Word-wrap into lines for a given max width (always at least one line).
+function _qrWrapLines(ctx, text, maxWidth) {
   const words = String(text).split(/\s+/).filter(Boolean);
   const lines = []; let line = '';
   for (const w of words) {
@@ -4829,8 +4829,7 @@ function _qrWrapText(ctx, text, cx, top, maxWidth, lineHeight) {
     else line = t;
   }
   if (line) lines.push(line);
-  lines.forEach((ln, i) => ctx.fillText(ln, cx, top + i * lineHeight));
-  return top + lines.length * lineHeight;
+  return lines.length ? lines : [''];
 }
 
 // Print-ready "Scan to order" poster. Free/Growth get the "Powered by
@@ -4856,53 +4855,75 @@ async function downloadStorePoster() {
 
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, W, 16); ctx.fillRect(0, H - 16, W, 16);
-
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    let y = 110;
 
-    if (logoImg) {
-      const d = 180, cx = W / 2;
+    // Large sizes to fill the poster. QR shrinks a touch if the store name
+    // wraps to two lines so nothing overflows.
+    const hasLogo = !!logoImg;
+    const logoD = 240, gLogo = 46;
+    const nameFont = 82, nameLH = 96, gName = 22;
+    const headFont = 62, headH = 62, gHead = 30;
+    const subFont = 34, subH = 34, gSub = 54;
+    const urlFont = 42, urlH = 42, gUrl = 16;
+    const insFont = 30, insH = 30;
+
+    ctx.font = '800 ' + nameFont + 'px ' + FONT;
+    const nameLines = _qrWrapLines(ctx, storeName, W - 200);
+    const qrT = nameLines.length > 1 ? 600 : 700;
+
+    const totalH =
+      (hasLogo ? logoD + gLogo : 0) +
+      nameLines.length * nameLH + gName +
+      headH + gHead +
+      subH + gSub +
+      qrT + 56 +
+      urlH + gUrl +
+      insH;
+
+    // Vertically center the whole block in the area above the footer so
+    // there's no big empty band at the bottom.
+    const footZone = isPro ? 80 : 120;
+    const top = 70, bottom = H - footZone;
+    let y = top + Math.max(0, Math.round((bottom - top - totalH) / 2));
+
+    if (hasLogo) {
+      const cx = W / 2;
       ctx.save();
-      ctx.beginPath(); ctx.arc(cx, y + d / 2, d / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-      ctx.drawImage(logoImg, cx - d / 2, y, d, d);
+      ctx.beginPath(); ctx.arc(cx, y + logoD / 2, logoD / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      ctx.drawImage(logoImg, cx - logoD / 2, y, logoD, logoD);
       ctx.restore();
-      y += d + 34;
+      y += logoD + gLogo;
     }
 
-    ctx.fillStyle = '#0f172a';
-    ctx.font = '800 66px ' + FONT;
-    y = _qrWrapText(ctx, storeName, W / 2, y, W - 200, 78) + 16;
+    ctx.fillStyle = '#0f172a'; ctx.font = '800 ' + nameFont + 'px ' + FONT;
+    nameLines.forEach((ln, i) => ctx.fillText(ln, W / 2, y + i * nameLH));
+    y += nameLines.length * nameLH + gName;
 
-    ctx.fillStyle = '#2563eb';
-    ctx.font = '800 50px ' + FONT;
-    ctx.fillText('I-scan para mag-order!', W / 2, y); y += 50 + 24;
+    ctx.fillStyle = '#2563eb'; ctx.font = '800 ' + headFont + 'px ' + FONT;
+    ctx.fillText('I-scan para mag-order!', W / 2, y); y += headH + gHead;
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '500 28px ' + FONT;
-    ctx.fillText('Delivery • Pickup • GCash • COD', W / 2, y); y += 28 + 46;
+    ctx.fillStyle = '#64748b'; ctx.font = '500 ' + subFont + 'px ' + FONT;
+    ctx.fillText('Delivery • Pickup • GCash • COD', W / 2, y); y += subH + gSub;
 
     const qr = window.qrcode(0, 'H'); qr.addData(url); qr.make();
-    const qrT = 560;
     const qx = (W - qrT) / 2;
     ctx.fillStyle = '#f1f5f9';
-    qrRoundRect(ctx, qx - 28, y - 28, qrT + 56, qrT + 56, 28); ctx.fill();
+    qrRoundRect(ctx, qx - 28, y - 28, qrT + 56, qrT + 56, 30); ctx.fill();
     drawQRInto(ctx, qr, qx, y, qrT, logoImg);
     y += qrT + 56;
 
     ctx.fillStyle = '#0f172a';
-    ctx.font = '700 32px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-    ctx.fillText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), W / 2, y); y += 32 + 16;
+    ctx.font = '700 ' + urlFont + 'px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    ctx.fillText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), W / 2, y); y += urlH + gUrl;
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '500 26px ' + FONT;
+    ctx.fillStyle = '#64748b'; ctx.font = '500 ' + insFont + 'px ' + FONT;
     ctx.fillText('Buksan ang camera at i-scan ang QR code.', W / 2, y);
 
     if (!isPro) {
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '600 26px ' + FONT;
+      ctx.fillStyle = '#94a3b8'; ctx.font = '600 28px ' + FONT;
       ctx.textBaseline = 'bottom';
-      ctx.fillText('Powered by Pabili Mart', W / 2, H - 54);
+      ctx.fillText('Powered by Pabili Mart', W / 2, H - 50);
     }
 
     triggerDownload(cv.toDataURL('image/png'), 'pabili-mart-' + (TENANT_ID || 'store') + '-poster.png');
