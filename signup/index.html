@@ -1458,6 +1458,137 @@
     .layout-desc { font-size: 13px; }
   }
 
+  /* ============================================================
+     Guide page — step-by-step "how to sign up" walkthrough.
+     Vertical numbered timeline; mirrors the home design tokens.
+     ============================================================ */
+  .guide-hero { text-align: center; max-width: 680px; margin: 0 auto 8px; }
+  .guide-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 14px; border-radius: 999px; margin-bottom: 18px;
+  }
+  .guide-hero h1 {
+    font-size: 34px; line-height: 1.12; letter-spacing: -0.02em;
+    color: var(--ink); font-weight: 800; margin-bottom: 14px;
+  }
+  .guide-hero h1 .grad {
+    background: linear-gradient(120deg, var(--accent), var(--accent-grad-end));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .guide-hero p { font-size: 17px; color: var(--muted); }
+
+  .guide-steps {
+    max-width: 760px; margin: 48px auto 0;
+    position: relative;
+  }
+  /* Connecting line down the left rail of the number badges. */
+  .guide-steps::before {
+    content: ""; position: absolute; top: 20px; bottom: 20px; left: 21px;
+    width: 2px; background: linear-gradient(var(--line), var(--line));
+    z-index: 0;
+  }
+  .guide-step {
+    position: relative; z-index: 1;
+    display: flex; gap: 22px; align-items: flex-start;
+    padding-bottom: 30px;
+  }
+  .guide-step:last-child { padding-bottom: 0; }
+  .guide-step-num {
+    flex-shrink: 0;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-grad-end));
+    color: #fff; font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+    border: 4px solid var(--bg);
+  }
+  .guide-step.is-done .guide-step-num {
+    background: linear-gradient(135deg, var(--success), #15803d);
+    box-shadow: 0 6px 16px rgba(22, 163, 74, 0.25);
+  }
+  .guide-step-body {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    box-shadow: var(--shadow-xs);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .guide-step-body:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
+  .guide-step-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 4px;
+  }
+  .guide-step.is-done .guide-step-tag { color: var(--success); }
+  .guide-step-body h3 {
+    font-size: 19px; font-weight: 700; color: var(--ink);
+    margin-bottom: 12px; letter-spacing: -0.01em;
+  }
+  .guide-actions { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .guide-actions li {
+    position: relative; padding-left: 26px;
+    font-size: 15px; color: var(--text); line-height: 1.5;
+  }
+  .guide-actions li::before {
+    content: ""; position: absolute; left: 0; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent-soft);
+    border: 2px solid var(--accent);
+  }
+  .guide-step.is-done .guide-actions li::before {
+    background: var(--success-soft); border-color: var(--success);
+  }
+  .guide-actions strong { color: var(--ink); font-weight: 700; }
+  .guide-actions code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--surface-2); color: var(--ink);
+    padding: 1px 6px; border-radius: 5px; font-size: 13px;
+  }
+  .guide-tip {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-top: 14px; padding: 12px 14px;
+    border-radius: var(--radius);
+    font-size: 14px; line-height: 1.45;
+  }
+  .guide-tip-icon { flex-shrink: 0; font-size: 15px; line-height: 1.4; }
+  .guide-tip.info  { background: var(--accent-soft);  color: #1e40af; }
+  .guide-tip.warn  { background: #fef3c7;              color: #854d0e; }
+  .guide-tip.ok    { background: var(--success-soft);  color: #15803d; }
+  .guide-tip strong { font-weight: 700; }
+
+  /* Closing CTA on the guide page */
+  .guide-cta {
+    max-width: 760px; margin: 52px auto 0;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    border-radius: var(--radius-lg);
+    padding: 40px 36px; text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .guide-cta h2 {
+    color: #fff; font-size: 26px; font-weight: 800;
+    letter-spacing: -0.02em; margin-bottom: 10px;
+  }
+  .guide-cta p { color: #94a3b8; font-size: 16px; margin-bottom: 24px; }
+  .guide-cta .btn-hero { background: #fff; color: var(--ink); }
+  .guide-cta .btn-hero:hover { background: #f1f5f9; }
+
+  @media (max-width: 640px) {
+    .guide-hero h1 { font-size: 27px; }
+    .guide-hero p { font-size: 15px; }
+    .guide-step { gap: 14px; }
+    .guide-step-num { width: 38px; height: 38px; font-size: 16px; }
+    .guide-steps::before { left: 18px; }
+    .guide-step-body { padding: 18px 18px; }
+    .guide-step-body h3 { font-size: 17px; }
+    .guide-actions li { font-size: 14px; }
+    .guide-cta { padding: 32px 22px; }
+    .guide-cta h2 { font-size: 22px; }
+  }
+
   /* iOS auto-zoom prevention */
   @media (hover: none) and (pointer: coarse) {
     input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="hidden"]):not([type="file"]),
@@ -1487,6 +1618,7 @@
       <a href="#home"     class="nav-link" data-page-link="home">Home</a>
       <a href="#features" class="nav-link" data-page-link="features">Features</a>
       <a href="#plans"    class="nav-link" data-page-link="plans">Plans</a>
+      <a href="#guide"    class="nav-link" data-page-link="guide">Guide</a>
       <a href="#faq"      class="nav-link" data-page-link="faq">FAQ</a>
       <a href="#signup"   class="nav-cta"  data-page-link="signup">Sign in</a>
     </div>
@@ -2293,6 +2425,164 @@
 </section>
 
 <!-- ============================================================
+     Guide page — step-by-step "Paano mag-sign up" walkthrough.
+     A standalone [data-page="guide"] route; 8 numbered steps that
+     mirror the actual signup flow, in Taglish for shop owners.
+     ============================================================ -->
+<section class="guide-page" data-page="guide" id="guide">
+  <div class="container">
+    <div class="guide-hero">
+      <span class="guide-eyebrow">Setup Guide · 8 Hakbang</span>
+      <h1>Paano gumawa ng <span class="grad">sarili mong online store.</span></h1>
+      <p>Sundan lang ang 8 madaling hakbang. Walang bayad, walang credit card — pagkatapos, live na ang tindahan mo online.</p>
+    </div>
+
+    <div class="guide-steps">
+
+      <!-- Step 1 -->
+      <div class="guide-step">
+        <div class="guide-step-num">1</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 01 · Simulan</div>
+          <h3>I-tap ang “Start your store free”</h3>
+          <ul class="guide-actions">
+            <li>Buksan ang <strong>pabilimart.com</strong> sa phone o computer mo.</li>
+            <li>Sa home page, hanapin ang dark na button na <strong>“Start your store free”</strong> at i-tap ito.</li>
+          </ul>
+          <div class="guide-tip ok">
+            <span class="guide-tip-icon">✅</span>
+            <span><strong>Walang bayad.</strong> Walang kailangang credit card — live ang store mo in 2 minutes.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="guide-step">
+        <div class="guide-step-num">2</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 02 · Mag-sign in</div>
+          <h3>Gumawa ng account</h3>
+          <ul class="guide-actions">
+            <li>I-tap ang <strong>Continue with Google</strong> — ito ang pinaka-mabilis na paraan.</li>
+            <li>O kaya, mag-type ng <strong>email</strong> at gumawa ng <strong>password</strong> (6+ characters), tapos i-tap ang <strong>Create account</strong>.</li>
+          </ul>
+          <div class="guide-tip info">
+            <span class="guide-tip-icon">💡</span>
+            <span>May account ka na? I-tap ang <strong>“Have an account? Sign in.”</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="guide-step">
+        <div class="guide-step-num">3</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 03 · Google sign-in</div>
+          <h3>Piliin ang Google account mo</h3>
+          <ul class="guide-actions">
+            <li>Ilagay ang <strong>email or phone</strong> na naka-link sa Google mo, tapos i-tap ang <strong>Next</strong>.</li>
+            <li>Sundan ang Google steps. Awtomatiko kang babalik sa <strong>Pabili Mart</strong> pagkatapos.</li>
+          </ul>
+          <div class="guide-tip warn">
+            <span class="guide-tip-icon">⚠️</span>
+            <span>Kung <strong>email + password</strong> ang ginamit mo, <strong>laktawan</strong> ang hakbang na ito.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="guide-step">
+        <div class="guide-step-num">4</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 04 · Pangalanan</div>
+          <h3>Ilagay ang pangalan ng store</h3>
+          <ul class="guide-actions">
+            <li>Sa <strong>Store name</strong>, i-type ang pangalan ng tindahan mo — ito ang makikita ng customers.</li>
+            <li>Awtomatikong gagawa ng <strong>Store URL</strong>. Pwede mong i-edit — pero <strong>permanent</strong> na ito kapag na-save.</li>
+          </ul>
+          <div class="guide-tip info">
+            <span class="guide-tip-icon">💡</span>
+            <span>URL rule: <strong>lowercase letters, numbers, at hyphens</strong> lang — 3 hanggang 32 characters.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="guide-step">
+        <div class="guide-step-num">5</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 05 · Store details</div>
+          <h3>Punan ang details at GCash</h3>
+          <ul class="guide-actions">
+            <li><strong>Store address</strong> — kung saan pwedeng mag-pickup ang customers.</li>
+            <li><strong>GCash name</strong> at <strong>phone number</strong> (11 digits, simula sa <code>09</code>) — dito magpapadala ng bayad ang customers.</li>
+            <li><strong>Invite code</strong> ay optional — iwanang blangko. Tapos i-tap ang <strong>Create my store</strong>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="guide-step">
+        <div class="guide-step-num">6</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 06 · Live na!</div>
+          <h3>Ready na ang store mo</h3>
+          <ul class="guide-actions">
+            <li>May <strong>2 links</strong> ka: ang <strong>Storefront</strong> (i-share sa customers) at ang <strong>Admin</strong> (para i-manage).</li>
+            <li>Pre-loaded na ng <strong>5 starter products</strong> — pwede mong i-edit o dagdagan. I-tap ang <strong>Open my admin</strong>.</li>
+          </ul>
+          <div class="guide-tip ok">
+            <span class="guide-tip-icon">📌</span>
+            <span>I-save ang storefront link — ito ang i-share mo sa mga suki para makapag-order.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 7 -->
+      <div class="guide-step">
+        <div class="guide-step-num">7</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 07 · Admin</div>
+          <h3>Ito ang Admin Dashboard mo</h3>
+          <ul class="guide-actions">
+            <li>Dito makikita ang <strong>sales stats</strong> mo: products, orders, confirmed, pending, at iba pa.</li>
+            <li>Gamitin ang menu sa ibaba — <strong>Products</strong> para magdagdag ng items, <strong>Orders</strong> para sa orders ng customer.</li>
+          </ul>
+          <div class="guide-tip ok">
+            <span class="guide-tip-icon">✅</span>
+            <span>I-tap ang green na <strong>Storefront</strong> button para makita ang nakikita ng customers.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 8 -->
+      <div class="guide-step is-done">
+        <div class="guide-step-num">8</div>
+        <div class="guide-step-body">
+          <div class="guide-step-tag">Hakbang 08 · Storefront</div>
+          <h3>Ito ang nakikita ng customers</h3>
+          <ul class="guide-actions">
+            <li>Eto na ang <strong>live storefront</strong> mo — kumpleto na ng products at presyo.</li>
+            <li><strong>I-share ang link</strong> sa Facebook, Messenger, o sa mga suki para makapag-order na agad.</li>
+          </ul>
+          <div class="guide-tip ok">
+            <span class="guide-tip-icon">🎉</span>
+            <span><strong>Tapos ka na!</strong> Live na ang tindahan mo online.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="guide-cta">
+      <h2>Handa nang magsimula?</h2>
+      <p>Gawin live ang tindahan mo ngayon — 2 minuto lang, walang bayad.</p>
+      <a href="#signup" class="btn-hero" data-page-link="signup">Start your store free <span class="arrow">→</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
      Footer
      ============================================================ -->
 <footer>
@@ -2563,7 +2853,7 @@ function clearStatus() {
 // like a real multi-page site. All in-page links go through
 // navigateToPage so we can scroll to the TOP of each page instead of
 // letting the browser's default anchor-jump land mid-section.
-const PAGE_LIST = ['home', 'features', 'plans', 'faq', 'signup'];
+const PAGE_LIST = ['home', 'features', 'plans', 'guide', 'faq', 'signup'];
 function getPageFromHash() {
   const raw = (location.hash || '').replace(/^#/, '').toLowerCase();
   // Legacy #pricing CTA target aliases into Plans for back-compat.
