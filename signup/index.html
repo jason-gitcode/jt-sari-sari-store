@@ -167,6 +167,7 @@
     display: flex; align-items: center; gap: 10px;
     text-decoration: none; color: var(--ink);
     font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+    white-space: nowrap; flex-shrink: 0;
   }
   .brand-mark {
     width: 28px; height: 28px;
@@ -176,11 +177,12 @@
     color: #fff; font-weight: 700; font-size: 14px;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.30);
   }
-  .nav-actions { display: flex; align-items: center; gap: 18px; }
+  .nav-actions { display: flex; align-items: center; gap: 18px; flex-wrap: nowrap; }
   .nav-link {
     font-size: 14px; font-weight: 500; color: var(--text);
     text-decoration: none; transition: color 0.15s;
     padding: 6px 4px; border-bottom: 2px solid transparent;
+    white-space: nowrap;
   }
   .nav-link:hover { color: var(--accent); }
   .nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
@@ -200,6 +202,7 @@
     font-size: 14px; font-weight: 600;
     text-decoration: none; border: 0;
     transition: background 0.15s;
+    white-space: nowrap; flex-shrink: 0;
   }
   .nav-cta:hover { background: #000; }
 
@@ -1419,13 +1422,12 @@
   @media (max-width: 600px) {
     section { padding: 48px 0; }
     .container { padding: 0 18px; }
-    .topbar-inner { padding: 12px 18px; }
     .topbar-inner { padding: 10px 14px; }
-    .nav-actions { gap: 8px; }
-    .nav-link { font-size: 12px; padding: 4px 2px; }
-    .nav-cta { font-size: 12px; padding: 6px 12px; }
-    .brand { font-size: 14px; }
-    .brand-mark { width: 22px; height: 22px; font-size: 11px; }
+    .nav-actions { gap: 13px; }
+    .nav-link { font-size: 13px; padding: 4px 1px; }
+    .nav-cta { font-size: 13px; padding: 7px 13px; }
+    .brand { font-size: 15px; gap: 8px; }
+    .brand-mark { width: 24px; height: 24px; font-size: 12px; }
     .plan-tab { padding: 9px 6px; font-size: 13px; min-width: 0; gap: 2px; }
     .plan-tab-pre { display: none; }
     .plan-tab-price { font-size: 10px; }
@@ -1632,7 +1634,6 @@
       Pabili Mart
     </a>
     <div class="nav-actions">
-      <a href="#home"     class="nav-link" data-page-link="home">Home</a>
       <a href="#features" class="nav-link" data-page-link="features">Features</a>
       <a href="#plans"    class="nav-link" data-page-link="plans">Plans</a>
       <a href="#guide"    class="nav-link" data-page-link="guide">Guide</a>
