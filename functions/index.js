@@ -642,6 +642,24 @@ exports.backfillSubscriptions = onCall(async (request) => {
 });
 
 // ============================================================
+// Build a <=6-char uppercased code from the slug's hyphen-separated words
+// for the GCash payment reference. Each word gets a fair share toward 6
+// chars; if a word is shorter than its share, the leftover carries to the
+// next word. "jacob"->JACOB, "jacob-store"->JACSTO, "my-store"->MYSTOR,
+// "js-mini-mart"->JSMIMA. MUST stay identical to slugRefCode() in admin.html.
+function slugRefCode(slug) {
+  const words = String(slug || '').split('-')
+    .map(w => w.replace(/[^A-Za-z0-9]/g, '').toUpperCase())
+    .filter(Boolean);
+  let remaining = 6, code = '';
+  for (let i = 0; i < words.length && remaining > 0; i++) {
+    const take = Math.min(Math.ceil(remaining / (words.length - i)), words[i].length);
+    code += words[i].slice(0, take);
+    remaining -= take;
+  }
+  return code;
+}
+
 // submitManualPayment — tenant owner submits a manual GCash payment for
 // a tier upgrade or renewal. Creates a pending_verification payment doc
 // + fires a Discord webhook so the superadmin can confirm in real time.
@@ -649,7 +667,7 @@ exports.backfillSubscriptions = onCall(async (request) => {
 // Validation: requested tier exists, amount matches tier price, receipt
 // is a reasonable size (compressed client-side), tenant owns the tid.
 //
-// Idempotency: the reference code (PM{slug}{YYYYMM}, alphanumeric) is the doc ID,
+// Idempotency: the reference code (PM + 6-char slug + YYYYMM) is the doc ID,
 // so resubmitting the same month overwrites the previous pending doc
 // for that period — prevents duplicate submissions clogging the queue.
 // ============================================================
@@ -781,10 +799,10 @@ exports.submitManualPayment = onCall(async (request) => {
   // ---- Compute reference code (YYYYMM in Manila time) ----
   const manila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const period = manila.getFullYear() + String(manila.getMonth() + 1).padStart(2, '0');
-  // Alphanumeric only — GCash's Message/Note field rejects special
-  // characters (hyphens included). Strip them so the owner can paste the
-  // code into GCash. MUST match the client's refCode in admin.html.
-  const referenceCode = `PM-${tid}-${period}`.replace(/[^A-Za-z0-9]/g, '');
+  // PM + <=6-char slug code + YYYYMM. Short & alphanumeric so the owner can
+  // paste it into GCash's Message/Note (no special chars). slugRefCode()
+  // MUST match the client's formula in admin.html.
+  const referenceCode = `PM${slugRefCode(tid)}${period}`;
 
   // ---- Write payment doc (idempotent on referenceCode) ----
   const paymentRef = tref.collection('payments').doc(referenceCode);

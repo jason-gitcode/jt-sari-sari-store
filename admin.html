@@ -5177,6 +5177,25 @@ function manilaPeriodCode() {
   return manila.getFullYear() + String(manila.getMonth() + 1).padStart(2, '0');
 }
 
+// Build a <=6-char uppercased code from the slug's hyphen-separated words,
+// for the GCash payment reference (PM + code + YYYYMM). Each word gets a
+// fair share toward 6 chars; if a word is shorter than its share, the
+// leftover carries to the next word. 1 word "jacob"->JACOB, 2 words
+// "jacob-store"->JACSTO, "my-store"->MYSTOR, 3 words "js-mini-mart"->JSMIMA.
+// MUST stay identical to slugRefCode() in functions/index.js (the doc ID).
+function slugRefCode(slug) {
+  const words = String(slug || '').split('-')
+    .map(w => w.replace(/[^A-Za-z0-9]/g, '').toUpperCase())
+    .filter(Boolean);
+  let remaining = 6, code = '';
+  for (let i = 0; i < words.length && remaining > 0; i++) {
+    const take = Math.min(Math.ceil(remaining / (words.length - i)), words[i].length);
+    code += words[i].slice(0, take);
+    remaining -= take;
+  }
+  return code;
+}
+
 function openPayNowModal() {
   // Default to upgrading to Growth if currently Free; otherwise pay for
   // the current paid tier's renewal.
@@ -5264,10 +5283,10 @@ function showPayNowModal() {
   payNowReceiptData = null;
   payNowReceiptName = null;
   const tier = TIER_INFO[payNowTargetTier];
-  // Alphanumeric only — GCash's Message/Note field rejects special
-  // characters (hyphens included), so strip them. MUST match the same
-  // sanitization in functions/index.js submitManualPayment (the doc ID).
-  const refCode = `PM-${TENANT_ID}-${manilaPeriodCode()}`.replace(/[^A-Za-z0-9]/g, '');
+  // PM + <=6-char slug code + YYYYMM — short & alphanumeric so it pastes
+  // cleanly into GCash's Message/Note (no special chars). slugRefCode()
+  // MUST match functions/index.js submitManualPayment (the doc ID).
+  const refCode = `PM${slugRefCode(TENANT_ID)}${manilaPeriodCode()}`;
   document.getElementById('paynow-tier-name').textContent = tier.name;
   document.getElementById('paynow-amount').textContent = fmtPHP(tier.amount);
   document.getElementById('paynow-ref-code').textContent = refCode;
