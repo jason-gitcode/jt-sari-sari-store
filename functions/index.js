@@ -3,6 +3,7 @@ const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const zlib = require('zlib');
 
 initializeApp();
 
@@ -2212,6 +2213,35 @@ async function lookupStoreName(slug) {
   return null;
 }
 
+// Send an HTML response compressed per the client's Accept-Encoding (brotli or
+// gzip). Function / Cloud Run responses are NOT auto-compressed by Hosting (only
+// static files are), so the storefront would otherwise ship ~5x larger than the
+// static-served brotli size. Vary: Accept-Encoding keeps the CDN caching per
+// encoding. Falls back to plain text if compression ever throws — never breaks.
+function sendHtml(req, res, html, cacheControl) {
+  res.set('Cache-Control', cacheControl);
+  res.set('Vary', 'Accept-Encoding');
+  res.type('html');
+  const ae = String((req.headers && req.headers['accept-encoding']) || '');
+  try {
+    if (/\bbr\b/.test(ae)) {
+      const buf = zlib.brotliCompressSync(Buffer.from(html, 'utf8'),
+        { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } });
+      res.set('Content-Encoding', 'br');
+      res.status(200).send(buf);
+      return;
+    }
+    if (/\bgzip\b/.test(ae)) {
+      res.set('Content-Encoding', 'gzip');
+      res.status(200).send(zlib.gzipSync(Buffer.from(html, 'utf8')));
+      return;
+    }
+  } catch (err) {
+    console.error('storefrontMeta compress failed:', err);
+  }
+  res.status(200).send(html); // uncompressed fallback
+}
+
 exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10, invoker: 'public' }, async (req, res) => {
   let html = null;
   try {
@@ -2247,13 +2277,11 @@ exports.storefrontMeta = onRequest({ region: 'asia-southeast1', maxInstances: 10
     }
     // CDN-cache per path so warm previews + repeat loads skip the function.
     // Short window so a store rename / new tenant reflects quickly.
-    res.set('Cache-Control', 'public, max-age=600, s-maxage=600');
-    res.status(200).type('html').send(html);
+    sendHtml(req, res, html, 'public, max-age=600, s-maxage=600');
   } catch (e) {
     // Injection failed — serve the unmodified shell so the store never breaks.
     console.error('storefrontMeta inject failed:', e);
-    res.set('Cache-Control', 'no-store');
-    res.status(200).type('html').send(html);
+    sendHtml(req, res, html, 'no-store');
   }
 });
 
