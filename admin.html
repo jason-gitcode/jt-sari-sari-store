@@ -903,6 +903,26 @@
     [data-theme="dark"] .supp-modal-footer .supp-del-btn { border-color: rgba(248,113,113,0.4); }
     [data-theme="dark"] .supp-modal-footer .supp-del-btn:hover { background: rgba(248,113,113,0.12); }
 
+    /* Priority-support CTA — a clear, obvious filled button (the bare
+       .btn-primary class is only styled inside modal footers, so this
+       section button needs its own box style). */
+    .ps-cta-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--ink); color: var(--surface);
+      border: 1px solid var(--ink); border-radius: 8px;
+      padding: 11px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; line-height: 1.2;
+      box-shadow: 0 2px 6px rgba(15,23,42,0.12);
+      transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
+    }
+    .ps-cta-btn:hover { background: var(--ink-soft); box-shadow: 0 4px 10px rgba(15,23,42,0.16); }
+    .ps-cta-btn:active { transform: translateY(1px); }
+    .ps-cta-btn.secondary {
+      background: var(--surface); color: var(--ink);
+      border: 1px solid var(--line-strong); box-shadow: var(--shadow-xs, 0 1px 2px rgba(15,23,42,0.05));
+    }
+    .ps-cta-btn.secondary:hover { background: var(--surface-2); border-color: var(--ink-soft); box-shadow: none; }
+
     /* View modal layout */
     /* View-modal field rows — used by both the supplier and the product
        view popups. Two-column layout (label | value) so the modal stays
@@ -7536,7 +7556,7 @@ function renderPrioritySupportSection() {
           </div>
           <div style="font-size:12px; color:var(--muted);">Billing, bug, feature request, or how-to.</div>
         </div>
-        <button type="button" class="btn-primary" onclick="openSupportTicketModal()" style="flex:0 0 auto;">🎧 Contact support</button>
+        <button type="button" class="ps-cta-btn" onclick="openSupportTicketModal()" style="flex:0 0 auto;">🎧 Contact support</button>
       </div>
     `;
   } else if (isBlocked) {
@@ -7554,7 +7574,7 @@ function renderPrioritySupportSection() {
           </div>
           <div style="font-size:12px; color:var(--muted);">Direct line to Pabili Mart · 4-business-hour SLA · ticket audit log.</div>
         </div>
-        <button type="button" class="btn-secondary" onclick="openLockedFeatureModal('priority-support')" style="flex:0 0 auto;">Learn more</button>
+        <button type="button" class="ps-cta-btn secondary" onclick="openLockedFeatureModal('priority-support')" style="flex:0 0 auto;">Learn more</button>
       </div>
     `;
   }
