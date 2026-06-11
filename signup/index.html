@@ -1521,6 +1521,25 @@
   }
   .guide-hero p { font-size: 17px; color: var(--muted); }
 
+  /* Guide sub-tabs — switch between the "set up" and "order" walkthroughs */
+  .guide-tabs {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin: 0 auto 36px;
+  }
+  .guide-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--surface); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 10px 20px; font-size: 14px; font-weight: 700;
+    white-space: nowrap; transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
+  .guide-tab:hover { color: var(--ink); border-color: var(--line-strong); }
+  .guide-tab.is-active {
+    background: var(--ink); color: #fff; border-color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .guide-panel[hidden] { display: none; }
+
   .guide-steps {
     max-width: 760px; margin: 48px auto 0;
     position: relative;
@@ -2491,6 +2510,15 @@
      ============================================================ -->
 <section class="guide-page" data-page="guide" id="guide">
   <div class="container">
+
+    <!-- Sub-tabs — two guides live under one Guide page -->
+    <div class="guide-tabs" role="tablist">
+      <button type="button" class="guide-tab is-active" data-guide-tab="setup" role="tab" aria-selected="true">🏪 I-set up ang store</button>
+      <button type="button" class="guide-tab" data-guide-tab="order" role="tab" aria-selected="false">🛒 Mag-order (COD)</button>
+    </div>
+
+    <!-- ===== TAB 1 · Set up your store ===== -->
+    <div class="guide-panel" data-guide-panel="setup">
     <div class="guide-hero">
       <span class="guide-eyebrow">Setup Guide · 8 Hakbang</span>
       <h1>Paano gumawa ng <span class="grad">sarili mong online store.</span></h1>
@@ -2663,6 +2691,135 @@
       <p>Gawin live ang tindahan mo ngayon — 2 minuto lang, walang bayad.</p>
       <a href="#signup" class="btn-hero" data-page-link="signup">Start your store free <span class="arrow">→</span></a>
     </div>
+    </div><!-- /guide-panel setup -->
+
+    <!-- ===== TAB 2 · Place an order (Cash on Delivery) ===== -->
+    <div class="guide-panel" data-guide-panel="order" hidden>
+      <div class="guide-hero">
+        <span class="guide-eyebrow">Order Guide · 6 Hakbang</span>
+        <h1>Paano mag-order <span class="grad">sa store.</span></h1>
+        <p>Ipakita sa mga suki kung gaano kadali umorder — pumili, ilagay ang details, i-place. Cash on Delivery (COD): bayad kapag dumating na ang order.</p>
+      </div>
+
+      <div class="guide-steps">
+
+        <!-- Order step 1 -->
+        <div class="guide-step">
+          <div class="guide-step-num">1</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 01 · Mamili</div>
+              <h3>Pumili ng produkto</h3>
+              <ul class="guide-actions">
+                <li>Sa storefront, i-browse o i-search ang gusto mong bilhin.</li>
+                <li>I-tap ang <strong>➕</strong> button sa item para idagdag sa cart — lalabas ang bilang sa <strong>🛒</strong> sa taas.</li>
+              </ul>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-1.png?v=1" width="600" height="1007" loading="lazy" alt="Storefront — pumili at idagdag sa cart"></div>
+          </div>
+        </div>
+
+        <!-- Order step 2 -->
+        <div class="guide-step">
+          <div class="guide-step-num">2</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 02 · Cart</div>
+              <h3>I-check ang iyong cart</h3>
+              <ul class="guide-actions">
+                <li>I-tap ang <strong>🛒</strong> cart icon sa taas para makita ang mga napili mo.</li>
+                <li>Baguhin ang dami gamit ang <strong>➖ / ➕</strong>, o alisin ang item. Tapos i-tap ang <strong>Checkout</strong>.</li>
+              </ul>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-2.png?v=1" width="600" height="1007" loading="lazy" alt="Your Cart — review items at Checkout"></div>
+          </div>
+        </div>
+
+        <!-- Order step 3 -->
+        <div class="guide-step">
+          <div class="guide-step-num">3</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 03 · Details</div>
+              <h3>Ilagay ang iyong details</h3>
+              <ul class="guide-actions">
+                <li>Sa <strong>Order Summary</strong>, makikita ang items, subtotal, at total.</li>
+                <li>Ilagay ang iyong <strong>Name</strong> at <strong>Mobile number</strong>.</li>
+                <li>Piliin kung paano matatanggap: <strong>Delivery</strong> (ihahatid) o <strong>Pick-up</strong> (kukunin sa store).</li>
+              </ul>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-3.png?v=1" width="600" height="843" loading="lazy" alt="Order Summary — name, mobile, delivery o pickup"></div>
+          </div>
+        </div>
+
+        <!-- Order step 4 -->
+        <div class="guide-step">
+          <div class="guide-step-num">4</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 04 · Address</div>
+              <h3>Ilagay ang delivery address</h3>
+              <ul class="guide-actions">
+                <li>I-tap ang <strong>Use my location</strong> para automatic na ma-pin sa mapa — malaking tulong sa rider.</li>
+                <li>O kaya, i-type ang <strong>Lot/Block/Phase</strong>, <strong>Street/Avenue</strong>, at <strong>Subdivision/Barangay</strong>.</li>
+              </ul>
+              <div class="guide-tip info">
+                <span class="guide-tip-icon">💡</span>
+                <span>Kung <strong>Pick-up</strong> ang pinili mo, laktawan ito — pupuntahan mo na lang ang store address.</span>
+              </div>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-4.png?v=1" width="600" height="916" loading="lazy" alt="Delivery address na may map pin"></div>
+          </div>
+        </div>
+
+        <!-- Order step 5 -->
+        <div class="guide-step">
+          <div class="guide-step-num">5</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 05 · Bayad</div>
+              <h3>Piliin ang Cash on Delivery</h3>
+              <ul class="guide-actions">
+                <li>Sa <strong>Payment Method</strong>, piliin ang <strong>Cash on Delivery</strong>.</li>
+                <li>Maghanda ng <strong>exact amount o barya</strong> — babayaran pagdating ng order. Tapos i-tap ang <strong>Place Order</strong>.</li>
+              </ul>
+              <div class="guide-tip info">
+                <span class="guide-tip-icon">💡</span>
+                <span>May <strong>GCash</strong> din kung mas gusto mong magbayad online.</span>
+              </div>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-5.png?v=1" width="600" height="528" loading="lazy" alt="Payment Method — Cash on Delivery, Place Order"></div>
+          </div>
+        </div>
+
+        <!-- Order step 6 -->
+        <div class="guide-step is-done">
+          <div class="guide-step-num">6</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 06 · Tapos na!</div>
+              <h3>Order placed!</h3>
+              <ul class="guide-actions">
+                <li>Lalabas ang <strong>Order Placed!</strong> na may order number mo (hal. <strong>#GTEEBQ</strong>) — i-screenshot para reference.</li>
+                <li>Hihintayin mo na lang i-confirm at ihatid ng store. I-tap ang <strong>Continue Shopping</strong> para mag-order ulit.</li>
+              </ul>
+              <div class="guide-tip ok">
+                <span class="guide-tip-icon">🎉</span>
+                <span><strong>Ganun lang kadali!</strong> Aabisuhan ka ng store kapag papunta na ang order mo.</span>
+              </div>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/order-6.png?v=1" width="600" height="1006" loading="lazy" alt="Order Placed confirmation na may order number"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="guide-cta">
+        <h2>Gusto mo ng ganitong store?</h2>
+        <p>Gawin live ang sarili mong tindahan — libre, 2 minuto lang.</p>
+        <a href="#signup" class="btn-hero" data-page-link="signup">Start your store free <span class="arrow">→</span></a>
+      </div>
+    </div><!-- /guide-panel order -->
   </div>
 </section>
 
@@ -3013,6 +3170,23 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.topbar')) closeMobileMenu();
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileMenu(); });
+
+// ============================================================
+// Guide sub-tabs — toggle the "set up" / "order" walkthroughs.
+// ============================================================
+document.querySelectorAll('.guide-tab').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.getAttribute('data-guide-tab');
+    document.querySelectorAll('.guide-tab').forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.guide-panel').forEach((p) => {
+      p.hidden = p.getAttribute('data-guide-panel') !== tab;
+    });
+  });
+});
 
 // Browser back/forward + any external hash mutation.
 window.addEventListener('popstate', () => showPage(getPageFromHash()));
