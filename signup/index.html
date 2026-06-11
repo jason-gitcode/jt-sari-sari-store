@@ -10,6 +10,12 @@
   }
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- If we're returning from a Google sign-in redirect, mark the doc IMMEDIATELY
+     (before first paint) so the "Signing you in…" splash covers the page instead
+     of flashing the landing view while Firebase resolves the auth state. -->
+<script>
+  try { if (sessionStorage.getItem('pmPendingSignIn')) document.documentElement.classList.add('pm-signing-in'); } catch (e) {}
+</script>
 <title>Start Your Store — Pabili Mart</title>
 <base href="/">
 <link rel="manifest" href="/manifest.json" />
@@ -61,6 +67,23 @@
     min-height: 100vh;
   }
   footer { margin-top: auto; }
+
+  /* Sign-in splash — full-screen cover shown on return from a Google redirect
+     so the landing page never flashes before auth resolves. */
+  #auth-redirect-splash { display: none; }
+  html.pm-signing-in #auth-redirect-splash {
+    display: flex; position: fixed; inset: 0; z-index: 100000;
+    flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    background: var(--bg, #ffffff); color: var(--ink, #111827);
+    font-size: 15px; font-weight: 500;
+  }
+  .ars-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid var(--line, #e5e7eb);
+    border-top-color: var(--accent, #2563eb);
+    animation: ars-spin 0.8s linear infinite;
+  }
+  @keyframes ars-spin { to { transform: rotate(360deg); } }
 
   /* ============================================================
      Themed notice modal — replaces native window.alert() so error
@@ -1444,6 +1467,13 @@
 </head>
 <body>
 
+<!-- Sign-in splash — covers the page on return from a Google redirect until the
+     auth state resolves (shown via html.pm-signing-in; hidden by hideAuthSplash). -->
+<div id="auth-redirect-splash" aria-hidden="true">
+  <div class="ars-spinner"></div>
+  <div class="ars-text">Signing you in…</div>
+</div>
+
 <!-- ============================================================
      Top nav
      ============================================================ -->
@@ -2712,6 +2742,8 @@ function startVerifyPolling() {
 
 let _showStepFiredOnce = false;
 function showStep(id) {
+  // Any real step rendering means auth has resolved — drop the sign-in splash.
+  if (typeof hideAuthSplash === 'function') hideAuthSplash();
   // Auto-advance polling runs only on the verify step.
   if (id === 'step-verify') startVerifyPolling(); else stopVerifyPolling();
   ['step-signin', 'step-verify', 'step-details', 'step-already-owner', 'step-success'].forEach(s => {
@@ -2736,8 +2768,9 @@ document.getElementById('signin-btn').addEventListener('click', async () => {
     // Full-page REDIRECT, not a popup. Under modern COOP rules the popup can't
     // hand its result back to this page (it rejects as popup-closed-by-user and
     // strands the user on the landing page) — especially on mobile/Safari.
-    // The redirect result is picked up on return by getRedirectResult +
-    // onAuthStateChanged below.
+    // Flag the pending redirect so the return shows a "Signing you in…" splash
+    // instead of flashing the landing page while auth resolves.
+    try { sessionStorage.setItem('pmPendingSignIn', '1'); } catch (_) {}
     await auth.signInWithRedirect(provider);
   } catch (err) {
     console.error(err);
@@ -2745,14 +2778,42 @@ document.getElementById('signin-btn').addEventListener('click', async () => {
   }
 });
 
-// Complete a returning Google redirect sign-in. Success → onAuthStateChanged
-// routes the user; here we only surface errors.
-auth.getRedirectResult().catch(err => {
-  const code = (err && err.code) || '';
-  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-  console.error('redirect sign-in error:', err);
-  showNotice('Sign-in failed', (err && err.message) ? err.message : 'Please try again.');
-});
+// ----- Post-redirect "Signing you in…" splash -----
+// On returning from the Google redirect, the page reloads at the landing view
+// and onAuthStateChanged only resolves a moment later — which flashed the
+// landing page and made sign-in feel broken. The splash (shown from first paint
+// by the head script when pmPendingSignIn is set) covers that gap; it's hidden
+// the moment a real step renders (showStep) or the redirect resolves with no user.
+function isPendingSignIn() { try { return !!sessionStorage.getItem('pmPendingSignIn'); } catch (_) { return false; } }
+function clearPendingSignIn() { try { sessionStorage.removeItem('pmPendingSignIn'); } catch (_) {} }
+function hideAuthSplash() {
+  clearPendingSignIn();
+  document.documentElement.classList.remove('pm-signing-in');
+  const el = document.getElementById('auth-redirect-splash');
+  if (el) el.style.display = 'none';
+}
+// Safety net — never let the splash get stuck if auth never resolves.
+setTimeout(() => { if (isPendingSignIn()) { hideAuthSplash(); } }, 15000);
+
+// Resolve the returning redirect: success → onAuthStateChanged routes + showStep
+// hides the splash; no user / error → reveal the sign-in step.
+(async function handleAuthRedirectReturn() {
+  if (!isPendingSignIn()) return;
+  try {
+    const res = await auth.getRedirectResult();
+    if (res && res.user) return; // onAuthStateChanged + showStep take over
+    hideAuthSplash();
+    showStep('step-signin');
+  } catch (err) {
+    console.error('redirect sign-in error:', err);
+    hideAuthSplash();
+    showStep('step-signin');
+    const code = (err && err.code) || '';
+    if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+      showNotice('Sign-in failed', (err && err.message) ? err.message : 'Please try again.');
+    }
+  }
+})();
 
 // ============================================================
 // Themed notice modal — replaces native window.alert()
@@ -3065,7 +3126,13 @@ async function proceedVerifiedUser(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  if (!user) { showStep('step-signin'); return; }
+  if (!user) {
+    // A redirect sign-in may still be resolving — keep the splash up and let
+    // handleAuthRedirectReturn decide, so we don't flash the sign-in step.
+    if (isPendingSignIn()) return;
+    showStep('step-signin');
+    return;
+  }
   // Right after verifying via the email link, this tab's cached token can
   // still report unverified — refresh from the server before deciding, and
   // force a token refresh so the email_verified claim reaches the callables.
