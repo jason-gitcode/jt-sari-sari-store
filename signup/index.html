@@ -1670,13 +1670,15 @@
   }
   @media (max-width: 640px) {
     .guide-page { padding-top: 14px; }
-    /* 2x2 grid — show all 4 tabs without horizontal scroll */
+    /* 2-col grid — show all tabs without horizontal scroll */
     .guide-tabs {
       display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
       width: 100%; max-width: 340px; overflow: visible;
       margin-bottom: 24px;
     }
     .guide-tab { justify-content: center; padding: 10px 8px; }
+    /* An odd last tab spans the full row instead of sitting in a half cell */
+    .guide-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .guide-hero h1 { font-size: 27px; }
     .guide-hero p { font-size: 15px; }
     .guide-step { gap: 14px; }
@@ -2541,6 +2543,7 @@
       <button type="button" class="guide-tab" data-guide-tab="order" role="tab" aria-selected="false">🛒 Mag-order</button>
       <button type="button" class="guide-tab" data-guide-tab="accept" role="tab" aria-selected="false">✅ Mag-accept</button>
       <button type="button" class="guide-tab" data-guide-tab="product" role="tab" aria-selected="false">📦 Mag-add</button>
+      <button type="button" class="guide-tab" data-guide-tab="qr" role="tab" aria-selected="false">🔳 QR code</button>
     </div>
 
     <!-- ===== TAB 1 · Set up your store ===== -->
@@ -3042,6 +3045,97 @@
         <a href="#signup" class="btn-hero" data-page-link="signup">Start your store free <span class="arrow">→</span></a>
       </div>
     </div><!-- /guide-panel product -->
+
+    <!-- ===== TAB 5 · Generate a storefront QR code (store owner) ===== -->
+    <div class="guide-panel" data-guide-panel="qr" hidden>
+      <div class="guide-hero">
+        <span class="guide-eyebrow">Owner Guide · 4 Hakbang</span>
+        <h1>Paano gumawa ng <span class="grad">QR code.</span></h1>
+        <p>Gumawa ng QR code ng storefront mo para madaling ma-scan at ma-order ng customers — i-print sa tarpaulin, flyer, o packaging.</p>
+      </div>
+
+      <div class="guide-steps">
+
+        <!-- QR step 1 -->
+        <div class="guide-step">
+          <div class="guide-step-num">1</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 01 · Share store</div>
+              <h3>I-tap ang “Share store”</h3>
+              <ul class="guide-actions">
+                <li>Sa iyong admin <strong>Home</strong>, hanapin ang <strong>“Share store”</strong> button sa itaas.</li>
+                <li>I-tap ito para gumawa ng QR code ng storefront mo.</li>
+              </ul>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/qr-1.png?v=1" width="600" height="1073" loading="lazy" alt="Admin Home na may Share store button"></div>
+          </div>
+        </div>
+
+        <!-- QR step 2 -->
+        <div class="guide-step">
+          <div class="guide-step-num">2</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 02 · QR code</div>
+              <h3>Lalabas ang QR code mo</h3>
+              <ul class="guide-actions">
+                <li>Awtomatikong gagawa ng <strong>QR code</strong> na naka-link sa storefront mo (may logo sa gitna).</li>
+                <li>Pwede mong i-tap ang <strong>Copy link</strong> para kopyahin ang storefront URL.</li>
+              </ul>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/qr-2.png?v=1" width="600" height="1058" loading="lazy" alt="Share your store modal na may QR code"></div>
+          </div>
+        </div>
+
+        <!-- QR step 3 -->
+        <div class="guide-step">
+          <div class="guide-step-num">3</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 03 · Download</div>
+              <h3>I-download ang QR o poster</h3>
+              <ul class="guide-actions">
+                <li>I-tap ang <strong>QR only</strong> para sa QR code lang, o <strong>Poster</strong> para sa print-ready poster (may store name at presyo-ready na design).</li>
+                <li>I-confirm ang download — mase-save ito bilang PNG.</li>
+              </ul>
+              <div class="guide-tip info">
+                <span class="guide-tip-icon">💡</span>
+                <span>Ang <strong>poster</strong> ay handa nang i-print — perfect sa tarpaulin o A4.</span>
+              </div>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/qr-3.png?v=1" width="600" height="1060" loading="lazy" alt="Download prompt para sa QR poster"></div>
+          </div>
+        </div>
+
+        <!-- QR step 4 -->
+        <div class="guide-step is-done">
+          <div class="guide-step-num">4</div>
+          <div class="guide-step-body">
+            <div class="guide-step-text">
+              <div class="guide-step-tag">Hakbang 04 · Tapos na!</div>
+              <h3>I-print at i-display!</h3>
+              <ul class="guide-actions">
+                <li>Eto na ang QR/poster mo — i-print at i-display sa tindahan, tarpaulin, flyer, o packaging.</li>
+                <li>I-scan lang ng customer gamit ang camera → diretso sa storefront mo para mag-order.</li>
+              </ul>
+              <div class="guide-tip ok">
+                <span class="guide-tip-icon">🎉</span>
+                <span><strong>Ganun lang kadali!</strong> Mas madaling makahanap at makabili ang mga suki mo.</span>
+              </div>
+            </div>
+            <div class="guide-shot"><img src="/signup/img/qr-4.png?v=1" width="600" height="799" loading="lazy" alt="Na-download na print-ready QR poster"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="guide-cta">
+        <h2>Handa nang mag-benta online?</h2>
+        <p>Gawin live ang sarili mong tindahan — libre, 2 minuto lang.</p>
+        <a href="#signup" class="btn-hero" data-page-link="signup">Start your store free <span class="arrow">→</span></a>
+      </div>
+    </div><!-- /guide-panel qr -->
   </div>
 </section>
 
