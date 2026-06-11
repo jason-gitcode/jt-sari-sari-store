@@ -1517,8 +1517,19 @@
     padding: 22px 24px;
     box-shadow: var(--shadow-xs);
     transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; gap: 24px; align-items: flex-start;
   }
   .guide-step-body:hover { border-color: var(--line-strong); box-shadow: var(--shadow); }
+  .guide-step-text { flex: 1; min-width: 0; }
+  /* Phone-style screenshot for each step */
+  .guide-shot { flex-shrink: 0; width: 196px; }
+  .guide-shot img {
+    width: 100%; height: auto; display: block;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
+    background: #fff;
+  }
   .guide-step-tag {
     font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
     text-transform: uppercase; color: var(--accent); margin-bottom: 4px;
@@ -1576,6 +1587,11 @@
   .guide-cta .btn-hero { background: #fff; color: var(--ink); }
   .guide-cta .btn-hero:hover { background: #f1f5f9; }
 
+  /* Stack screenshot below text on narrower viewports */
+  @media (max-width: 760px) {
+    .guide-step-body { flex-direction: column; gap: 18px; }
+    .guide-shot { width: 100%; max-width: 230px; align-self: center; }
+  }
   @media (max-width: 640px) {
     .guide-hero h1 { font-size: 27px; }
     .guide-hero p { font-size: 15px; }
@@ -1585,6 +1601,7 @@
     .guide-step-body { padding: 18px 18px; }
     .guide-step-body h3 { font-size: 17px; }
     .guide-actions li { font-size: 14px; }
+    .guide-shot { max-width: 210px; }
     .guide-cta { padding: 32px 22px; }
     .guide-cta h2 { font-size: 22px; }
   }
@@ -2443,16 +2460,19 @@
       <div class="guide-step">
         <div class="guide-step-num">1</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 01 · Simulan</div>
-          <h3>I-tap ang “Start your store free”</h3>
-          <ul class="guide-actions">
-            <li>Buksan ang <strong>pabilimart.com</strong> sa phone o computer mo.</li>
-            <li>Sa home page, hanapin ang dark na button na <strong>“Start your store free”</strong> at i-tap ito.</li>
-          </ul>
-          <div class="guide-tip ok">
-            <span class="guide-tip-icon">✅</span>
-            <span><strong>Walang bayad.</strong> Walang kailangang credit card — live ang store mo in 2 minutes.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 01 · Simulan</div>
+            <h3>I-tap ang “Start your store free”</h3>
+            <ul class="guide-actions">
+              <li>Buksan ang <strong>pabilimart.com</strong> sa phone o computer mo.</li>
+              <li>Sa home page, hanapin ang dark na button na <strong>“Start your store free”</strong> at i-tap ito.</li>
+            </ul>
+            <div class="guide-tip ok">
+              <span class="guide-tip-icon">✅</span>
+              <span><strong>Walang bayad.</strong> Walang kailangang credit card — live ang store mo in 2 minutes.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-1.png" width="600" height="1300" loading="lazy" alt="Pabili Mart home page na may ‘Start your store free’ button"></div>
         </div>
       </div>
 
@@ -2460,16 +2480,19 @@
       <div class="guide-step">
         <div class="guide-step-num">2</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 02 · Mag-sign in</div>
-          <h3>Gumawa ng account</h3>
-          <ul class="guide-actions">
-            <li>I-tap ang <strong>Continue with Google</strong> — ito ang pinaka-mabilis na paraan.</li>
-            <li>O kaya, mag-type ng <strong>email</strong> at gumawa ng <strong>password</strong> (6+ characters), tapos i-tap ang <strong>Create account</strong>.</li>
-          </ul>
-          <div class="guide-tip info">
-            <span class="guide-tip-icon">💡</span>
-            <span>May account ka na? I-tap ang <strong>“Have an account? Sign in.”</strong></span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 02 · Mag-sign in</div>
+            <h3>Gumawa ng account</h3>
+            <ul class="guide-actions">
+              <li>I-tap ang <strong>Continue with Google</strong> — ito ang pinaka-mabilis na paraan.</li>
+              <li>O kaya, mag-type ng <strong>email</strong> at gumawa ng <strong>password</strong> (6+ characters), tapos i-tap ang <strong>Create account</strong>.</li>
+            </ul>
+            <div class="guide-tip info">
+              <span class="guide-tip-icon">💡</span>
+              <span>May account ka na? I-tap ang <strong>“Have an account? Sign in.”</strong></span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-2.png" width="600" height="1300" loading="lazy" alt="Create your store — Continue with Google o email at password"></div>
         </div>
       </div>
 
@@ -2477,16 +2500,19 @@
       <div class="guide-step">
         <div class="guide-step-num">3</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 03 · Google sign-in</div>
-          <h3>Piliin ang Google account mo</h3>
-          <ul class="guide-actions">
-            <li>Ilagay ang <strong>email or phone</strong> na naka-link sa Google mo, tapos i-tap ang <strong>Next</strong>.</li>
-            <li>Sundan ang Google steps. Awtomatiko kang babalik sa <strong>Pabili Mart</strong> pagkatapos.</li>
-          </ul>
-          <div class="guide-tip warn">
-            <span class="guide-tip-icon">⚠️</span>
-            <span>Kung <strong>email + password</strong> ang ginamit mo, <strong>laktawan</strong> ang hakbang na ito.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 03 · Google sign-in</div>
+            <h3>Piliin ang Google account mo</h3>
+            <ul class="guide-actions">
+              <li>Ilagay ang <strong>email or phone</strong> na naka-link sa Google mo, tapos i-tap ang <strong>Next</strong>.</li>
+              <li>Sundan ang Google steps. Awtomatiko kang babalik sa <strong>Pabili Mart</strong> pagkatapos.</li>
+            </ul>
+            <div class="guide-tip warn">
+              <span class="guide-tip-icon">⚠️</span>
+              <span>Kung <strong>email + password</strong> ang ginamit mo, <strong>laktawan</strong> ang hakbang na ito.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-3.png" width="600" height="1300" loading="lazy" alt="Google sign-in page para sa pabilimart.com"></div>
         </div>
       </div>
 
@@ -2494,16 +2520,19 @@
       <div class="guide-step">
         <div class="guide-step-num">4</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 04 · Pangalanan</div>
-          <h3>Ilagay ang pangalan ng store</h3>
-          <ul class="guide-actions">
-            <li>Sa <strong>Store name</strong>, i-type ang pangalan ng tindahan mo — ito ang makikita ng customers.</li>
-            <li>Awtomatikong gagawa ng <strong>Store URL</strong>. Pwede mong i-edit — pero <strong>permanent</strong> na ito kapag na-save.</li>
-          </ul>
-          <div class="guide-tip info">
-            <span class="guide-tip-icon">💡</span>
-            <span>URL rule: <strong>lowercase letters, numbers, at hyphens</strong> lang — 3 hanggang 32 characters.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 04 · Pangalanan</div>
+            <h3>Ilagay ang pangalan ng store</h3>
+            <ul class="guide-actions">
+              <li>Sa <strong>Store name</strong>, i-type ang pangalan ng tindahan mo — ito ang makikita ng customers.</li>
+              <li>Awtomatikong gagawa ng <strong>Store URL</strong>. Pwede mong i-edit — pero <strong>permanent</strong> na ito kapag na-save.</li>
+            </ul>
+            <div class="guide-tip info">
+              <span class="guide-tip-icon">💡</span>
+              <span>URL rule: <strong>lowercase letters, numbers, at hyphens</strong> lang — 3 hanggang 32 characters.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-4.png" width="600" height="1300" loading="lazy" alt="Store name at Store URL setup"></div>
         </div>
       </div>
 
@@ -2511,13 +2540,16 @@
       <div class="guide-step">
         <div class="guide-step-num">5</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 05 · Store details</div>
-          <h3>Punan ang details at GCash</h3>
-          <ul class="guide-actions">
-            <li><strong>Store address</strong> — kung saan pwedeng mag-pickup ang customers.</li>
-            <li><strong>GCash name</strong> at <strong>phone number</strong> (11 digits, simula sa <code>09</code>) — dito magpapadala ng bayad ang customers.</li>
-            <li><strong>Invite code</strong> ay optional — iwanang blangko. Tapos i-tap ang <strong>Create my store</strong>.</li>
-          </ul>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 05 · Store details</div>
+            <h3>Punan ang details at GCash</h3>
+            <ul class="guide-actions">
+              <li><strong>Store address</strong> — kung saan pwedeng mag-pickup ang customers.</li>
+              <li><strong>GCash name</strong> at <strong>phone number</strong> (11 digits, simula sa <code>09</code>) — dito magpapadala ng bayad ang customers.</li>
+              <li><strong>Invite code</strong> ay optional — iwanang blangko. Tapos i-tap ang <strong>Create my store</strong>.</li>
+            </ul>
+          </div>
+          <div class="guide-shot"><img src="img/step-5.png" width="600" height="1300" loading="lazy" alt="Store address, GCash details, at invite code"></div>
         </div>
       </div>
 
@@ -2525,16 +2557,19 @@
       <div class="guide-step">
         <div class="guide-step-num">6</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 06 · Live na!</div>
-          <h3>Ready na ang store mo</h3>
-          <ul class="guide-actions">
-            <li>May <strong>2 links</strong> ka: ang <strong>Storefront</strong> (i-share sa customers) at ang <strong>Admin</strong> (para i-manage).</li>
-            <li>Pre-loaded na ng <strong>5 starter products</strong> — pwede mong i-edit o dagdagan. I-tap ang <strong>Open my admin</strong>.</li>
-          </ul>
-          <div class="guide-tip ok">
-            <span class="guide-tip-icon">📌</span>
-            <span>I-save ang storefront link — ito ang i-share mo sa mga suki para makapag-order.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 06 · Live na!</div>
+            <h3>Ready na ang store mo</h3>
+            <ul class="guide-actions">
+              <li>May <strong>2 links</strong> ka: ang <strong>Storefront</strong> (i-share sa customers) at ang <strong>Admin</strong> (para i-manage).</li>
+              <li>Pre-loaded na ng <strong>5 starter products</strong> — pwede mong i-edit o dagdagan. I-tap ang <strong>Open my admin</strong>.</li>
+            </ul>
+            <div class="guide-tip ok">
+              <span class="guide-tip-icon">📌</span>
+              <span>I-save ang storefront link — ito ang i-share mo sa mga suki para makapag-order.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-6.png" width="600" height="1300" loading="lazy" alt="Your store is ready — storefront at admin links"></div>
         </div>
       </div>
 
@@ -2542,16 +2577,19 @@
       <div class="guide-step">
         <div class="guide-step-num">7</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 07 · Admin</div>
-          <h3>Ito ang Admin Dashboard mo</h3>
-          <ul class="guide-actions">
-            <li>Dito makikita ang <strong>sales stats</strong> mo: products, orders, confirmed, pending, at iba pa.</li>
-            <li>Gamitin ang menu sa ibaba — <strong>Products</strong> para magdagdag ng items, <strong>Orders</strong> para sa orders ng customer.</li>
-          </ul>
-          <div class="guide-tip ok">
-            <span class="guide-tip-icon">✅</span>
-            <span>I-tap ang green na <strong>Storefront</strong> button para makita ang nakikita ng customers.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 07 · Admin</div>
+            <h3>Ito ang Admin Dashboard mo</h3>
+            <ul class="guide-actions">
+              <li>Dito makikita ang <strong>sales stats</strong> mo: products, orders, confirmed, pending, at iba pa.</li>
+              <li>Gamitin ang menu sa ibaba — <strong>Products</strong> para magdagdag ng items, <strong>Orders</strong> para sa orders ng customer.</li>
+            </ul>
+            <div class="guide-tip ok">
+              <span class="guide-tip-icon">✅</span>
+              <span>I-tap ang green na <strong>Storefront</strong> button para makita ang nakikita ng customers.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-7.png" width="600" height="1300" loading="lazy" alt="Admin dashboard na may sales stats"></div>
         </div>
       </div>
 
@@ -2559,16 +2597,19 @@
       <div class="guide-step is-done">
         <div class="guide-step-num">8</div>
         <div class="guide-step-body">
-          <div class="guide-step-tag">Hakbang 08 · Storefront</div>
-          <h3>Ito ang nakikita ng customers</h3>
-          <ul class="guide-actions">
-            <li>Eto na ang <strong>live storefront</strong> mo — kumpleto na ng products at presyo.</li>
-            <li><strong>I-share ang link</strong> sa Facebook, Messenger, o sa mga suki para makapag-order na agad.</li>
-          </ul>
-          <div class="guide-tip ok">
-            <span class="guide-tip-icon">🎉</span>
-            <span><strong>Tapos ka na!</strong> Live na ang tindahan mo online.</span>
+          <div class="guide-step-text">
+            <div class="guide-step-tag">Hakbang 08 · Storefront</div>
+            <h3>Ito ang nakikita ng customers</h3>
+            <ul class="guide-actions">
+              <li>Eto na ang <strong>live storefront</strong> mo — kumpleto na ng products at presyo.</li>
+              <li><strong>I-share ang link</strong> sa Facebook, Messenger, o sa mga suki para makapag-order na agad.</li>
+            </ul>
+            <div class="guide-tip ok">
+              <span class="guide-tip-icon">🎉</span>
+              <span><strong>Tapos ka na!</strong> Live na ang tindahan mo online.</span>
+            </div>
           </div>
+          <div class="guide-shot"><img src="img/step-8.png" width="600" height="1300" loading="lazy" alt="Live storefront na may products at presyo"></div>
         </div>
       </div>
 
