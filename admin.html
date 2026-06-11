@@ -3428,7 +3428,7 @@
            between "Contact support" (Pro) and "🔒 Upgrade to unlock" (Free/Growth). -->
       <div class="billing-section" id="billing-priority-support">
         <div class="billing-section-head">
-          <h3>Priority support <span id="priority-support-lock-badge" style="display:none;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;">🔒 Pro</span></h3>
+          <h3><span id="priority-support-title">Priority support</span> <span id="priority-support-lock-badge" style="display:none;font-size:12px;color:var(--muted);font-weight:500;margin-left:6px;">🔒 Pro</span></h3>
         </div>
         <div id="priority-support-body">
           <!-- Populated by renderPrioritySupportSection() -->
@@ -7862,6 +7862,8 @@ function renderPrioritySupportSection() {
     lockBadge.style.display = hasSupport ? 'none' : '';
     lockBadge.textContent = '🔒 Growth+';
   }
+  const titleEl = document.getElementById('priority-support-title');
+  if (titleEl) titleEl.textContent = isPro ? 'Priority support' : isGrowth ? 'General support' : 'Support';
 
   // Suspended / cancelled tenants must reactivate before submitting.
   const isBlocked = hasSupport && ['suspended', 'cancelled'].includes(status);
