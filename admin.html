@@ -4110,6 +4110,7 @@
     <div class="supp-modal-body" style="padding: 24px; text-align:center;">
       <div style="font-size:13px; color:var(--muted); line-height:1.55; margin-bottom:18px;">
         I-print at i-display sa tindahan — i-scan ng customers para mag-order online.
+        I-download ang QR lang, o ang <strong>print-ready poster</strong>.
       </div>
       <div id="store-qr-canvas-wrap" style="display:inline-block; padding:14px; background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 2px 10px rgba(15,23,42,0.06);">
         <div id="store-qr-loading" style="color:var(--muted); font-size:13px; width:220px; padding:90px 0;">Generating…</div>
@@ -4120,9 +4121,10 @@
         <button type="button" onclick="copyToClipboard(document.getElementById('store-qr-url').textContent, this)" style="background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--ink); cursor:pointer;">Copy link</button>
       </div>
     </div>
-    <div class="supp-modal-footer" style="justify-content:flex-end;">
+    <div class="supp-modal-footer" style="justify-content:flex-end; flex-wrap:wrap;">
       <button type="button" class="btn-secondary" onclick="closeStoreQRModal()">Close</button>
-      <button type="button" class="ps-cta-btn" id="store-qr-download-btn" onclick="downloadStoreQR()" style="opacity:0.5; pointer-events:none;">⬇️ Download PNG</button>
+      <button type="button" class="btn-secondary" id="store-qr-download-btn" onclick="downloadStoreQR()" style="opacity:0.5; pointer-events:none;">⬇️ QR only</button>
+      <button type="button" class="ps-cta-btn" id="store-qr-poster-btn" onclick="downloadStorePoster()">🖼️ Download poster</button>
     </div>
   </div>
 </div>
@@ -4770,12 +4772,146 @@ function renderStoreQR(url) {
 function downloadStoreQR() {
   const canvas = document.getElementById('store-qr-canvas');
   if (!canvas || !canvas.width) return;
+  triggerDownload(canvas.toDataURL('image/png'), 'pabili-mart-' + (TENANT_ID || 'store') + '-qr.png');
+}
+
+function triggerDownload(href, filename) {
   const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = 'pabili-mart-' + (TENANT_ID || 'store') + '-qr.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.href = href; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function _qrLoadImg(src) {
+  return new Promise(resolve => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+// Draw a QR (quiet zone + optional centered logo) into ctx, fit to `target`.
+function drawQRInto(ctx, qr, x, y, target, logoImg) {
+  const count = qr.getModuleCount();
+  const quiet = 4, total = count + quiet * 2;
+  const cell = Math.floor(target / total);
+  const size = cell * total;
+  const ox = x + Math.floor((target - size) / 2);
+  const oy = y + Math.floor((target - size) / 2);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(ox, oy, size, size);
+  ctx.fillStyle = '#0f172a';
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect(ox + (c + quiet) * cell, oy + (r + quiet) * cell, cell, cell);
+    }
+  }
+  if (logoImg) {
+    const box = Math.round(size * 0.20);
+    const lx = ox + Math.round((size - box) / 2);
+    const ly = oy + Math.round((size - box) / 2);
+    const pad = Math.round(box * 0.10);
+    ctx.fillStyle = '#ffffff';
+    qrRoundRect(ctx, lx - pad, ly - pad, box + pad * 2, box + pad * 2, Math.round(box * 0.18)); ctx.fill();
+    ctx.save();
+    qrRoundRect(ctx, lx, ly, box, box, Math.round(box * 0.16)); ctx.clip();
+    ctx.drawImage(logoImg, lx, ly, box, box); ctx.restore();
+  }
+}
+
+// Centered word-wrapped text (textBaseline must be 'top'). Returns next y.
+function _qrWrapText(ctx, text, cx, top, maxWidth, lineHeight) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = []; let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxWidth && line) { lines.push(line); line = w; }
+    else line = t;
+  }
+  if (line) lines.push(line);
+  lines.forEach((ln, i) => ctx.fillText(ln, cx, top + i * lineHeight));
+  return top + lines.length * lineHeight;
+}
+
+// Print-ready "Scan to order" poster. Free/Growth get the "Powered by
+// Pabili Mart" footer; Pro gets an un-branded poster.
+async function downloadStorePoster() {
+  const btn = document.getElementById('store-qr-poster-btn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = 'Building…'; }
+  try {
+    await loadQRLib();
+    const url = storefrontShareUrl();
+    const storeName = (((typeof storeSettingsData !== 'undefined' && storeSettingsData && storeSettingsData.storeName) || 'My Store') + '').trim();
+    const tier = ((typeof subscriptionData !== 'undefined' && subscriptionData && subscriptionData.tier) || 'free');
+    const isPro = tier === 'pro';
+    const logoSrc = (typeof storeSettingsData !== 'undefined' && storeSettingsData &&
+                     storeSettingsData.logoEnabled === true && storeSettingsData.logoDataUrl) || null;
+    const logoImg = await _qrLoadImg(logoSrc);
+
+    const W = 1200, H = 1600;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const FONT = '-apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, W, 16); ctx.fillRect(0, H - 16, W, 16);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    let y = 110;
+
+    if (logoImg) {
+      const d = 180, cx = W / 2;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, y + d / 2, d / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      ctx.drawImage(logoImg, cx - d / 2, y, d, d);
+      ctx.restore();
+      y += d + 34;
+    }
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '800 66px ' + FONT;
+    y = _qrWrapText(ctx, storeName, W / 2, y, W - 200, 78) + 16;
+
+    ctx.fillStyle = '#2563eb';
+    ctx.font = '800 50px ' + FONT;
+    ctx.fillText('I-scan para mag-order!', W / 2, y); y += 50 + 24;
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 28px ' + FONT;
+    ctx.fillText('Delivery • Pickup • GCash • COD', W / 2, y); y += 28 + 46;
+
+    const qr = window.qrcode(0, 'H'); qr.addData(url); qr.make();
+    const qrT = 560;
+    const qx = (W - qrT) / 2;
+    ctx.fillStyle = '#f1f5f9';
+    qrRoundRect(ctx, qx - 28, y - 28, qrT + 56, qrT + 56, 28); ctx.fill();
+    drawQRInto(ctx, qr, qx, y, qrT, logoImg);
+    y += qrT + 56;
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '700 32px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    ctx.fillText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), W / 2, y); y += 32 + 16;
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 26px ' + FONT;
+    ctx.fillText('Buksan ang camera at i-scan ang QR code.', W / 2, y);
+
+    if (!isPro) {
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '600 26px ' + FONT;
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('Powered by Pabili Mart', W / 2, H - 54);
+    }
+
+    triggerDownload(cv.toDataURL('image/png'), 'pabili-mart-' + (TENANT_ID || 'store') + '-poster.png');
+  } catch (err) {
+    const msg = (err && err.message) ? err.message : 'Could not build the poster.';
+    if (typeof showToast === 'function') showToast(msg, 'error'); else alert(msg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = orig; }
+  }
 }
 
 function closeStoreQRModal() {
