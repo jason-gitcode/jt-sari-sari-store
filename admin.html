@@ -11,6 +11,11 @@
     }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Returning from a Google sign-in redirect: show the "Signing you in…" splash
+       from first paint so the login screen doesn't flash before auth resolves. -->
+  <script>
+    try { if (sessionStorage.getItem('pmPendingSignIn')) document.documentElement.classList.add('pm-signing-in'); } catch (e) {}
+  </script>
   <title>Admin</title>
   <base href="/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -180,6 +185,23 @@
     button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
     input, select, textarea { font: inherit; color: inherit; }
     code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 0.92em; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+
+    /* Sign-in splash — full-screen cover on return from a Google redirect so the
+       login screen doesn't flash before auth resolves. */
+    #auth-redirect-splash { display: none; }
+    html.pm-signing-in #auth-redirect-splash {
+      display: flex; position: fixed; inset: 0; z-index: 100000;
+      flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      background: var(--bg, #0f172a); color: var(--ink, #e2e8f0);
+      font-size: 15px; font-weight: 500;
+    }
+    .ars-spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid rgba(148,163,184,0.35);
+      border-top-color: var(--accent, #3b82f6);
+      animation: ars-spin 0.8s linear infinite;
+    }
+    @keyframes ars-spin { to { transform: rotate(360deg); } }
 
     /* ---------- LOGIN SCREEN ---------- */
     .login-screen {
@@ -2773,6 +2795,13 @@
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
+
+<!-- Sign-in splash — covers the page on return from a Google redirect until the
+     auth state resolves (shown via html.pm-signing-in; hidden by hideAuthSplash). -->
+<div id="auth-redirect-splash" aria-hidden="true">
+  <div class="ars-spinner"></div>
+  <div class="ars-text">Signing you in…</div>
+</div>
 
 <!-- ADMIN LOGIN -->
 <div class="login-screen hidden" id="login-screen">
@@ -6951,7 +6980,10 @@ async function login() {
     // most-recently-used account (helps when multiple admins share a device).
     provider.setCustomParameters({ prompt: 'select_account' });
     // Full-page REDIRECT, not a popup — popups drop the auth result on the way
-    // back under modern COOP rules, stranding the user. Result handled on return.
+    // back under modern COOP rules, stranding the user. Flag the pending redirect
+    // so the return shows a "Signing you in…" splash instead of flashing the
+    // login screen. Result handled on return by handleAuthRedirectReturn.
+    try { sessionStorage.setItem('pmPendingSignIn', '1'); } catch (_) {}
     await auth.signInWithRedirect(provider);
   } catch (e) {
     err.textContent = 'Sign-in failed. Please try again.';
@@ -6960,15 +6992,39 @@ async function login() {
   }
 }
 
-// Surface errors from a returning Google redirect sign-in (success → the
-// onAuthStateChanged gate routes into the admin).
-auth.getRedirectResult().catch(e => {
-  const code = (e && e.code) || '';
-  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-  console.error('redirect sign-in error:', e);
-  const el = document.getElementById('login-error');
-  if (el) el.textContent = 'Sign-in failed. Please try again.';
-});
+// ----- Post-redirect "Signing you in…" splash -----
+// Covers the page on return from a Google redirect so the login screen doesn't
+// flash before auth resolves. Shown from first paint by the head script when
+// pmPendingSignIn is set; hidden by showLogin/showAdmin/adminShowVerify (any
+// terminal UI) or when the redirect resolves with no user.
+function isPendingSignIn() { try { return !!sessionStorage.getItem('pmPendingSignIn'); } catch (_) { return false; } }
+function clearPendingSignIn() { try { sessionStorage.removeItem('pmPendingSignIn'); } catch (_) {} }
+function hideAuthSplash() {
+  clearPendingSignIn();
+  document.documentElement.classList.remove('pm-signing-in');
+  const el = document.getElementById('auth-redirect-splash');
+  if (el) el.style.display = 'none';
+}
+setTimeout(() => { if (isPendingSignIn()) hideAuthSplash(); }, 15000); // safety net
+
+(async function handleAuthRedirectReturn() {
+  if (!isPendingSignIn()) return;
+  try {
+    const res = await auth.getRedirectResult();
+    if (res && res.user) return; // onAuthStateChanged gate routes; showAdmin/adminShowVerify hide the splash
+    hideAuthSplash();
+    showLogin();
+  } catch (e) {
+    console.error('redirect sign-in error:', e);
+    hideAuthSplash();
+    showLogin();
+    const code = (e && e.code) || '';
+    if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+      const el = document.getElementById('login-error');
+      if (el) el.textContent = 'Sign-in failed. Please try again.';
+    }
+  }
+})();
 
 // ---- Email + password / magic-link admin sign-in (alongside Google) ----
 // The backend already requires email_verified on every callable, so an
@@ -7080,6 +7136,7 @@ async function adminSubmitMagic() {
     .catch(e => { const el = document.getElementById('login-error'); if (el) el.textContent = adminAuthError(e); });
 })();
 function adminShowVerify(user) {
+  if (typeof hideAuthSplash === 'function') hideAuthSplash();
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'none';
   document.getElementById('admin-verify-email').textContent = user.email;
@@ -7117,11 +7174,13 @@ function logout() {
 
 
 function showLogin() {
+  if (typeof hideAuthSplash === 'function') hideAuthSplash();
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('admin-area').style.display = 'none';
 }
 
 function showAdmin() {
+  if (typeof hideAuthSplash === 'function') hideAuthSplash();
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('admin-area').style.display = 'flex';
   registerPullToRefresh();
@@ -10696,7 +10755,13 @@ async function handleAdminAuth(user) {
 }
 
 auth.onAuthStateChanged(async user => {
-  if (!user) { showLogin(); return; }
+  if (!user) {
+    // A redirect sign-in may still be resolving — keep the splash up and let
+    // handleAuthRedirectReturn decide, so the login screen never flashes.
+    if (isPendingSignIn()) return;
+    showLogin();
+    return;
+  }
   // Cached token can still report unverified right after the email link;
   // refresh from the server (+ token) before holding them at the overlay.
   if (!user.emailVerified) {
