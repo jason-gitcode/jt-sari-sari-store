@@ -5151,7 +5151,8 @@ function scrollToTierCompare() {
 
 // ----- Pay Now flow -----
 // Reads platform/billing for the GCash + Maya account details, generates
-// a reference code (PM-{slug}-{YYYYMM}), and walks the owner through:
+// a reference code (PM{slug}{YYYYMM}, alphanumeric — no special chars so
+// it pastes cleanly into GCash), and walks the owner through:
 // (1) sending payment via GCash, (2) uploading a receipt screenshot,
 // (3) submitting → status flips to pending_verification in Firestore.
 let platformBillingData = null;
@@ -5263,7 +5264,10 @@ function showPayNowModal() {
   payNowReceiptData = null;
   payNowReceiptName = null;
   const tier = TIER_INFO[payNowTargetTier];
-  const refCode = `PM-${TENANT_ID}-${manilaPeriodCode()}`;
+  // Alphanumeric only — GCash's Message/Note field rejects special
+  // characters (hyphens included), so strip them. MUST match the same
+  // sanitization in functions/index.js submitManualPayment (the doc ID).
+  const refCode = `PM-${TENANT_ID}-${manilaPeriodCode()}`.replace(/[^A-Za-z0-9]/g, '');
   document.getElementById('paynow-tier-name').textContent = tier.name;
   document.getElementById('paynow-amount').textContent = fmtPHP(tier.amount);
   document.getElementById('paynow-ref-code').textContent = refCode;

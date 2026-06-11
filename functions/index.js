@@ -649,7 +649,7 @@ exports.backfillSubscriptions = onCall(async (request) => {
 // Validation: requested tier exists, amount matches tier price, receipt
 // is a reasonable size (compressed client-side), tenant owns the tid.
 //
-// Idempotency: the reference code (`PM-{slug}-{YYYYMM}`) is the doc ID,
+// Idempotency: the reference code (PM{slug}{YYYYMM}, alphanumeric) is the doc ID,
 // so resubmitting the same month overwrites the previous pending doc
 // for that period — prevents duplicate submissions clogging the queue.
 // ============================================================
@@ -781,7 +781,10 @@ exports.submitManualPayment = onCall(async (request) => {
   // ---- Compute reference code (YYYYMM in Manila time) ----
   const manila = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const period = manila.getFullYear() + String(manila.getMonth() + 1).padStart(2, '0');
-  const referenceCode = `PM-${tid}-${period}`;
+  // Alphanumeric only — GCash's Message/Note field rejects special
+  // characters (hyphens included). Strip them so the owner can paste the
+  // code into GCash. MUST match the client's refCode in admin.html.
+  const referenceCode = `PM-${tid}-${period}`.replace(/[^A-Za-z0-9]/g, '');
 
   // ---- Write payment doc (idempotent on referenceCode) ----
   const paymentRef = tref.collection('payments').doc(referenceCode);
