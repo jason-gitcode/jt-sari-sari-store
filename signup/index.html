@@ -1524,36 +1524,41 @@
   /* Pull the guide content up close under the header (override section pad) */
   .guide-page { padding-top: 28px; }
 
-  /* Guide sub-tabs — compact segmented control (active = raised chip).
-     One row on desktop; a 2x2 grid on mobile so all four fit without
-     horizontal scrolling. */
-  .guide-tabs {
-    display: flex; gap: 4px;
-    width: fit-content; max-width: 100%;
-    margin: 0 auto 36px;
-    padding: 4px;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+  /* Guide picker — a single dropdown button; click to choose a guide.
+     Stays one tidy row at any width. */
+  .guide-select { position: relative; width: fit-content; max-width: 100%; margin: 0 auto 36px; }
+  .guide-select-btn {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 14px;
+    min-width: 260px; max-width: 100%;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    padding: 12px 18px; font-size: 15px; font-weight: 700;
+    cursor: pointer; box-shadow: var(--shadow-sm);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .guide-tabs::-webkit-scrollbar { display: none; }
-  .guide-tab {
-    flex: 0 0 auto;
-    display: inline-flex; align-items: center; gap: 6px;
-    background: transparent; color: var(--muted);
-    border: 0; border-radius: 9px;
-    padding: 9px 15px; font-size: 13.5px; font-weight: 600;
-    white-space: nowrap;
-    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+  .guide-select-btn:hover { border-color: var(--accent); }
+  .guide-select-label { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .guide-select-caret { color: var(--muted); font-size: 11px; flex-shrink: 0; transition: transform 0.18s; }
+  .guide-select.open .guide-select-caret { transform: rotate(180deg); }
+  .guide-select-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: var(--shadow-lg);
+    padding: 6px; z-index: 20;
+    display: none; flex-direction: column; gap: 2px;
   }
-  .guide-tab:hover { color: var(--ink); }
-  .guide-tab.is-active {
-    background: var(--surface); color: var(--ink); font-weight: 700;
-    box-shadow: var(--shadow-xs);
+  .guide-select.open .guide-select-menu { display: flex; }
+  .guide-select-item {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; text-align: left;
+    background: transparent; color: var(--text);
+    border: 0; border-radius: 8px;
+    padding: 11px 14px; font-size: 14px; font-weight: 600;
+    white-space: nowrap; cursor: pointer;
+    transition: background 0.12s, color 0.12s;
   }
+  .guide-select-item:hover { background: var(--surface-2); color: var(--ink); }
+  .guide-select-item.is-active { background: var(--accent-soft); color: var(--accent); }
   .guide-panel[hidden] { display: none; }
 
   .guide-steps {
@@ -1670,15 +1675,9 @@
   }
   @media (max-width: 640px) {
     .guide-page { padding-top: 14px; }
-    /* 2-col grid — show all tabs without horizontal scroll */
-    .guide-tabs {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
-      width: 100%; max-width: 340px; overflow: visible;
-      margin-bottom: 24px;
-    }
-    .guide-tab { justify-content: center; padding: 10px 8px; }
-    /* An odd last tab spans the full row instead of sitting in a half cell */
-    .guide-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    /* Full-width dropdown on phones */
+    .guide-select { width: 100%; max-width: 340px; margin-bottom: 24px; }
+    .guide-select-btn { width: 100%; min-width: 0; }
     .guide-hero h1 { font-size: 27px; }
     .guide-hero p { font-size: 15px; }
     .guide-step { gap: 14px; }
@@ -2538,12 +2537,18 @@
   <div class="container">
 
     <!-- Sub-tabs — two guides live under one Guide page -->
-    <div class="guide-tabs" role="tablist">
-      <button type="button" class="guide-tab is-active" data-guide-tab="setup" role="tab" aria-selected="true">🏪 I-set up</button>
-      <button type="button" class="guide-tab" data-guide-tab="order" role="tab" aria-selected="false">🛒 Mag-order</button>
-      <button type="button" class="guide-tab" data-guide-tab="accept" role="tab" aria-selected="false">✅ Mag-accept</button>
-      <button type="button" class="guide-tab" data-guide-tab="product" role="tab" aria-selected="false">📦 Mag-add</button>
-      <button type="button" class="guide-tab" data-guide-tab="qr" role="tab" aria-selected="false">🔳 QR code</button>
+    <div class="guide-select" id="guideSelect">
+      <button type="button" class="guide-select-btn" id="guideSelectBtn" aria-haspopup="listbox" aria-expanded="false">
+        <span class="guide-select-label" id="guideSelectLabel">🏪 I-set up ang store</span>
+        <span class="guide-select-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="guide-select-menu" id="guideSelectMenu" role="listbox">
+        <button type="button" class="guide-select-item is-active" role="option" aria-selected="true"  data-guide-tab="setup">🏪 I-set up ang store</button>
+        <button type="button" class="guide-select-item"           role="option" aria-selected="false" data-guide-tab="order">🛒 Mag-order (COD)</button>
+        <button type="button" class="guide-select-item"           role="option" aria-selected="false" data-guide-tab="accept">✅ Mag-accept ng order</button>
+        <button type="button" class="guide-select-item"           role="option" aria-selected="false" data-guide-tab="product">📦 Mag-add ng product</button>
+        <button type="button" class="guide-select-item"           role="option" aria-selected="false" data-guide-tab="qr">🔳 Gumawa ng QR code</button>
+      </div>
     </div>
 
     <!-- ===== TAB 1 · Set up your store ===== -->
@@ -3488,21 +3493,36 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileMenu(); });
 
 // ============================================================
-// Guide sub-tabs — toggle the "set up" / "order" walkthroughs.
+// Guide picker — a dropdown to choose which walkthrough to show.
 // ============================================================
-document.querySelectorAll('.guide-tab').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const tab = btn.getAttribute('data-guide-tab');
-    document.querySelectorAll('.guide-tab').forEach((b) => {
-      const on = b === btn;
-      b.classList.toggle('is-active', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
+(function initGuideSelect() {
+  const sel = document.getElementById('guideSelect');
+  if (!sel) return;
+  const btn = document.getElementById('guideSelectBtn');
+  const label = document.getElementById('guideSelectLabel');
+  const items = sel.querySelectorAll('.guide-select-item');
+  function setOpen(o) {
+    sel.classList.toggle('open', o);
+    btn.setAttribute('aria-expanded', o ? 'true' : 'false');
+  }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(!sel.classList.contains('open')); });
+  items.forEach((it) => it.addEventListener('click', () => {
+    const tab = it.getAttribute('data-guide-tab');
+    items.forEach((x) => {
+      const on = x === it;
+      x.classList.toggle('is-active', on);
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     document.querySelectorAll('.guide-panel').forEach((p) => {
       p.hidden = p.getAttribute('data-guide-panel') !== tab;
     });
-  });
-});
+    if (label) label.textContent = it.textContent;
+    setOpen(false);
+  }));
+  // Close on outside click or Escape.
+  document.addEventListener('click', (e) => { if (sel.classList.contains('open') && !sel.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+})();
 
 // Browser back/forward + any external hash mutation.
 window.addEventListener('popstate', () => showPage(getPageFromHash()));
