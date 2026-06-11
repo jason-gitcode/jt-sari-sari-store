@@ -2276,10 +2276,12 @@
       .brand-title.scale-sm,
       .brand-title.scale-xs { font-size: 11px; }
       .brand-sub { display: none; }
-      /* Icon-only Storefront button on phones — reclaim ~70px so the
-         branch picker (Pro multi-branch) actually fits in the header. */
-      .storefront-btn span { display: none; }
-      .storefront-btn { padding: 7px 11px; }
+      /* Keep the "Storefront" label visible on phones for every plan. When the
+         tenant has branches, the header also shows the "All branches" picker —
+         so hide the store name then (and only then) to make room for both the
+         Storefront button and the picker. No branches → the store name stays. */
+      .storefront-btn { padding: 7px 12px; }
+      #admin-area.has-branches .brand-text { display: none; }
       .container { padding: 14px 12px 20px; }
       /* On phones the top tab strip is replaced by the fixed bottom nav bar
          (Home / Orders / Products / Suppliers / More). Container gains bottom
@@ -7815,8 +7817,11 @@ function syncBranchFilterUI() {
   const isPro = tier === 'pro';
   // Show only when Pro AND tenant has at least one branch. Single-branch
   // tenants would have no real reason to switch.
+  const adminArea = document.getElementById('admin-area');
   if (!isPro || !branchesData || branchesData.length === 0) {
     wrap.style.display = 'none';
+    // No picker → keep the store name in the mobile header.
+    if (adminArea) adminArea.classList.remove('has-branches');
     if (SELECTED_BRANCH_FILTER !== null) {
       SELECTED_BRANCH_FILTER = null;
       onBranchFilterChange(''); // re-render any open tab with no filter
@@ -7824,6 +7829,8 @@ function syncBranchFilterUI() {
     return;
   }
   wrap.style.display = '';
+  // Picker is showing — on phones, hide the store name to fit Storefront + picker.
+  if (adminArea) adminArea.classList.add('has-branches');
   // Hydrate dropdown options. Active selection from SELECTED_BRANCH_FILTER
   // (falls back to localStorage on the first run).
   const wasNull = SELECTED_BRANCH_FILTER === null;
