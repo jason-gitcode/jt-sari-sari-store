@@ -4140,8 +4140,8 @@
       <button type="button" class="close-btn" onclick="closeSupportTicketModal()">×</button>
     </div>
     <div class="supp-modal-body" style="padding: 24px;">
-      <div style="font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 18px;">
-        Your ticket goes straight to the Pabili Mart priority queue. We'll reply within <strong style="color: var(--ink);">4 business hours</strong> to <span id="support-ticket-reply-email" style="color: var(--ink); font-weight: 500;">your account email</span>.
+      <div id="support-ticket-lead" style="font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 18px;">
+        Your ticket goes to the Pabili Mart support queue.
       </div>
       <div style="margin-bottom: 14px;">
         <label for="support-ticket-subject" style="display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">Subject</label>
@@ -4184,8 +4184,8 @@
       <button type="button" class="close-btn" onclick="closeSupportTicketSentModal()">×</button>
     </div>
     <div class="supp-modal-body" style="padding: 24px;">
-      <div style="font-size: 14px; color: var(--ink); line-height: 1.55; margin-bottom: 16px;">
-        Thanks — your support ticket is in the priority queue. We'll reply within <strong>4 business hours</strong>.
+      <div id="support-ticket-sent-lead" style="font-size: 14px; color: var(--ink); line-height: 1.55; margin-bottom: 16px;">
+        Thanks — your support ticket has been received.
       </div>
       <div style="background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;">
         <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">Ticket reference</div>
@@ -7758,16 +7758,16 @@ const LOCKED_FEATURES = {
     ]
   },
   'priority-support': {
-    title: '🎧 Priority Support — a Pro feature',
+    title: '🎧 Contact support',
     icon: '🎧',
-    blurb: 'A direct line to Pabili Mart with a 4-business-hour response SLA. Skip the general inbox for billing, bug, or how-to questions.',
-    tier: 'pro',
+    blurb: 'Message Pabili Mart support directly from your admin. Available on Growth and Pro — Pro adds a 4-business-hour SLA and priority routing.',
+    tier: 'growth',
     unlocksWith: [
       'Direct contact form to Pabili Mart support',
-      '4-business-hour response SLA',
-      'Routed to a priority inbox (not the general queue)',
-      'Email reply to your verified account address',
-      'Ticket audit log saved to your store for reference'
+      'Attach an error screenshot',
+      'Ticket audit log saved to your store',
+      'Growth: general support queue',
+      'Pro: priority queue + 4-business-hour SLA'
     ]
   },
   'custom-domain': {
@@ -7856,19 +7856,28 @@ function renderPrioritySupportSection() {
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const status = (subscriptionData && subscriptionData.status) || 'active';
   const isPro = tier === 'pro';
-  if (lockBadge) lockBadge.style.display = isPro ? 'none' : '';
+  const isGrowth = tier === 'growth';
+  const hasSupport = isPro || isGrowth;            // Growth + Pro can contact support
+  if (lockBadge) {
+    lockBadge.style.display = hasSupport ? 'none' : '';
+    lockBadge.textContent = '🔒 Growth+';
+  }
 
-  // Suspended / cancelled Pro tenants need to reactivate before submitting.
-  const isBlocked = isPro && ['suspended', 'cancelled'].includes(status);
+  // Suspended / cancelled tenants must reactivate before submitting.
+  const isBlocked = hasSupport && ['suspended', 'cancelled'].includes(status);
 
-  if (isPro && !isBlocked) {
+  if (hasSupport && !isBlocked) {
+    const lead = isPro
+      ? 'Direct line to Pabili Mart support. Reply within <strong>4 business hours</strong> to your account email.'
+      : 'Contact Pabili Mart support. We&rsquo;ll reply to your account email as soon as we can.';
+    const sub = isPro
+      ? 'Priority queue · 4-business-hour SLA · billing, bug, feature, or how-to.'
+      : 'General queue · billing, bug, feature, or how-to. <span style="color:var(--muted);">Pro adds a 4-hour SLA.</span>';
     body.innerHTML = `
       <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
         <div style="flex:1 1 240px; min-width:0;">
-          <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:4px;">
-            Direct line to Pabili Mart support. Reply within <strong>4 business hours</strong> to your account email.
-          </div>
-          <div style="font-size:12px; color:var(--muted);">Billing, bug, feature request, or how-to.</div>
+          <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:4px;">${lead}</div>
+          <div style="font-size:12px; color:var(--muted);">${sub}</div>
         </div>
         <button type="button" class="ps-cta-btn" onclick="openSupportTicketModal()" style="flex:0 0 auto;">🎧 Contact support</button>
       </div>
@@ -7876,7 +7885,7 @@ function renderPrioritySupportSection() {
   } else if (isBlocked) {
     body.innerHTML = `
       <div style="font-size:14px; color:var(--ink); line-height:1.55;">
-        Your Pro subscription is <strong>${escSupportText(status)}</strong>. Reactivate it from the Current plan section above to submit a support ticket.
+        Your subscription is <strong>${escSupportText(status)}</strong>. Reactivate it from the Current plan section above to contact support.
       </div>
     `;
   } else {
@@ -7884,9 +7893,9 @@ function renderPrioritySupportSection() {
       <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
         <div style="flex:1 1 240px; min-width:0;">
           <div style="font-size:14px; color:var(--ink); line-height:1.55; margin-bottom:4px;">
-            🔒 Priority support is a <strong>PabiliMart Pro</strong> feature.
+            🔒 Contacting support is available on <strong>Growth</strong> and <strong>Pro</strong>.
           </div>
-          <div style="font-size:12px; color:var(--muted);">Direct line to Pabili Mart · 4-business-hour SLA · ticket audit log.</div>
+          <div style="font-size:12px; color:var(--muted);">Growth: general queue. Pro: priority queue + 4-business-hour SLA + ticket audit log.</div>
         </div>
         <button type="button" class="ps-cta-btn secondary" onclick="openLockedFeatureModal('priority-support')" style="flex:0 0 auto;">Learn more</button>
       </div>
@@ -7905,19 +7914,24 @@ function escSupportText(s) {
 // ----- Submit ticket modal -----
 function openSupportTicketModal() {
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
-  if (tier !== 'pro') {
-    // Defensive — section shouldn't show the button on non-Pro, but if
+  if (tier !== 'pro' && tier !== 'growth') {
+    // Defensive — section shouldn't show the button on Free, but if
     // someone calls this from the console, route them to the locked modal.
     openLockedFeatureModal('priority-support');
     return;
   }
+  const isPro = tier === 'pro';
   document.getElementById('support-ticket-subject').value = 'general';
   document.getElementById('support-ticket-message').value = '';
   document.getElementById('support-ticket-char-count').textContent = '0';
   document.getElementById('support-ticket-status').textContent = '';
   removeSupportScreenshot();
   const email = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'your account email';
-  document.getElementById('support-ticket-reply-email').textContent = email;
+  const e = escSupportText(email);
+  const leadEl = document.getElementById('support-ticket-lead');
+  if (leadEl) leadEl.innerHTML = isPro
+    ? `Your ticket goes to the Pabili Mart <strong style="color:var(--ink);">priority queue</strong> — reply within <strong style="color:var(--ink);">4 business hours</strong> to <span style="color:var(--ink);font-weight:500;">${e}</span>.`
+    : `Your ticket goes to the Pabili Mart support queue. We&rsquo;ll reply to <span style="color:var(--ink);font-weight:500;">${e}</span> as soon as we can.`;
   document.getElementById('support-ticket-modal').classList.add('show');
   // Live char count
   const ta = document.getElementById('support-ticket-message');
@@ -8010,6 +8024,13 @@ async function submitSupportTicketForm() {
     const ticketId = (res && res.data && res.data.ticketId) || '—';
     closeSupportTicketModal();
     document.getElementById('support-ticket-sent-id').textContent = ticketId;
+    const sentLead = document.getElementById('support-ticket-sent-lead');
+    if (sentLead) {
+      const isPro = ((subscriptionData && subscriptionData.tier) || 'free') === 'pro';
+      sentLead.innerHTML = isPro
+        ? 'Thanks — your ticket is in the <strong>priority queue</strong>. We&rsquo;ll reply within <strong>4 business hours</strong>.'
+        : 'Thanks — your support ticket has been received. We&rsquo;ll reply to your account email as soon as we can.';
+    }
     document.getElementById('support-ticket-sent-modal').classList.add('show');
   } catch (err) {
     console.error('submitSupportTicket failed:', err);

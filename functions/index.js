@@ -1298,8 +1298,11 @@ exports.submitSupportTicket = onCall(async (request) => {
   const sub = subSnap.exists ? (subSnap.data() || {}) : {};
   const tier = (sub.tier || 'free').toLowerCase();
   const status = (sub.status || 'active').toLowerCase();
-  if (tier !== 'pro' && !isSuperadmin) {
-    throw new HttpsError('failed-precondition', 'Priority Support is a Pro feature. Upgrade your plan to submit a ticket.');
+  // Support tickets: Growth + Pro (and superadmin). Pro = priority queue
+  // (SLA + role ping); Growth = general queue (separate channel, no SLA).
+  const isPriority = tier === 'pro' || isSuperadmin;
+  if (tier !== 'pro' && tier !== 'growth' && !isSuperadmin) {
+    throw new HttpsError('failed-precondition', 'Contacting support is available on Growth and Pro. Upgrade your plan to submit a ticket.');
   }
   if (['suspended', 'cancelled'].includes(status) && !isSuperadmin) {
     throw new HttpsError('failed-precondition', `Your subscription is ${status}. Reactivate it from the Billing tab to contact support.`);
@@ -1322,6 +1325,7 @@ exports.submitSupportTicket = onCall(async (request) => {
       tid,
       tenantName: tenant.name || tid,
       tier,
+      queue: isPriority ? 'priority' : 'general',
       status: 'open',
       subject,
       message,
@@ -1338,14 +1342,16 @@ exports.submitSupportTicket = onCall(async (request) => {
     throw err;
   }
 
-  // Discord delivery. Read webhook from platform/billing; prefer the
-  // dedicated prioritySupportWebhook over the subscription one so Jason
-  // can route tickets to a separate channel from payment notifications.
+  // Discord delivery. Pro tickets go to the priority channel; Growth
+  // tickets go to a separate general-support channel. Both fall back to
+  // the subscription/payment webhook if their dedicated one is unset.
   let webhook = null;
   try {
     const billingSnap = await db.collection('platform').doc('billing').get();
     const billing = billingSnap.exists ? (billingSnap.data() || {}) : {};
-    webhook = billing.prioritySupportWebhook || billing.subscriptionDiscordWebhook || null;
+    webhook = isPriority
+      ? (billing.prioritySupportWebhook || billing.subscriptionDiscordWebhook || null)
+      : (billing.generalSupportWebhook || billing.subscriptionDiscordWebhook || null);
   } catch (err) {
     console.warn('[submitSupportTicket] platform/billing read failed:', err.message);
   }
@@ -1360,7 +1366,9 @@ exports.submitSupportTicket = onCall(async (request) => {
     }[subject] || subject;
 
     const content = [
-      `<@&${PRIORITY_SUPPORT_ROLE_ID}> 🎧 **PRIORITY TICKET — ${subjectLabel}**`,
+      isPriority
+        ? `<@&${PRIORITY_SUPPORT_ROLE_ID}> 🎧 **PRIORITY TICKET — ${subjectLabel}**`
+        : `🎫 **SUPPORT TICKET — ${subjectLabel}**`,
       `**Store:** ${tenant.name || tid}  ·  \`${tid}\``,
       `**Owner:** ${email}`,
       `**Tier:** ${tier} · status: ${status}`,
@@ -1369,7 +1377,9 @@ exports.submitSupportTicket = onCall(async (request) => {
       '> ' + message.replace(/\n/g, '\n> '),
       hasScreenshot ? '📎 _Screenshot attached below._' : '',
       '',
-      `_SLA: 4 business hours. Reply via email to ${email}._`
+      isPriority
+        ? `_SLA: 4 business hours. Reply via email to ${email}._`
+        : `_General support (Growth) — no SLA. Reply via email to ${email}._`
     ].filter((line, i, arr) => !(line === '' && arr[i - 1] === '')).join('\n');
 
     try {
@@ -1378,7 +1388,7 @@ exports.submitSupportTicket = onCall(async (request) => {
       // BOTH returns HTTP 400. We use the explicit roles array form so
       // only this specific role ID can be pinged from the content (defense
       // against accidental @everyone if the content ever has it).
-      const payloadJson = { content, allowed_mentions: { roles: [PRIORITY_SUPPORT_ROLE_ID] } };
+      const payloadJson = { content, allowed_mentions: isPriority ? { roles: [PRIORITY_SUPPORT_ROLE_ID] } : { parse: [] } };
       const m = hasScreenshot && screenshotDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
       let res;
       if (m) {
