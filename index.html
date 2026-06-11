@@ -2813,6 +2813,18 @@ function escBranchAttr(s) {
 
 async function loadBranchesForStorefront() {
   if (!TENANT_ID) return;
+  // Multi-branch is a Pro feature. If the tenant isn't Pro (e.g. downgraded
+  // Pro → Free), ignore any branches still in Firestore — the storefront acts
+  // as a single store (no picker, tenant-level catalog). Read settings/store
+  // .tier directly; the settings snapshot may not have arrived yet at bootstrap.
+  try {
+    const ss = await db.collection('tenants').doc(TENANT_ID).collection('settings').doc('store').get();
+    const tier = ss.exists ? ((ss.data() || {}).tier || 'free') : 'free';
+    if (tier !== 'pro') { BRANCHES = []; return; }
+  } catch (e) {
+    console.warn('[branches] tier check failed:', e);
+    BRANCHES = []; return;
+  }
   try {
     const snap = await db.collection('tenants').doc(TENANT_ID).collection('branches').orderBy('createdAt', 'asc').get();
     BRANCHES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
