@@ -1521,22 +1521,34 @@
   }
   .guide-hero p { font-size: 17px; color: var(--muted); }
 
-  /* Guide sub-tabs — switch between the "set up" and "order" walkthroughs */
+  /* Guide sub-tabs — compact segmented control (active = raised chip).
+     Scrolls horizontally instead of wrapping when it overflows. */
   .guide-tabs {
-    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    display: flex; gap: 4px;
+    width: fit-content; max-width: 100%;
     margin: 0 auto 36px;
+    padding: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .guide-tabs::-webkit-scrollbar { display: none; }
   .guide-tab {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: var(--surface); color: var(--muted);
-    border: 1px solid var(--line); border-radius: 999px;
-    padding: 10px 20px; font-size: 14px; font-weight: 700;
-    white-space: nowrap; transition: color 0.15s, background 0.15s, border-color 0.15s;
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; color: var(--muted);
+    border: 0; border-radius: 9px;
+    padding: 9px 15px; font-size: 13.5px; font-weight: 600;
+    white-space: nowrap;
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .guide-tab:hover { color: var(--ink); border-color: var(--line-strong); }
+  .guide-tab:hover { color: var(--ink); }
   .guide-tab.is-active {
-    background: var(--ink); color: #fff; border-color: var(--ink);
-    box-shadow: var(--shadow-sm);
+    background: var(--surface); color: var(--ink); font-weight: 700;
+    box-shadow: var(--shadow-xs);
   }
   .guide-panel[hidden] { display: none; }
 
@@ -2513,10 +2525,10 @@
 
     <!-- Sub-tabs — two guides live under one Guide page -->
     <div class="guide-tabs" role="tablist">
-      <button type="button" class="guide-tab is-active" data-guide-tab="setup" role="tab" aria-selected="true">🏪 I-set up ang store</button>
-      <button type="button" class="guide-tab" data-guide-tab="order" role="tab" aria-selected="false">🛒 Mag-order (COD)</button>
-      <button type="button" class="guide-tab" data-guide-tab="accept" role="tab" aria-selected="false">✅ Mag-accept ng order</button>
-      <button type="button" class="guide-tab" data-guide-tab="product" role="tab" aria-selected="false">📦 Mag-add ng product</button>
+      <button type="button" class="guide-tab is-active" data-guide-tab="setup" role="tab" aria-selected="true">🏪 I-set up</button>
+      <button type="button" class="guide-tab" data-guide-tab="order" role="tab" aria-selected="false">🛒 Mag-order</button>
+      <button type="button" class="guide-tab" data-guide-tab="accept" role="tab" aria-selected="false">✅ Mag-accept</button>
+      <button type="button" class="guide-tab" data-guide-tab="product" role="tab" aria-selected="false">📦 Mag-add</button>
     </div>
 
     <!-- ===== TAB 1 · Set up your store ===== -->
