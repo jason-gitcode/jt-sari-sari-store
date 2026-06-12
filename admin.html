@@ -1765,7 +1765,9 @@
       flex-shrink: 0;
     }
     .dash-preset-btn {
-      padding: 6px 12px;
+      height: 32px; box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
       font-size: var(--fs-sm); font-weight: 500;
@@ -1782,8 +1784,9 @@
        media query. */
     .dash-more-btn {
       display: none;
-      align-items: center; gap: 4px;
-      padding: 6px 12px;
+      height: 32px; box-sizing: border-box;
+      align-items: center; justify-content: center; gap: 4px;
+      padding: 0 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
       font-size: var(--fs-sm); font-weight: 500;
@@ -1798,7 +1801,9 @@
     /* "Go" button submits a custom date range and closes the dropdown. */
     .period-go-btn {
       flex: 0 0 auto;
-      padding: 6px 14px;
+      height: 32px; box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0 14px;
       border: 1px solid var(--ink);
       border-radius: var(--radius-sm);
       background: var(--ink); color: var(--surface);
@@ -1809,7 +1814,7 @@
     .period-go-btn:hover { opacity: .9; }
     .dash-date-range {
       display: flex; align-items: center; gap: 8px;
-      margin-left: auto; flex-wrap: wrap;
+      flex-wrap: wrap;
       font-size: var(--fs-sm); color: var(--muted);
     }
     /* Native <input type="date"> doesn't inherit font-family / -weight, so
@@ -1818,7 +1823,8 @@
        typography properties so the dates match the .dash-preset-btn
        look exactly. */
     .dash-date-range input {
-      padding: 6px 12px;
+      height: 32px;
+      padding: 0 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
       background: var(--surface);
@@ -1829,6 +1835,8 @@
       line-height: 1.4;
       outline: none;
       box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
     }
     .dash-date-range input:focus { border-color: var(--accent); color: var(--ink); }
     /* iOS Safari renders the date VALUE through this pseudo-element and ignores
@@ -2401,7 +2409,7 @@
         margin-left: 0; width: auto;
         flex-wrap: nowrap; gap: 6px; align-items: center;
       }
-      .dash-date-range input { flex: 1 1 0; min-width: 0; padding: 6px 8px; }
+      .dash-date-range input { flex: 1 1 0; min-width: 0; padding: 0 8px; }
       .setting-row { flex-direction: column; align-items: flex-start; }
       .setting-control { align-self: stretch; }
       /* Toggle-bearing rows stay in row layout on phones so the toggle
