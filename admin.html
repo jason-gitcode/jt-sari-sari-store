@@ -4453,7 +4453,7 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="save-btn">Save Product</button>
+        <button type="submit" class="save-btn" onpointerdown="window._pressT=performance.now()">Save Product</button>
         <button type="button" class="cancel-btn" onclick="closeProductModal()">Cancel</button>
       </div>
     </form>
@@ -10859,9 +10859,15 @@ async function saveProduct(e) {
     const _t3 = performance.now();
     closeProductModal();
     const _t4 = performance.now();
-    // [TEMP DIAGNOSTIC v323] timing folded into the toast that reliably shows.
-    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms branch=${Math.round(_t3 - _t2)}ms close=${Math.round(_t4 - _t3)}ms images=[${_imgInfo}]`);
-    showToast(`pre${Math.round(_t0 - _tStart)} up${Math.round(_t1 - _t0)} set${Math.round(_t2 - _t1)} br${Math.round(_t3 - _t2)} close${Math.round(_t4 - _t3)} · ${_imgInfo}`, 'success');
+    // [TEMP DIAGNOSTIC v324] measure the two un-instrumented gaps:
+    //  press = pointerdown on Save -> saveProduct start (click handling)
+    //  paint = saveProduct start -> browser actually paints next frame
+    const _press = window._pressT ? Math.round(_tStart - window._pressT) : -1;
+    console.log(`[saveProduct timing] press=${_press}ms set=${Math.round(_t2 - _t1)}ms close=${Math.round(_t4 - _t3)}ms`);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const _paint = Math.round(performance.now() - _tStart);
+      showToast(`press${_press} set${Math.round(_t2 - _t1)} close${Math.round(_t4 - _t3)} PAINT${_paint} · ${_imgInfo}`, 'success');
+    }));
   } catch (err) {
     console.error('Save error:', err);
     // Surface the underlying Firestore message so transient bugs
