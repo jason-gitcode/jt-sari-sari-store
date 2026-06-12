@@ -785,6 +785,17 @@
     }
     .more-sheet-item:active { background: var(--surface-2); }
     .more-sheet-item.active { background: var(--surface-2); color: var(--accent); font-weight: 600; }
+
+    /* Tablet / touch devices (e.g. iPad, any orientation): use the same fixed
+       bottom nav as phones instead of the top tab strip, while keeping the
+       roomy desktop layout otherwise. Desktops (fine pointer) keep the top
+       tabs. The ≤600px phone query below also flips these; this extends it to
+       wider touch devices. */
+    @media (min-width: 601px) and (pointer: coarse) {
+      .tabs { display: none; }
+      .bottom-nav { display: flex; }
+      .container { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    }
     /* Each tab panel is its OWN scroll container (body is position:fixed at
        the root). `overscroll-behavior: none` kills BOTH scroll-chaining to
        the parent AND the iOS boundary rubber-band on the container itself.
