@@ -5408,6 +5408,7 @@ function renderBillingTab() {
 
   // ---- Tier comparison ----
   const currentTier = (subscriptionData && subscriptionData.tier) || 'free';
+  const currentStatus = (subscriptionData && subscriptionData.status) || 'active';
   // Trial eligibility — Free + never trialed before. trialUsedAt is a
   // Firestore Timestamp once set; undefined / null on legacy tenants
   // until they trigger a startFreeTrial / confirmManualPayment path.
@@ -5425,8 +5426,15 @@ function renderBillingTab() {
       ctaAction = '';
     } else if ((TIER_RANK[t] ?? 9) < (TIER_RANK[currentTier] ?? 0)) {
       // Lower than the current tier → a downgrade (Free, or Growth when on Pro).
-      ctaText = 'Downgrade';
-      ctaAction = `onclick="requestTierChange('${t}')"`;
+      // During a trial, a lower PAID tier means "pay now to switch" (ends the
+      // trial), not a scheduled downgrade — label it accordingly.
+      if (currentStatus === 'trialing' && t !== 'free') {
+        ctaText = `Switch to ${info.name.replace('PabiliMart ', '')}`;
+        ctaAction = `onclick="requestTierChange('${t}')"`;
+      } else {
+        ctaText = 'Downgrade';
+        ctaAction = `onclick="requestTierChange('${t}')"`;
+      }
     } else if (trialEligible) {
       ctaText = 'Start 30-day free trial';
       ctaAction = `onclick="startTenantTrial('${t}')"`;
@@ -5651,9 +5659,18 @@ function openPayNowModal() {
 const TIER_RANK = { free: 0, growth: 1, pro: 2 };
 function requestTierChange(tier) {
   const current = (subscriptionData && subscriptionData.tier) || 'free';
-  // Lower rank than current = a downgrade → schedule at period end (no
-  // payment). Same/higher = an upgrade → pay flow.
+  const status = (subscriptionData && subscriptionData.status) || 'active';
+  // Lower rank than current = a downgrade → schedule at period end (no payment).
   if ((TIER_RANK[tier] ?? 9) < (TIER_RANK[current] ?? 0)) {
+    // A trial can't be "scheduled". The only trial downgrade is →Free
+    // (cancel the trial). Switching a trial to a lower PAID tier (e.g. a Pro
+    // trial → Growth) means paying now to start that plan, which ends the
+    // trial — route to the payment flow, not the cancel-trial path.
+    if (status === 'trialing' && tier !== 'free') {
+      payNowTargetTier = tier;
+      showPayNowModal();
+      return;
+    }
     openDowngradeModal(tier);
     return;
   }
@@ -5682,6 +5699,13 @@ function openDowngradeModal(targetTier) {
   const status = subscriptionData.status || 'active';
   if (tier === 'free') { showToast('You\'re already on Free.', 'info'); return; }
   if ((TIER_RANK[targetTier] ?? 9) >= (TIER_RANK[tier] ?? 0)) { showToast('That isn\'t a downgrade.', 'info'); return; }
+  // A trial can only downgrade to Free (cancel the trial). Switching a trial
+  // to a paid tier is a pay-now action — redirect, never show the schedule modal.
+  if (status === 'trialing' && targetTier !== 'free') {
+    payNowTargetTier = targetTier;
+    showPayNowModal();
+    return;
+  }
   pendingDowngradeTarget = targetTier;
   const fromInfo = TIER_INFO[tier] || TIER_INFO.free;
   const toInfo = TIER_INFO[targetTier] || TIER_INFO.free;
