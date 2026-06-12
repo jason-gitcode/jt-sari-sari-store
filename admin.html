@@ -5319,10 +5319,11 @@ function renderBillingTab() {
         const gd = gEnd.toDate ? gEnd.toDate() : (gEnd.seconds ? new Date(gEnd.seconds * 1000) : new Date(gEnd));
         if (!isNaN(gd.getTime())) graceLeft = Math.max(0, Math.ceil((gd.getTime() - Date.now()) / (24*60*60*1000)));
       }
+      const graceStay = graceLeft != null ? ` for <strong>${graceLeft} more day${graceLeft === 1 ? '' : 's'}</strong>` : '';
+      const graceUntil = gEnd ? ` (until <strong>${fmtBillingDate(subscriptionData.graceEndsAt)}</strong>)` : '';
       statusBlock = `
-        <div style="color:#f59e0b;font-weight:700;">⏳ Grace period — moving to ${toName}</div>
-        <div style="margin-top:4px;">You're still on <strong>${info.name}</strong>${graceLeft != null ? ` for <strong>${graceLeft} more day${graceLeft === 1 ? '' : 's'}</strong>` : ''}${gEnd ? ` (until <strong>${fmtBillingDate(subscriptionData.graceEndsAt)}</strong>)` : ''}, then you drop to <strong>${toName}</strong>.</div>
-        <div style="margin-top:4px;font-size:12px;color:var(--muted);">On that day only <strong>${(toCap || 0).toLocaleString()}</strong> products stay visible — pick which ones in the <strong>Products</strong> tab. Extras are archived (kept in admin, not deleted). <strong>Pay now</strong> to stay on ${info.name} and keep your full catalog.</div>
+        <div style="color:#f59e0b;font-weight:600;margin-bottom:6px;">⏳ Grace period — moving to ${toName}</div>
+        <div style="line-height:1.6;">You're still on <strong>${info.name}</strong>${graceStay}${graceUntil}, then you move to <strong>${toName}</strong>. On that day only <strong>${(toCap || 0).toLocaleString()}</strong> products stay visible — choose which to keep in the <strong>Products</strong> tab; the rest are archived (kept in admin, never deleted). <strong>Pay now</strong> to stay on ${info.name} and keep your full catalog.</div>
       `;
     } else if (status === 'past_due') {
       statusBlock = `
