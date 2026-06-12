@@ -4453,7 +4453,7 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="save-btn" onpointerdown="window._pressT=performance.now()">Save Product</button>
+        <button type="submit" class="save-btn">Save Product</button>
         <button type="button" class="cancel-btn" onclick="closeProductModal()">Cancel</button>
       </div>
     </form>
@@ -7614,7 +7614,6 @@ function showAdmin() {
 function subscribeToProducts() {
   if (unsubscribeProducts) unsubscribeProducts();
   unsubscribeProducts = tcol('products').onSnapshot(snapshot => {
-    const _s0 = performance.now(); // [TEMP DIAGNOSTIC v323]
     const changes = snapshot.docChanges();
     // A metadata-only fire (e.g. the server ack of our own just-written
     // doc) carries no doc changes — nothing visual changed, so skip the
@@ -7622,33 +7621,22 @@ function subscribeToProducts() {
     if (changes.length === 0) return;
     products = snapshot.docs.map(doc => doc.data());
     products.sort((a, b) => a.id - b.id);
-    const _s1 = performance.now();
     renderAdminCategories();
-    const _s2 = performance.now();
     // Surgical fast-path: a pure-modify snapshot (Save Product, stock +/-,
     // availability/hide toggle) with no active list filter patches only the
     // changed rows. Rebuilding all ~851 rows on every change froze the admin
     // for several seconds on large catalogs (storefront syncCartButtons
     // lesson, applied to admin). Falls back to a full render otherwise.
     const onlyModified = changes.every(c => c.type === 'modified');
-    const _patched = onlyModified && patchProductRows(changes.map(c => c.doc.data()));
-    if (!_patched) {
+    if (!(onlyModified && patchProductRows(changes.map(c => c.doc.data())))) {
       renderProducts();
     }
-    const _s3 = performance.now();
     // Keep the Settings → Appearance category-order editor live as new
     // product categories appear (or last products of a category are deleted).
     if (typeof renderCategoryOrderEditor === 'function') renderCategoryOrderEditor();
-    const _s4 = performance.now();
     // Phase D: refresh product-cap pill + Add Product disabled state +
     // upgrade banner. Counts change with every snapshot.
     renderProductCapStatus();
-    const _s5 = performance.now();
-    if (_s5 - _s0 > 400) {
-      const msg = `SNAP map${Math.round(_s1 - _s0)} cats${Math.round(_s2 - _s1)} ${_patched ? 'patch' : 'FULL'}${Math.round(_s3 - _s2)} catord${Math.round(_s4 - _s3)} cap${Math.round(_s5 - _s4)} n=${changes.length}`;
-      console.log('[onSnapshot timing]', msg);
-      showToast(msg, 'success');
-    }
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
@@ -10726,7 +10714,6 @@ function editProduct(id) {
 
 async function saveProduct(e) {
   e.preventDefault();
-  const _tStart = performance.now(); // [TEMP DIAGNOSTIC v320]
 
   const selCat = document.getElementById('product-category').value;
   const customCat = document.getElementById('custom-category-input').value.trim();
@@ -10823,16 +10810,11 @@ async function saveProduct(e) {
   }
 
   try {
-    // [TEMP DIAGNOSTIC v320] measure each save phase to find the 6-7s stall.
-    const _t0 = performance.now();
     // Upload any newly-added base64 images to Storage and store URLs instead
     // — keeps the heavy image bytes out of the product doc (storefront speed).
     // Existing https: URLs pass through unchanged.
-    const _imgInfo = (formData.images || []).map(im => typeof im === 'string' ? (im.slice(0, 5)) : typeof im).join(',');
     formData.images = await uploadProductImages(TENANT_ID, String(formData.id), formData.images);
-    const _t1 = performance.now();
     await tcol('products').doc(String(formData.id)).set(formData);
-    const _t2 = performance.now();
     // After the product doc is written, seed/update per-branch inventory
     // docs for any branch-specific products. Best-effort — if these
     // partial writes fail we still leave the product saved.
@@ -10856,18 +10838,8 @@ async function saveProduct(e) {
         showToast('Product saved, but seeding branch inventory partially failed. Check Firestore.', 'warn');
       }
     }
-    const _t3 = performance.now();
+    showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
     closeProductModal();
-    const _t4 = performance.now();
-    // [TEMP DIAGNOSTIC v324] measure the two un-instrumented gaps:
-    //  press = pointerdown on Save -> saveProduct start (click handling)
-    //  paint = saveProduct start -> browser actually paints next frame
-    const _press = window._pressT ? Math.round(_tStart - window._pressT) : -1;
-    console.log(`[saveProduct timing] press=${_press}ms set=${Math.round(_t2 - _t1)}ms close=${Math.round(_t4 - _t3)}ms`);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const _paint = Math.round(performance.now() - _tStart);
-      showToast(`press${_press} set${Math.round(_t2 - _t1)} close${Math.round(_t4 - _t3)} PAINT${_paint} · ${_imgInfo}`, 'success');
-    }));
   } catch (err) {
     console.error('Save error:', err);
     // Surface the underlying Firestore message so transient bugs
