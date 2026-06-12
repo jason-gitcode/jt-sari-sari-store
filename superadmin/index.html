@@ -670,6 +670,7 @@
       <span>All tenants <span id="tenants-result-meta" class="tenants-result-meta"></span></span>
       <div class="actions">
         <button class="btn btn-icon" onclick="runBackfill()" title="Backfill tier mirror on tenant root docs (idempotent)">⚙ Backfill</button>
+        <button class="btn btn-icon" onclick="runImageMigration()" title="Move a tenant's product images from base64 → Cloud Storage (idempotent, batched)">🖼 Migrate images</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
       </div>
     </div>
@@ -932,6 +933,7 @@ const listPaymentsAllFn      = functions.httpsCallable('listPaymentsAll');
 const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
 const rejectManualPaymentFn  = functions.httpsCallable('rejectManualPayment');
 const backfillSubscriptionsFn = functions.httpsCallable('backfillSubscriptions');
+const migrateProductImagesFn  = functions.httpsCallable('migrateProductImages');
 
 // Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
 const SUPERADMIN_EMAILS = new Set([
@@ -1204,6 +1206,33 @@ async function runBackfill() {
   } catch (err) {
     console.error('backfill failed:', err);
     alert('Backfill failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// Batched product-image migration: base64 in Firestore -> Cloud Storage.
+// Loops the callable until { done: true }. Idempotent (re-running skips
+// already-migrated URLs). Progress is logged to the console per batch.
+async function runImageMigration() {
+  const tid = prompt('Migrate product images for which tenant slug?', 'jsminimart');
+  if (!tid) return;
+  if (!confirm(`Move all base64 product images for "${tid}" into Cloud Storage?\nIdempotent + batched — safe to re-run.`)) return;
+  let cursor = null, totProcessed = 0, totUpdated = 0, totImages = 0, batches = 0;
+  try {
+    while (true) {
+      const res = await migrateProductImagesFn({ tid, cursor });
+      const d = (res && res.data) || {};
+      batches++;
+      totProcessed += d.processed || 0;
+      totUpdated += d.updated || 0;
+      totImages += d.imagesUploaded || 0;
+      cursor = d.nextCursor || cursor;
+      console.log(`[migrate ${tid}] batch ${batches}: processed=${d.processed} updated=${d.updated} images=${d.imagesUploaded} cursor=${cursor} done=${d.done}`);
+      if (d.done) break;
+    }
+    alert(`Image migration complete for "${tid}":\nproducts processed: ${totProcessed}\nproducts updated: ${totUpdated}\nimages moved: ${totImages}\nbatches: ${batches}`);
+  } catch (err) {
+    console.error('image migration failed:', err);
+    alert(`Image migration failed after ${batches} batch(es): ${(err && err.message) ? err.message : err}\nIt's idempotent — re-run to continue.`);
   }
 }
 

@@ -1,8 +1,10 @@
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const { getStorage } = require('firebase-admin/storage');
+const crypto = require('crypto');
 const zlib = require('zlib');
 
 initializeApp();
@@ -639,6 +641,80 @@ exports.backfillSubscriptions = onCall(async (request) => {
     tierSynced++;
   }
   return { seeded, skipped, tierSynced, total: snap.size };
+});
+
+// ============================================================
+// migrateProductImages — superadmin one-shot (batched). Moves a tenant's
+// product images out of Firestore (base64 in `images[]`) into Cloud
+// Storage, replacing each base64 entry with a Firebase download URL.
+// Idempotent: https: entries are left alone, so it's safe to re-run.
+// Drive it in batches until { done: true }.
+// ============================================================
+const PRODUCT_IMAGE_BUCKET = 'jt-sari-sari-store.firebasestorage.app';
+
+exports.migrateProductImages = onCall({ memory: '512MiB', timeoutSeconds: 540 }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  const limit = Math.min(Math.max(parseInt(data.limit, 10) || 75, 1), 300);
+  const cursor = data.cursor ? String(data.cursor) : null;
+
+  const bucket = getStorage().bucket(PRODUCT_IMAGE_BUCKET);
+  const col = db.collection('tenants').doc(tid).collection('products');
+  let q = col.orderBy(FieldPath.documentId()).limit(limit);
+  if (cursor) q = col.orderBy(FieldPath.documentId()).startAfter(cursor).limit(limit);
+
+  const snap = await q.get();
+  let processed = 0, updated = 0, imagesUploaded = 0;
+  let lastId = cursor;
+
+  for (const doc of snap.docs) {
+    processed++;
+    lastId = doc.id;
+    const images = Array.isArray((doc.data() || {}).images) ? doc.data().images : [];
+    if (!images.length) continue;
+    let changed = false;
+    const out = [];
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      const m = (typeof img === 'string') && img.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (m) {
+        const buf = Buffer.from(m[2], 'base64');
+        const dlToken = crypto.randomUUID();
+        const path = `tenants/${tid}/products/${doc.id}/${i}.jpg`;
+        await bucket.file(path).save(buf, {
+          resumable: false,
+          metadata: {
+            contentType: 'image/jpeg',
+            cacheControl: 'public, max-age=31536000, immutable',
+            metadata: { firebaseStorageDownloadTokens: dlToken }
+          }
+        });
+        out.push(`https://firebasestorage.googleapis.com/v0/b/${PRODUCT_IMAGE_BUCKET}/o/${encodeURIComponent(path)}?alt=media&token=${dlToken}`);
+        imagesUploaded++;
+        changed = true;
+      } else if (typeof img === 'string' && img) {
+        out.push(img); // already a URL — leave it
+      }
+    }
+    if (changed) {
+      await doc.ref.update({ images: out });
+      updated++;
+    }
+  }
+
+  return {
+    processed,
+    updated,
+    imagesUploaded,
+    nextCursor: lastId,
+    done: snap.size < limit
+  };
 });
 
 // ============================================================

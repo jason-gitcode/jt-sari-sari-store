@@ -2812,6 +2812,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- Storage SDK — product images live in Cloud Storage (not base64 in
+       the product doc) so the storefront catalog query stays light. -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
   <!-- Functions SDK — needed for the Billing Pay-Now flow (Phase B) and
        superadmin one-shots like backfillSubscriptions. -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
@@ -7299,6 +7302,31 @@ function compressImage(file, callback) {
   reader.readAsDataURL(file);
 }
 
+// Upload product images to Cloud Storage. Any base64 (data:) image is
+// uploaded to tenants/{tid}/products/{productId}/{i}.jpg with a long
+// immutable cache header and replaced by its download URL; existing https:
+// URLs pass through. Keeps base64 out of the Firestore product doc so the
+// storefront catalog query stays light.
+async function uploadProductImages(tid, productId, images) {
+  if (!Array.isArray(images) || !images.length) return [];
+  const storage = firebase.storage();
+  const out = [];
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    if (typeof img === 'string' && img.startsWith('data:')) {
+      const ref = storage.ref(`tenants/${tid}/products/${productId}/${i}.jpg`);
+      const snap = await ref.putString(img, 'data_url', {
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000, immutable'
+      });
+      out.push(await snap.ref.getDownloadURL());
+    } else if (typeof img === 'string' && img) {
+      out.push(img); // already a Storage URL
+    }
+  }
+  return out;
+}
+
 function renderPhotoPreviews() {
   const container  = document.getElementById('photo-previews');
   const uploadLabel = document.getElementById('photo-upload-label');
@@ -10680,6 +10708,10 @@ async function saveProduct(e) {
   }
 
   try {
+    // Upload any newly-added base64 images to Storage and store URLs instead
+    // — keeps the heavy image bytes out of the product doc (storefront speed).
+    // Existing https: URLs pass through unchanged.
+    formData.images = await uploadProductImages(TENANT_ID, String(formData.id), formData.images);
     await tcol('products').doc(String(formData.id)).set(formData);
     // After the product doc is written, seed/update per-branch inventory
     // docs for any branch-specific products. Best-effort — if these
