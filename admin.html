@@ -9459,27 +9459,42 @@ function copyOrder(orderId, btn) {
   const unchecked      = o.uncheckedItems || [];
   const uncheckedTotal = unchecked.reduce((s, i) => s + parseFloat(i.lineTotal), 0);
 
+  // Plain-text receipt for SMS/Viber/Messenger. Proportional fonts can't
+  // align columns, so we use clear emoji labels, light dividers, and a
+  // single " — " separator instead of ragged spacing.
+  const storeName = (typeof storeSettingsData !== 'undefined' && storeSettingsData && storeSettingsData.storeName)
+    ? storeSettingsData.storeName : 'Pabili Mart';
+  const fulfillLabel = isPickup ? '🏬 Pick-up at store' : '🛵 Delivery';
+  const DIV = '————————————';
+
   let t = '';
-  t += `#${shortId} - ${o.status.toUpperCase()} - ${isPickup ? 'PICK-UP' : 'DELIVERY'} - ${time}\n`;
+  t += `🧾 ${storeName}\n`;
+  t += `Order #${shortId} — ${o.status.toUpperCase()}\n`;
+  t += `${fulfillLabel} · ${time}\n`;
   t += `\n`;
-  t += `${o.customer?.name || '—'} · ${o.customer?.phone || '—'}\n`;
-  t += `${addr}\n`;
-  if (o.notes) t += `Note: ${o.notes}\n`;
+  t += `👤 ${o.customer?.name || '—'}\n`;
+  t += `📞 ${o.customer?.phone || '—'}\n`;
+  if (!isPickup) t += `📍 ${addr}\n`;
+  if (o.notes) t += `📝 ${o.notes}\n`;
+  t += `\n${DIV}\n`;
+  t += `🛒 ITEMS\n`;
+  confirmed.forEach(i => { t += `• ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
   t += `\n`;
-  t += `✓ Confirmed Items\n`;
-  t += `\n`;
-  confirmed.forEach(i => { t += `${i.qty}× ${i.productName}     ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
-  t += `Subtotal:     ₱${displaySub.toFixed(2)}\n`;
-  t += `Delivery Fee:     ${feeStr}\n`;
-  t += `Total:     ₱${displayTotal.toFixed(2)}\n`;
-  t += `Payment:     ${payLabel}\n`;
+  t += `Subtotal — ₱${displaySub.toFixed(2)}\n`;
+  if (!isPickup) t += `Delivery — ${feeStr}\n`;
+  t += `Total — ₱${displayTotal.toFixed(2)}\n`;
+  t += `${payLabel}\n`;
 
   if (unchecked.length) {
-    t += `\nUnavailable Items\n\n`;
-    unchecked.forEach(i => { t += `${i.qty}× ${i.productName}     ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
-    t += `Refund Amount: ₱${uncheckedTotal.toFixed(2)}\n`;
-    if (o.partialRefundRef) t += `✓ Partial Refund Recorded — GCash Reference Number: ${o.partialRefundRef}\n`;
+    t += `\n${DIV}\n`;
+    t += `⚠️ UNAVAILABLE — refunded\n`;
+    unchecked.forEach(i => { t += `• ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
+    t += `Refund — ₱${uncheckedTotal.toFixed(2)}\n`;
+    if (o.partialRefundRef) t += `✓ GCash refund ref: ${o.partialRefundRef}\n`;
   }
+
+  t += `\n${DIV}\n`;
+  t += `Salamat po sa pag-order! 🙏`;
 
   navigator.clipboard.writeText(t.trim()).then(() => {
     btn.textContent = '✓ Copied!';
