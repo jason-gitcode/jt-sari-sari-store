@@ -11438,7 +11438,15 @@ function setDashPreset(preset, doRender = true) {
     const d = new Date(); d.setDate(d.getDate() - 29);
     dashFromDate = manilaDateStr(d); dashToDate = today;
   } else {
-    dashFromDate = null; dashToDate = null;
+    // All Time — show the real span (earliest order → today) in the boxes
+    // instead of leaving them blank. Same data as before; just populated so
+    // the date inputs aren't empty/shrunk.
+    let earliest = today;
+    (typeof orders !== 'undefined' ? orders : []).forEach(o => {
+      const ds = getOrderDateStr(o);
+      if (ds && ds < earliest) earliest = ds;
+    });
+    dashFromDate = earliest; dashToDate = today;
   }
   const fromInp = document.getElementById('dash-from');
   const toInp   = document.getElementById('dash-to');
