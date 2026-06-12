@@ -9507,8 +9507,7 @@ function copyOrder(orderId, btn) {
   }
 
   t += `\n${DIV}\n`;
-  t += `🛒 Order again:\n${storefrontShareUrl()}\n`;
-  t += `\nSalamat po sa pag-order! 🙏`;
+  t += `🛒 Order again:\n${storefrontShareUrl()}`;
 
   navigator.clipboard.writeText(t.trim()).then(() => {
     btn.textContent = '✓ Copied!';
