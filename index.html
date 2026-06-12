@@ -2641,7 +2641,11 @@ if (window.location.hash === '#cart') {
 let shuffledOrder = null;
 function subscribeProducts() {
 tcol('products').onSnapshot(snapshot => {
-  const fresh = snapshot.docs.map(doc => doc.data());
+  // Exclude tier-archived products (downgrade overflow kept in admin but
+  // hidden from the storefront) at the source — so categories, search,
+  // counts, and the grid never see them. Distinct from the manual `hidden`
+  // toggle, which is filtered later in renderProducts().
+  const fresh = snapshot.docs.map(doc => doc.data()).filter(p => p.archived !== true);
   if (shuffledOrder === null) {
     // First load — shuffle once for this session
     fresh.sort((a, b) => a.id - b.id);

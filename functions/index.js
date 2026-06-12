@@ -1066,6 +1066,7 @@ exports.confirmManualPayment = onCall(async (request) => {
   const pref = tref.collection('payments').doc(paymentId);
   const sref = tref.collection('subscription').doc('current');
 
+  let confirmedTier = null;
   await db.runTransaction(async (tx) => {
     const psnap = await tx.get(pref);
     if (!psnap.exists) throw new HttpsError('not-found', 'Payment not found.');
@@ -1074,6 +1075,7 @@ exports.confirmManualPayment = onCall(async (request) => {
       throw new HttpsError('failed-precondition', `Payment is not pending (status: ${p.status}).`);
     }
     const tier = p.tier;
+    confirmedTier = tier;
     if (!SUBSCRIPTION_TIERS[tier] || tier === 'free') {
       throw new HttpsError('failed-precondition', 'Payment is for an unknown or non-paid tier.');
     }
@@ -1106,10 +1108,15 @@ exports.confirmManualPayment = onCall(async (request) => {
       trialEndsAt: null,
       trialUsedAt,
       pastDueSince: null,
-      // Lifecycle automation (Phase C-1): clear ALL terminal-state markers
-      // when a payment confirms — a single payment can resurrect a tenant
-      // from grace/suspended/cancelled-scheduled back to active.
+      // Lifecycle automation: clear ALL grace/downgrade markers when a
+      // payment confirms — a single payment resurrects a tenant from
+      // grace/scheduled-downgrade back to active on the paid tier.
       graceSince: null,
+      graceEndsAt: null,
+      graceFromTier: null,
+      graceToTier: null,
+      scheduledTier: null,
+      pendingRetainIds: null,
       suspendedAt: null,
       cancelledAt: null,
       cancellationReason: null,
@@ -1135,6 +1142,14 @@ exports.confirmManualPayment = onCall(async (request) => {
     // Tier mirror on the tenant root doc (superadmin tenants list).
     tx.update(tref, { tier });
   });
+
+  // After confirming, re-cap the catalog to the paid tier: upgrading to Pro
+  // un-archives everything (cap 6000 ≥ catalog); renewing Growth keeps the
+  // current visible 500. Best-effort — the payment is already committed.
+  if (confirmedTier && confirmedTier !== 'free') {
+    try { await archiveProductsForTier(tid, confirmedTier, []); }
+    catch (err) { console.warn('[confirmManualPayment] re-cap failed for', tid, ':', err.message); }
+  }
 
   return { paymentId, tid, status: 'confirmed' };
 });
@@ -1977,15 +1992,82 @@ exports.checkCustomDomainsHealth = onSchedule({
 // when any tenant transitions, so Jason gets a daily heartbeat.
 // ============================================================
 
-const LIFECYCLE_PAST_DUE_DAYS = 7;
-const LIFECYCLE_GRACE_DAYS = 7;
-const LIFECYCLE_SUSPENDED_DAYS = 60;
+// Grace window (days) a tenant keeps their CURRENT tier after the paid
+// period ends / a downgrade is scheduled, before dropping to the target
+// tier. Longer for Pro than Growth.
+function _graceDaysForTier(tier) {
+  return tier === 'pro' ? 15 : 7;
+}
 
 function _daysBetween(laterDate, earlierTs) {
   if (!earlierTs) return Infinity;
   const earlierMs = earlierTs.toMillis ? earlierTs.toMillis() : new Date(earlierTs).getTime();
   if (!Number.isFinite(earlierMs)) return Infinity;
   return (laterDate.getTime() - earlierMs) / (24 * 60 * 60 * 1000);
+}
+
+function _shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ============================================================
+// archiveProductsForTier — enforce a tier's product cap by archiving the
+// overflow (NOT deleting). Used both on downgrade-drop (lifecycle) and on
+// payment/upgrade (re-cap / restore). Idempotent; only writes flags that
+// actually change. Orders + customer data are never touched.
+//
+// Keep-set fill order, until the target cap is reached:
+//   1. `retainIds` — the owner's explicit picks during grace (existing only)
+//   2. currently-VISIBLE products (archived !== true) — preserves the live
+//      set on renewals so we never reshuffle what's already showing; when
+//      the owner made NO explicit pick AND the visible set exceeds the cap,
+//      this group is shuffled so the cut is random (per spec)
+//   3. currently-ARCHIVED products (id order) — restores extras on upgrade
+// Everything outside the keep-set gets archived:true.
+// ============================================================
+async function archiveProductsForTier(tid, targetTier, retainIds) {
+  const cap = (SUBSCRIPTION_TIERS[targetTier] || SUBSCRIPTION_TIERS.free).productCap;
+  const col = db.collection('tenants').doc(tid).collection('products');
+  const snap = await col.get();
+  const docs = snap.docs;
+  if (docs.length === 0) return { total: 0, kept: 0, archived: 0, cap };
+
+  const idSet = new Set(docs.map(d => d.id));
+  const explicit = (Array.isArray(retainIds) ? retainIds : []).map(String).filter(id => idSet.has(id));
+  const hasExplicit = explicit.length > 0;
+
+  const keep = new Set();
+  for (const id of explicit) { if (keep.size >= cap) break; keep.add(id); }
+
+  if (keep.size < cap) {
+    const visible = [], archivedPool = [];
+    for (const d of docs) {
+      if (keep.has(d.id)) continue;
+      if ((d.data() || {}).archived === true) archivedPool.push(d.id);
+      else visible.push(d.id);
+    }
+    // No explicit pick + visible set must be cut → random which survive.
+    if (!hasExplicit) _shuffle(visible);
+    archivedPool.sort((a, b) => Number(a) - Number(b));
+    for (const id of visible)      { if (keep.size >= cap) break; keep.add(id); }
+    for (const id of archivedPool) { if (keep.size >= cap) break; keep.add(id); }
+  }
+
+  let ops = 0, batch = db.batch();
+  const commits = [];
+  for (const d of docs) {
+    const shouldArchive = !keep.has(d.id);
+    if (((d.data() || {}).archived === true) === shouldArchive) continue; // unchanged
+    batch.set(d.ref, { archived: shouldArchive }, { merge: true });
+    if (++ops >= 450) { commits.push(batch.commit()); batch = db.batch(); ops = 0; }
+  }
+  if (ops > 0) commits.push(batch.commit());
+  await Promise.all(commits);
+  return { total: docs.length, kept: keep.size, archived: docs.length - keep.size, cap };
 }
 
 exports.runSubscriptionLifecycle = onSchedule({
@@ -2034,89 +2116,98 @@ exports.runSubscriptionLifecycle = onSchedule({
 
     const trialEnd = sub.trialEndsAt;
     const periodEnd = sub.currentPeriodEnd;
-    const pastDueSince = sub.pastDueSince;
-    const graceSince = sub.graceSince;
-    const suspendedAt = sub.suspendedAt;
-    const cancelAtPeriodEnd = sub.cancelAtPeriodEnd === true;
+    const graceEndsAt = sub.graceEndsAt;
+    const scheduledTier = String(sub.scheduledTier || '').toLowerCase();
 
-    let next = null;     // { status, patch, label }
+    // Decide the single transition for this tenant today, if any.
+    //   enterGrace : active period ended (unpaid OR scheduled downgrade) →
+    //                keep the current tier through a grace window
+    //   drop       : grace window elapsed (or a trial expired with no pay) →
+    //                move to the target tier + archive the catalog to its cap
+    let action = null;
 
-    // 1. trialing → past_due (trial expired)
+    // 1. Trial expired, never paid → drop straight to Free (no grace).
     if (status === 'trialing' && trialEnd && _daysBetween(now, trialEnd) >= 0) {
-      next = {
-        status: 'past_due',
-        patch: { status: 'past_due', pastDueSince: FieldValue.serverTimestamp() },
-        label: 'trialing→past_due'
+      action = { kind: 'drop', fromTier: tier, toTier: 'free', label: `trialing→free (trial expired)` };
+    }
+    // 2. Paid period ended → enter grace on the current tier. Target is the
+    //    scheduled downgrade tier if the owner chose one, else Free
+    //    (non-payment always lands on Free). A renewal pushes currentPeriodEnd
+    //    into the future, so only lapsed/scheduled tenants reach here.
+    else if (status === 'active' && periodEnd && _daysBetween(now, periodEnd) >= 0) {
+      const toTier = (scheduledTier === 'growth' || scheduledTier === 'free') ? scheduledTier : 'free';
+      const graceDays = _graceDaysForTier(tier);
+      action = {
+        kind: 'enterGrace',
+        fromTier: tier,
+        toTier,
+        graceDays,
+        graceEnds: new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000),
+        label: `active→grace (${tier}, ${graceDays}d → ${toTier})`
       };
     }
-    // 2. active → cancelled (scheduled cancellation reached period end)
-    else if (status === 'active' && cancelAtPeriodEnd && periodEnd && _daysBetween(now, periodEnd) >= 0) {
-      next = {
-        status: 'cancelled',
-        patch: {
-          status: 'cancelled',
-          cancelledAt: FieldValue.serverTimestamp(),
-          cancellationReason: sub.cancellationReason || 'tenant_requested_at_period_end',
-          tier: 'free' // drop tier on cancellation
-        },
-        label: 'active→cancelled (scheduled)',
-        dropTier: true
-      };
-    }
-    // 3. active → past_due (period end passed without payment AND no cancel)
-    else if (status === 'active' && !cancelAtPeriodEnd && periodEnd && _daysBetween(now, periodEnd) >= 0) {
-      next = {
-        status: 'past_due',
-        patch: { status: 'past_due', pastDueSince: FieldValue.serverTimestamp() },
-        label: 'active→past_due'
-      };
-    }
-    // 4. past_due → grace (after LIFECYCLE_PAST_DUE_DAYS)
-    else if (status === 'past_due' && _daysBetween(now, pastDueSince) >= LIFECYCLE_PAST_DUE_DAYS) {
-      next = {
-        status: 'grace',
-        patch: { status: 'grace', graceSince: FieldValue.serverTimestamp() },
-        label: 'past_due→grace'
-      };
-    }
-    // 5. grace → suspended (after LIFECYCLE_GRACE_DAYS)
-    else if (status === 'grace' && _daysBetween(now, graceSince) >= LIFECYCLE_GRACE_DAYS) {
-      next = {
-        status: 'suspended',
-        patch: { status: 'suspended', suspendedAt: FieldValue.serverTimestamp() },
-        label: 'grace→suspended'
-      };
-    }
-    // 6. suspended → cancelled (after LIFECYCLE_SUSPENDED_DAYS)
-    else if (status === 'suspended' && _daysBetween(now, suspendedAt) >= LIFECYCLE_SUSPENDED_DAYS) {
-      next = {
-        status: 'cancelled',
-        patch: {
-          status: 'cancelled',
-          cancelledAt: FieldValue.serverTimestamp(),
-          cancellationReason: 'lifecycle_auto_suspended_too_long',
-          tier: 'free'
-        },
-        label: 'suspended→cancelled',
-        dropTier: true
-      };
+    // 3. Grace window elapsed → drop to the target tier + archive catalog.
+    else if (status === 'grace' && graceEndsAt && _daysBetween(now, graceEndsAt) >= 0) {
+      const toTier = String(sub.graceToTier || 'free').toLowerCase();
+      action = { kind: 'drop', fromTier: String(sub.graceFromTier || tier).toLowerCase(), toTier, label: `grace→${toTier} (drop)` };
     }
 
-    if (!next) { unchanged++; continue; }
+    if (!action) { unchanged++; continue; }
 
     try {
-      // Apply patch to subscription doc.
-      await subRef.update(next.patch);
-      // On cancellation, drop the tier mirrors so storefront branding +
-      // product cap revert. Root doc + settings/store both flip.
-      if (next.dropTier) {
-        await tenantDoc.ref.update({ tier: 'free' });
-        await tenantDoc.ref.collection('settings').doc('store').set({ tier: 'free' }, { merge: true });
+      if (action.kind === 'enterGrace') {
+        await subRef.update({
+          status: 'grace',
+          graceSince: FieldValue.serverTimestamp(),
+          graceEndsAt: action.graceEnds,
+          graceFromTier: action.fromTier,
+          graceToTier: action.toTier
+        });
+      } else { // drop
+        const toTier = action.toTier;
+        // Archive the catalog down to the target tier's cap (honoring the
+        // owner's retain picks, else random). Free/Growth have caps; pro
+        // would keep everything. Best-effort: a failure here still drops
+        // the tier so the store isn't stuck paying for a tier it lost.
+        const retainIds = Array.isArray(sub.pendingRetainIds) ? sub.pendingRetainIds : [];
+        try {
+          action.archiveInfo = await archiveProductsForTier(tid, toTier, retainIds);
+        } catch (aerr) {
+          console.warn('[runSubscriptionLifecycle] archive failed for', tid, ':', aerr.message);
+        }
+        const patch = {
+          tier: toTier,
+          status: 'active',
+          amount: (SUBSCRIPTION_TIERS[toTier] || SUBSCRIPTION_TIERS.free).amount,
+          scheduledTier: null,
+          cancelAtPeriodEnd: false,
+          cancellationRequestedAt: null,
+          graceSince: null, graceEndsAt: null, graceFromTier: null, graceToTier: null,
+          pendingRetainIds: null,
+          trialEndsAt: null,
+          droppedAt: FieldValue.serverTimestamp(),
+          droppedFromTier: action.fromTier
+        };
+        if (toTier === 'free') {
+          patch.amount = 0;
+          patch.currentPeriodStart = FieldValue.serverTimestamp();
+          patch.currentPeriodEnd = null; // Free never renews
+        } else {
+          // Voluntary downgrade to a paid tier (e.g. Pro→Growth): start a
+          // fresh 30-day period at the new tier's rate; the next manual
+          // renewal is billed at that rate.
+          patch.currentPeriodStart = FieldValue.serverTimestamp();
+          patch.currentPeriodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        }
+        await subRef.update(patch);
+        // Mirror the tier so storefront branding + admin cap revert.
+        await tenantDoc.ref.update({ tier: toTier });
+        await tenantDoc.ref.collection('settings').doc('store').set({ tier: toTier }, { merge: true });
       }
       transitions.push({
         tid,
         name: tenantData.name || tid,
-        label: next.label,
+        label: action.label + (action.archiveInfo ? ` [kept ${action.archiveInfo.kept}/${action.archiveInfo.cap}, archived ${action.archiveInfo.archived}]` : ''),
         tier
       });
     } catch (err) {
