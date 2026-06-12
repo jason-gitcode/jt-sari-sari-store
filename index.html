@@ -2098,7 +2098,7 @@ function addFromModal() {
     }
   }
   cart[key] = (cart[key] || 0) + 1;
-  saveCart(); renderCart(); renderProducts();
+  saveCart(); renderCart(); syncCartButtons();
   closeProductModal();
   showToast("Added to cart");
 }
@@ -2270,6 +2270,35 @@ function attachListScrollSpy() {
 }
 
 // ---------- PRODUCTS ----------
+// Out-of-stock + display-stock helpers (shared by render + the surgical
+// cart-button sync below).
+function isProductOos(p) {
+  if (p.available === false) return true;
+  if (p.variants && p.variants.length > 0) return p.variants.every(v => (v.stock ?? 0) === 0);
+  return p.stock === 0;
+}
+function productDisplayStock(p) {
+  if (p.variants && p.variants.length > 0) return p.variants.reduce((s, v) => s + (v.stock ?? 0), 0);
+  return p.stock;
+}
+// Update just the add-to-cart buttons (label / count / disabled) from the
+// current cart WITHOUT rebuilding the product grid. A full rebuild
+// re-creates every product <img>, which now loads from a Storage URL and
+// visibly flickers on each click — this keeps the DOM (and images) stable.
+function syncCartButtons() {
+  document.querySelectorAll('#products button[data-pid]').forEach(btn => {
+    const p = PRODUCTS.find(x => String(x.id) === btn.getAttribute('data-pid'));
+    if (!p) return;
+    const ok = p.available !== false && !isProductOos(p);
+    const cartQty = productCartQty(p.id);
+    const ds = productDisplayStock(p);
+    const atMax = ok && ds !== null && ds !== undefined && ds > 0 && cartQty >= ds;
+    btn.disabled = !ok || atMax;
+    btn.classList.toggle('in-cart', ok && cartQty > 0);
+    btn.textContent = (ok && cartQty > 0) ? String(cartQty) : '+';
+  });
+}
+
 function renderProducts() {
   const grid = document.getElementById('products');
   const layout = document.documentElement.getAttribute('data-layout');
@@ -2336,7 +2365,7 @@ function renderProducts() {
         <div class="card-desc">${p.description || ''}</div>
         <div class="card-bottom">
           <div class="price${isRange ? ' is-range' : ''}">${priceStr}</div>
-          <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;box-shadow:none;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
+          <button class="add-btn${ok && cartQty > 0 ? ' in-cart' : ''}" data-pid="${p.id}" onclick="${!btnDisabled ? `addToCart(${p.id}); event.stopPropagation()` : 'event.stopPropagation()'}" ${btnDisabled ? 'disabled' : ''} title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}" style="${!ok ? 'background:var(--line);cursor:not-allowed;box-shadow:none;' : ''}">${ok && cartQty > 0 ? cartQty : '+'}</button>
         </div>
       </div>
     </div>
@@ -2386,7 +2415,7 @@ function renderListLayout(list, isSearching, isOos) {
         </div>
         <div class="list-item-thumb">
           ${imgHtml}
-          <button class="${addBtnClass}" ${btnDisabled ? 'disabled' : ''} onclick="${addOnClick}" title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}">${addBtnLabel}</button>
+          <button class="${addBtnClass}" data-pid="${p.id}" ${btnDisabled ? 'disabled' : ''} onclick="${addOnClick}" title="${!ok ? 'Out of stock' : atMax ? 'Maximum stock reached' : 'Add to cart'}">${addBtnLabel}</button>
         </div>
       </div>
     `;
@@ -2457,7 +2486,7 @@ function addWithVariant(id, variantIdx) {
   const key = `${id}_v${variantIdx}`;
   if (vStock !== null && (cart[key] || 0) >= vStock) { showToast(`Only ${vStock} in stock`); return; }
   cart[key] = (cart[key] || 0) + 1;
-  saveCart(); renderCart(); renderProducts();
+  saveCart(); renderCart(); syncCartButtons();
   closeSizePicker();
   showToast('Added to cart');
 }
@@ -2469,7 +2498,7 @@ function addToCart(id) {
     if (productCartQty(id) >= p.stock) { showToast(`Only ${p.stock} in stock`); return; }
   }
   cart[String(id)] = (cart[String(id)] || 0) + 1;
-  saveCart(); renderCart(); renderProducts();
+  saveCart(); renderCart(); syncCartButtons();
   showToast("Added to cart");
 }
 function changeQty(key, delta) {
@@ -2486,17 +2515,17 @@ function changeQty(key, delta) {
   }
   cart[key] = (cart[key] || 0) + delta;
   if (cart[key] <= 0) delete cart[key];
-  saveCart(); renderCart(); renderProducts();
+  saveCart(); renderCart(); syncCartButtons();
 }
 function removeFromCart(key) {
   delete cart[key];
-  saveCart(); renderCart(); renderProducts();
+  saveCart(); renderCart(); syncCartButtons();
 }
 function removeAll() {
   cart = {};
   saveCart();
   renderCart();
-  renderProducts();
+  syncCartButtons();
   showToast('Removed all items');
 }
 function cartTotal() {
