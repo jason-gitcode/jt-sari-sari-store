@@ -7614,10 +7614,23 @@ function showAdmin() {
 function subscribeToProducts() {
   if (unsubscribeProducts) unsubscribeProducts();
   unsubscribeProducts = tcol('products').onSnapshot(snapshot => {
+    const changes = snapshot.docChanges();
+    // A metadata-only fire (e.g. the server ack of our own just-written
+    // doc) carries no doc changes — nothing visual changed, so skip the
+    // whole re-render. This alone removes one full rebuild per save.
+    if (changes.length === 0) return;
     products = snapshot.docs.map(doc => doc.data());
     products.sort((a, b) => a.id - b.id);
     renderAdminCategories();
-    renderProducts();
+    // Surgical fast-path: a pure-modify snapshot (Save Product, stock +/-,
+    // availability/hide toggle) with no active list filter patches only the
+    // changed rows. Rebuilding all ~851 rows on every change froze the admin
+    // for several seconds on large catalogs (storefront syncCartButtons
+    // lesson, applied to admin). Falls back to a full render otherwise.
+    const onlyModified = changes.every(c => c.type === 'modified');
+    if (!(onlyModified && patchProductRows(changes.map(c => c.doc.data())))) {
+      renderProducts();
+    }
     // Keep the Settings → Appearance category-order editor live as new
     // product categories appear (or last products of a category are deleted).
     if (typeof renderCategoryOrderEditor === 'function') renderCategoryOrderEditor();
@@ -10267,6 +10280,111 @@ async function toggleHidden(id, hidden) {
   }
 }
 
+// Single product-list row markup. Extracted from renderProducts so the
+// products onSnapshot can surgically patch just the changed row(s)
+// instead of rebuilding all ~851 rows on every save/stock-toggle — a full
+// innerHTML rebuild froze the admin for several seconds on large catalogs
+// (same lesson as the storefront's syncCartButtons flicker fix). The
+// data-pid attribute lets patchProductRows() find the row to replace.
+function productRowHtml(p, lowThresh) {
+  const available   = p.available !== false;
+  const isHidden    = p.hidden === true;
+  const hasVariants = p.variants && p.variants.length > 0;
+  // Phase 3: when a specific branch is selected, branch-scoped
+  // products read stock from the branch inventory map. Shared
+  // products + variants fall through to the existing logic.
+  const branchScoped = !hasVariants
+    && SELECTED_BRANCH_FILTER
+    && Array.isArray(p.branchIds)
+    && p.branchIds.includes(SELECTED_BRANCH_FILTER);
+  let stockNum;
+  if (hasVariants) {
+    stockNum = p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+  } else if (branchScoped) {
+    const inv = ADMIN_BRANCH_INVENTORY[String(p.id)];
+    stockNum = (inv && inv.stock != null) ? inv.stock : null;
+  } else {
+    stockNum = (p.stock !== null && p.stock !== undefined ? p.stock : null);
+  }
+  const isLowStock  = stockNum !== null && stockNum > 0 && stockNum <= lowThresh;
+  const isOutOf     = stockNum !== null && stockNum === 0;
+  const stockClass  = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
+  const stockCell   = hasVariants
+    ? `<div class="stock-adj">
+         <span class="stock-btn stock-spacer"></span>
+         <span class="pt-stock-val">${stockNum}</span>
+         <span class="stock-btn stock-spacer"></span>
+       </div>`
+    : stockNum !== null
+      ? `<div class="stock-adj">
+           <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
+           <span class="pt-stock-val">${stockNum}</span>
+           <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
+         </div>`
+      : `<div class="stock-adj">
+           <span class="stock-btn stock-spacer"></span>
+           <span class="pt-stock-val">—</span>
+           <span class="stock-btn stock-spacer"></span>
+         </div>`;
+  const thumb = p.images && p.images.length > 0
+    ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
+    : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
+  return `
+        <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}" data-pid="${p.id}">
+          <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
+          <div class="pt-cell">${thumb}</div>
+          <div class="pt-cell pt-name-col">
+            <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>
+            <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
+          </div>
+          <div class="pt-cell pt-stock">${stockCell}</div>
+          <div class="pt-cell pt-price-col">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? '₱' + mn.toFixed(2) : '₱' + mn.toFixed(2) + ' – ₱' + mx.toFixed(2); } return '₱' + parseFloat(p.price).toFixed(2); })()}</div>
+          <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
+          <div class="pt-cell pt-avail-col">
+            <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
+              <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
+              <span class="toggle-sl"></span>
+            </label>
+          </div>
+          <div class="pt-cell pt-hide-col">
+            <label class="toggle-sw is-hide" title="${isHidden ? 'Show this product on the storefront' : 'Hide this product from the storefront'}">
+              <input type="checkbox" ${isHidden ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleHidden(${p.id}, this.checked)" />
+              <span class="toggle-sl"></span>
+            </label>
+          </div>
+        </div>
+      `;
+}
+
+// Fast-path for the products onSnapshot: when a snapshot is purely
+// modifications (Save Product, stock +/-, availability/hide toggle) and
+// no list filter is active — so every product has a visible row — patch
+// just the changed rows in place. Returns true if it fully handled the
+// changes, false to fall back to a full renderProducts().
+function patchProductRows(changedProducts) {
+  // Any active filter (category / search / branch) can make a changed
+  // product need to appear or disappear from the list — too subtle to
+  // patch safely, so bail to a full render in those cases.
+  if (adminActiveCategory !== 'All' || searchTerm || SELECTED_BRANCH_FILTER) return false;
+  const list = document.getElementById('products-list');
+  if (!list) return false;
+  // Confirm every changed product already has a row before touching the
+  // DOM — if one is missing, fall back so nothing is silently dropped.
+  for (const p of changedProducts) {
+    if (!list.querySelector(`.pt-row.pt-data[data-pid="${p.id}"]`)) return false;
+  }
+  const lowThresh = parseInt(adminSettings.lowStockThreshold) || 5;
+  for (const p of changedProducts) {
+    const row = list.querySelector(`.pt-row.pt-data[data-pid="${p.id}"]`);
+    const tmp = document.createElement('template');
+    tmp.innerHTML = productRowHtml(p, lowThresh).trim();
+    const fresh = tmp.content.firstElementChild;
+    if (fresh) row.replaceWith(fresh);
+  }
+  updateDeleteBtn();
+  return true;
+}
+
 function renderProducts() {
   let filtered = products;
   // Phase 3: Branch filter — when a specific branch is selected in the
@@ -10315,75 +10433,7 @@ function renderProducts() {
       <div class="pt-cell">Available</div>
       <div class="pt-cell">Hide</div>
     </div>
-    ${filtered.map(p => {
-      const available   = p.available !== false;
-      const isHidden    = p.hidden === true;
-      const hasVariants = p.variants && p.variants.length > 0;
-      // Phase 3: when a specific branch is selected, branch-scoped
-      // products read stock from the branch inventory map. Shared
-      // products + variants fall through to the existing logic.
-      const branchScoped = !hasVariants
-        && SELECTED_BRANCH_FILTER
-        && Array.isArray(p.branchIds)
-        && p.branchIds.includes(SELECTED_BRANCH_FILTER);
-      let stockNum;
-      if (hasVariants) {
-        stockNum = p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
-      } else if (branchScoped) {
-        const inv = ADMIN_BRANCH_INVENTORY[String(p.id)];
-        stockNum = (inv && inv.stock != null) ? inv.stock : null;
-      } else {
-        stockNum = (p.stock !== null && p.stock !== undefined ? p.stock : null);
-      }
-      const isLowStock  = stockNum !== null && stockNum > 0 && stockNum <= lowThresh;
-      const isOutOf     = stockNum !== null && stockNum === 0;
-      const stockClass  = isOutOf ? 'out-of-stock' : (isLowStock ? 'low-stock' : '');
-      const stockCell   = hasVariants
-        ? `<div class="stock-adj">
-             <span class="stock-btn stock-spacer"></span>
-             <span class="pt-stock-val">${stockNum}</span>
-             <span class="stock-btn stock-spacer"></span>
-           </div>`
-        : stockNum !== null
-          ? `<div class="stock-adj">
-               <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
-               <span class="pt-stock-val">${stockNum}</span>
-               <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
-             </div>`
-          : `<div class="stock-adj">
-               <span class="stock-btn stock-spacer"></span>
-               <span class="pt-stock-val">—</span>
-               <span class="stock-btn stock-spacer"></span>
-             </div>`;
-      const thumb = p.images && p.images.length > 0
-        ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
-        : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
-      return `
-        <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}">
-          <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
-          <div class="pt-cell">${thumb}</div>
-          <div class="pt-cell pt-name-col">
-            <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>
-            <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
-          </div>
-          <div class="pt-cell pt-stock">${stockCell}</div>
-          <div class="pt-cell pt-price-col">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? '₱' + mn.toFixed(2) : '₱' + mn.toFixed(2) + ' – ₱' + mx.toFixed(2); } return '₱' + parseFloat(p.price).toFixed(2); })()}</div>
-          <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
-          <div class="pt-cell pt-avail-col">
-            <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
-              <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
-              <span class="toggle-sl"></span>
-            </label>
-          </div>
-          <div class="pt-cell pt-hide-col">
-            <label class="toggle-sw is-hide" title="${isHidden ? 'Show this product on the storefront' : 'Hide this product from the storefront'}">
-              <input type="checkbox" ${isHidden ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleHidden(${p.id}, this.checked)" />
-              <span class="toggle-sl"></span>
-            </label>
-          </div>
-        </div>
-      `;
-    }).join('')}
+    ${filtered.map(p => productRowHtml(p, lowThresh)).join('')}
   `;
   updateDeleteBtn();
 }
