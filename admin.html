@@ -4075,7 +4075,7 @@
     </div>
     <div class="supp-modal-body" style="padding: 20px 24px;">
       <div style="display: flex; align-items: flex-start; gap: 14px;">
-        <div style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 20px;">⚠️</div>
+        <div id="destructive-confirm-icon" style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; color: var(--danger); display: flex; align-items: center; justify-content: center; font-size: 20px;">⚠️</div>
         <div style="font-size: 14px; color: var(--ink); line-height: 1.55;" id="destructive-confirm-message">Are you sure?</div>
       </div>
     </div>
@@ -4593,11 +4593,13 @@ let ptrStartY = null;
 let ptrActive = false;
 let ptrLastDelta = 0;
 
-// Themed replacement for native confirm() on destructive actions.
-// Caller passes { title, message, confirmLabel, onConfirm }.
-// onConfirm fires when the red primary button is clicked.
+// Themed replacement for native confirm(). Caller passes
+// { title, message, confirmLabel, onConfirm, tone, icon }.
+// tone: 'destructive' (default, red ⚠️ + red button) or 'positive'
+// (green ✓ + green button) for reassuring/non-destructive confirms.
+// onConfirm fires when the primary button is clicked.
 let _destructivePending = null;
-function confirmDestructive({ title, message, confirmLabel, onConfirm }) {
+function confirmDestructive({ title, message, confirmLabel, onConfirm, tone, icon }) {
   _destructivePending = onConfirm || null;
   document.getElementById('destructive-confirm-title').textContent = title || 'Confirm';
   // message is rendered as HTML so callers can use <strong>/<code>/<em> for
@@ -4605,6 +4607,16 @@ function confirmDestructive({ title, message, confirmLabel, onConfirm }) {
   // before interpolating it into the message string.
   document.getElementById('destructive-confirm-message').innerHTML = message || 'Are you sure?';
   const btn = document.getElementById('destructive-confirm-go-btn');
+  const iconEl = document.getElementById('destructive-confirm-icon');
+  const positive = tone === 'positive';
+  // Always set both branches so styles don't leak between calls.
+  if (positive) {
+    if (iconEl) { iconEl.style.background = 'rgba(22,163,74,0.12)'; iconEl.style.color = '#16a34a'; iconEl.textContent = icon || '✓'; }
+    btn.style.background = '#16a34a'; btn.style.borderColor = '#16a34a'; btn.style.color = '#fff';
+  } else {
+    if (iconEl) { iconEl.style.background = '#fee2e2'; iconEl.style.color = 'var(--danger)'; iconEl.textContent = icon || '⚠️'; }
+    btn.style.background = 'var(--danger)'; btn.style.borderColor = 'var(--danger)'; btn.style.color = '#fff';
+  }
   btn.textContent = confirmLabel || 'Delete';
   btn.disabled = false;
   document.getElementById('destructive-confirm-modal').classList.add('show');
@@ -5758,17 +5770,25 @@ async function confirmCancelSubscription() {
     btn.disabled = false; btn.textContent = 'Try again';
   }
 }
-async function reactivateSubscription() {
-  const ok = confirm('Undo the scheduled downgrade and keep your current plan? You\'ll be billed normally at the next period.');
-  if (!ok) return;
-  try {
-    const fn = firebase.app().functions('asia-southeast1').httpsCallable('reactivateSubscription');
-    await fn({ tid: TENANT_ID });
-    showToast('Downgrade cancelled — you\'re staying on your current plan.', 'success');
-  } catch (err) {
-    console.error('reactivateSubscription failed:', err);
-    showToast((err && err.message) ? err.message : 'Could not undo. Try again.', 'error');
-  }
+function reactivateSubscription() {
+  const planName = (TIER_INFO[(subscriptionData && subscriptionData.tier) || 'free'] || TIER_INFO.free).name;
+  confirmDestructive({
+    tone: 'positive',
+    icon: '🔄',
+    title: 'Keep your current plan?',
+    message: `This cancels the scheduled downgrade and keeps you on <strong>${escSupportText(planName)}</strong>. Nothing changes today — you'll simply continue to be billed as usual at your next renewal.`,
+    confirmLabel: 'Keep my plan',
+    onConfirm: async () => {
+      try {
+        const fn = firebase.app().functions('asia-southeast1').httpsCallable('reactivateSubscription');
+        await fn({ tid: TENANT_ID });
+        showToast('Downgrade cancelled — you\'re staying on your current plan.', 'success');
+      } catch (err) {
+        console.error('reactivateSubscription failed:', err);
+        showToast((err && err.message) ? err.message : 'Could not undo the downgrade. Please try again.', 'error');
+      }
+    }
+  });
 }
 
 function showPayNowModal() {
