@@ -2382,6 +2382,57 @@ exports.reactivateSubscription = onCall(async (request) => {
 });
 
 // ============================================================
+// setRetainProducts — owner picks which products stay visible after a
+// pending downgrade (during the scheduled-active or grace window). Writes
+// subscription.pendingRetainIds, which the lifecycle drop honors. Capped at
+// the target tier's product cap. Subscription is server-write-only (rules),
+// so this must go through a callable.
+// ============================================================
+exports.setRetainProducts = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const email = token.email;
+  const isSuperadmin = SUPERADMIN_EMAILS.has(email);
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+  // De-dupe + stringify the incoming ids.
+  const productIds = Array.from(new Set((Array.isArray(data.productIds) ? data.productIds : []).map(String)));
+
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Tenant not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
+  if (!isSuperadmin && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can choose its retained products.');
+  }
+
+  const subRef = tref.collection('subscription').doc('current');
+  const subSnap = await subRef.get();
+  if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription found.');
+  const sub = subSnap.data() || {};
+  const status = (sub.status || 'active').toLowerCase();
+  // Only meaningful while a downgrade is pending — grace, or active with a
+  // scheduledTier set.
+  const targetTier = status === 'grace'
+    ? String(sub.graceToTier || 'free').toLowerCase()
+    : String(sub.scheduledTier || '').toLowerCase();
+  if (!targetTier) {
+    throw new HttpsError('failed-precondition', 'No pending downgrade — nothing to pre-select.');
+  }
+  const cap = (SUBSCRIPTION_TIERS[targetTier] || SUBSCRIPTION_TIERS.free).productCap;
+  if (productIds.length > cap) {
+    throw new HttpsError('invalid-argument', `You can keep at most ${cap} products on the ${targetTier} plan.`);
+  }
+
+  await subRef.update({ pendingRetainIds: productIds });
+  return { ok: true, count: productIds.length, cap, targetTier };
+});
+
+// ============================================================
 // storefrontMeta — per-tenant link-preview (OpenGraph) SSR.
 // ------------------------------------------------------------
 // Wired to the storefront `**` Hosting rewrite. Link-unfurl crawlers

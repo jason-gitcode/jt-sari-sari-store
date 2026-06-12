@@ -1068,6 +1068,22 @@
     .product-cap-pill.approaching { color: #92400e; border-color: rgba(245,158,11,0.30); background: rgba(245,158,11,0.10); }
     .product-cap-pill.at-cap { color: #b91c1c; border-color: rgba(220,38,38,0.30); background: rgba(220,38,38,0.10); }
     .product-cap-pill.unlimited { color: var(--muted); }
+    /* Tier-archived products: dimmed row + badge in the admin list. */
+    .pt-row.pt-data.is-archived { opacity: 0.55; }
+    .pt-archived-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+      text-transform: uppercase; color: #92400e; background: rgba(245,158,11,0.15);
+      border: 1px solid rgba(245,158,11,0.35); border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+      vertical-align: middle;
+    }
+    /* Visibility modal list rows. */
+    .vis-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line); }
+    .vis-row:last-child { border-bottom:0; }
+    .vis-row input[type="checkbox"] { width:18px; height:18px; flex-shrink:0; accent-color: var(--accent); }
+    .vis-row.disabled { opacity:0.5; }
+    .vis-row .vis-thumb { width:34px; height:34px; border-radius:6px; object-fit:cover; flex-shrink:0; display:grid; place-items:center; background:var(--surface-2); font-size:18px; }
+    .vis-row .vis-name { flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .vis-row .vis-meta { font-size:11px; color:var(--muted); }
 
     /* Cap upgrade nudge — full title + sub on desktop, single short line on phones. */
     .cap-banner {
@@ -3105,6 +3121,22 @@
           <button type="button" id="product-cap-banner-dismiss" onclick="dismissProductCapBanner()" aria-label="Dismiss" class="cap-banner-dismiss">×</button>
         </div>
       </div>
+      <!-- Storefront-visibility banner. Shown while a downgrade is pending
+           (pick which products to keep) or after a drop left products
+           archived (swap which are visible). renderVisibilityBanner() fills
+           it; both states open the same visibility modal. -->
+      <div id="visibility-banner" class="cap-banner" style="display:none; border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.08);">
+        <div class="cap-banner-row">
+          <div class="cap-banner-text">
+            <div class="cap-banner-full">
+              <strong id="visibility-banner-title"></strong>
+              <div id="visibility-banner-msg" style="color: var(--muted); margin-top: 2px;"></div>
+            </div>
+            <div class="cap-banner-compact" id="visibility-banner-compact"></div>
+          </div>
+          <button type="button" class="cap-banner-upgrade" id="visibility-banner-btn" onclick="openVisibilityModal()">Manage visibility</button>
+        </div>
+      </div>
       <div class="products-toolbar">
         <div class="admin-search">
           <span class="admin-search-icon" aria-hidden="true">🔍</span>
@@ -4239,6 +4271,34 @@
     <div class="supp-modal-footer">
       <button type="button" class="btn-secondary" onclick="closeCancelSubModal()">Keep my subscription</button>
       <button type="button" class="btn-danger" id="cancel-sub-confirm-btn" onclick="confirmCancelSubscription()">Yes, cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- STOREFRONT VISIBILITY MODAL — pick which products stay visible.
+     Dual-mode: 'pending' (pre-downgrade → writes pendingRetainIds via
+     setRetainProducts) or 'swap' (post-drop → writes product.archived
+     directly). visibilityState holds the working selection. -->
+<div class="supp-modal-overlay" id="visibility-modal" onclick="closeVisibilityBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()" style="max-width: 560px; display:flex; flex-direction:column; max-height: 86vh;">
+    <div class="supp-modal-header">
+      <h2 id="visibility-title">Choose visible products</h2>
+      <button type="button" class="close-btn" onclick="closeVisibilityModal()">×</button>
+    </div>
+    <div style="padding: 14px 24px 0;">
+      <div id="visibility-sub" style="font-size:13px; color:var(--ink); line-height:1.5; margin-bottom:10px;"></div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <span id="visibility-counter" style="font-size:13px; font-weight:700;"></span>
+        <button type="button" id="visibility-clear-btn" onclick="visibilityClearAll()" style="background:none; border:0; padding:2px 4px; font:inherit; font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">Clear all</button>
+      </div>
+      <input type="text" id="visibility-search" placeholder="Search products by name or category" oninput="renderVisibilityList(this.value)" autocomplete="off"
+        style="width:100%; padding:9px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; color:var(--ink); font-size:13px; font-family:inherit; outline:none; box-sizing:border-box; margin-bottom:6px;" />
+    </div>
+    <div id="visibility-list" style="overflow-y:auto; flex:1; padding: 4px 24px 10px; min-height: 120px;"></div>
+    <div id="visibility-status" style="font-size:12px; color:var(--error); min-height:16px; padding: 0 24px;"></div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-secondary" onclick="closeVisibilityModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="visibility-save-btn" onclick="saveVisibility()">Save</button>
     </div>
   </div>
 </div>
@@ -7711,7 +7771,12 @@ function renderProductCapStatus() {
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const info = TIER_INFO[tier] || TIER_INFO.free;
   const cap = info.productCap;
-  const count = (products || []).length;
+  // Count only NON-archived products against the cap — archived ones are
+  // hidden from the storefront and don't consume a slot, so "Add Product"
+  // gates on the visible count.
+  const count = (products || []).filter(p => p.archived !== true).length;
+  // Refresh the storefront-visibility banner (pending downgrade / post-drop).
+  if (typeof renderVisibilityBanner === 'function') renderVisibilityBanner();
   // Session-scoped dismissal — banner reappears after a fresh tab open
   // or a full page reload so tenants near the cap don't lose the nudge.
   const dismissed = sessionStorage.getItem('productCapBannerDismissed') === '1';
@@ -7769,6 +7834,206 @@ function dismissProductCapBanner() {
   sessionStorage.setItem('productCapBannerDismissed', '1');
   const banner = document.getElementById('product-cap-upgrade-banner');
   if (banner) banner.style.display = 'none';
+}
+
+// ============================================================
+// Storefront-visibility management (downgrade Phase 3).
+//
+// Two modes, one modal:
+//  • 'pending' — a downgrade is scheduled or in grace. The owner pre-picks
+//    which products survive the drop; saved to subscription.pendingRetainIds
+//    via the setRetainProducts callable. Nothing hides yet.
+//  • 'swap'    — post-drop. Some products are archived. The owner swaps which
+//    are visible; saved by writing product.archived directly (owner-writable).
+// Cap is enforced client-side (consistent with the rest of cap handling).
+// ============================================================
+function _visibilityContext() {
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const status = (subscriptionData && subscriptionData.status) || 'active';
+  const all = (products || []);
+  const archivedCount = all.filter(p => p.archived === true).length;
+  // Pending downgrade: grace, or active with a scheduledTier.
+  const pendingTarget = status === 'grace'
+    ? (subscriptionData && subscriptionData.graceToTier)
+    : (status === 'active' ? (subscriptionData && subscriptionData.scheduledTier) : null);
+  if (pendingTarget && TIER_INFO[pendingTarget]) {
+    const cap = TIER_INFO[pendingTarget].productCap;
+    // Only worth picking when the catalog exceeds the target cap.
+    if (all.length > cap) {
+      return { mode: 'pending', targetTier: pendingTarget, cap, total: all.length, archivedCount };
+    }
+  }
+  // Post-drop swap: something is archived under the current tier's cap.
+  if (archivedCount > 0 && TIER_INFO[tier]) {
+    return { mode: 'swap', targetTier: tier, cap: TIER_INFO[tier].productCap, total: all.length, archivedCount };
+  }
+  return null;
+}
+
+function renderVisibilityBanner() {
+  const banner = document.getElementById('visibility-banner');
+  if (!banner) return;
+  const ctx = _visibilityContext();
+  if (!ctx) { banner.style.display = 'none'; return; }
+  const titleEl = document.getElementById('visibility-banner-title');
+  const msgEl = document.getElementById('visibility-banner-msg');
+  const compactEl = document.getElementById('visibility-banner-compact');
+  const btn = document.getElementById('visibility-banner-btn');
+  const targetName = (TIER_INFO[ctx.targetTier] || TIER_INFO.free).name;
+  const capStr = ctx.cap.toLocaleString();
+  if (ctx.mode === 'pending') {
+    const chosen = Array.isArray(subscriptionData.pendingRetainIds) ? subscriptionData.pendingRetainIds.length : 0;
+    if (titleEl) titleEl.textContent = `Moving to ${targetName} — choose which ${capStr} products stay visible`;
+    if (msgEl) msgEl.textContent = chosen > 0
+      ? `${chosen} chosen so far. The rest are archived (kept in admin, not deleted) when you drop to ${targetName}. If you don't choose, your currently-visible products are kept.`
+      : `Pick up to ${capStr}. Extras are archived (kept in admin, not deleted) on the drop day. If you don't choose, your currently-visible products are kept automatically.`;
+    if (compactEl) compactEl.textContent = `Choose ${capStr} to keep visible.`;
+    if (btn) btn.textContent = 'Choose products';
+  } else {
+    const visible = ctx.total - ctx.archivedCount;
+    if (titleEl) titleEl.textContent = `${visible.toLocaleString()} / ${capStr} products visible · ${ctx.archivedCount.toLocaleString()} archived`;
+    if (msgEl) msgEl.textContent = `Archived products are hidden from your storefront but kept here. Swap which ones are visible any time. Upgrade to bring them all back.`;
+    if (compactEl) compactEl.textContent = `${ctx.archivedCount.toLocaleString()} archived — manage visibility.`;
+    if (btn) btn.textContent = 'Manage visibility';
+  }
+  banner.style.display = '';
+}
+
+let visibilityState = null;
+function openVisibilityModal() {
+  const ctx = _visibilityContext();
+  if (!ctx) { showToast('Nothing to manage — your catalog fits your plan.', 'info'); return; }
+  // Initial selection = currently-visible (non-archived) products, or the
+  // saved retain picks if the owner already chose some in 'pending' mode.
+  let selected;
+  if (ctx.mode === 'pending' && Array.isArray(subscriptionData.pendingRetainIds) && subscriptionData.pendingRetainIds.length) {
+    const valid = new Set((products || []).map(p => String(p.id)));
+    selected = new Set(subscriptionData.pendingRetainIds.map(String).filter(id => valid.has(id)));
+  } else {
+    selected = new Set((products || []).filter(p => p.archived !== true).map(p => String(p.id)));
+    // In pending mode the whole catalog is still visible (> cap), so trim the
+    // default down to the cap so the owner starts at a valid selection.
+    if (selected.size > ctx.cap) {
+      selected = new Set([...selected].slice(0, ctx.cap));
+    }
+  }
+  visibilityState = { mode: ctx.mode, cap: ctx.cap, targetTier: ctx.targetTier, selected };
+  const targetName = (TIER_INFO[ctx.targetTier] || TIER_INFO.free).name;
+  document.getElementById('visibility-title').textContent = ctx.mode === 'pending'
+    ? `Keep visible after moving to ${targetName}` : 'Manage storefront visibility';
+  document.getElementById('visibility-sub').innerHTML = ctx.mode === 'pending'
+    ? `Tick the products to keep on your storefront after the downgrade. Up to <strong>${ctx.cap.toLocaleString()}</strong>. Unticked products are archived (kept in admin, never deleted).`
+    : `Ticked products show on your storefront (max <strong>${ctx.cap.toLocaleString()}</strong>). Unticked are archived — kept here, never deleted.`;
+  document.getElementById('visibility-status').textContent = '';
+  document.getElementById('visibility-search').value = '';
+  const saveBtn = document.getElementById('visibility-save-btn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+  renderVisibilityList('');
+  updateVisibilityCounter();
+  document.getElementById('visibility-modal').classList.add('show');
+}
+function closeVisibilityModal() { document.getElementById('visibility-modal').classList.remove('show'); }
+function closeVisibilityBackdrop(e) { if (e && e.target !== e.currentTarget) return; closeVisibilityModal(); }
+
+function updateVisibilityCounter() {
+  if (!visibilityState) return;
+  const el = document.getElementById('visibility-counter');
+  const n = visibilityState.selected.size, cap = visibilityState.cap;
+  if (el) {
+    el.textContent = `${n} / ${cap.toLocaleString()} visible`;
+    el.style.color = n > cap ? 'var(--error)' : (n === cap ? '#92400e' : 'var(--ink)');
+  }
+}
+
+function renderVisibilityList(filter) {
+  if (!visibilityState) return;
+  const list = document.getElementById('visibility-list');
+  if (!list) return;
+  const q = (filter || '').trim().toLowerCase();
+  const atCap = visibilityState.selected.size >= visibilityState.cap;
+  const rows = (products || [])
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .filter(p => !q || `${p.name} ${p.category || ''}`.toLowerCase().includes(q))
+    .map(p => {
+      const id = String(p.id);
+      const checked = visibilityState.selected.has(id);
+      // Disable ticking new items once at cap; always allow un-ticking.
+      const disabled = !checked && atCap;
+      const thumb = (p.images && p.images.length)
+        ? `<img class="vis-thumb" src="${p.images[0]}" alt="" loading="lazy" decoding="async">`
+        : `<span class="vis-thumb">${p.emoji || '📦'}</span>`;
+      return `<label class="vis-row${disabled ? ' disabled' : ''}">
+        <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="toggleVisibilityPick('${id}', this.checked)">
+        ${thumb}
+        <span class="vis-name">${escText(p.name)}<div class="vis-meta">${escText(p.category || '')}${p.archived === true ? ' · currently archived' : ''}</div></span>
+      </label>`;
+    }).join('');
+  list.innerHTML = rows || `<div style="padding:14px 0; color:var(--muted); font-size:13px;">No products match.</div>`;
+}
+
+function toggleVisibilityPick(id, checked) {
+  if (!visibilityState) return;
+  if (checked) {
+    if (visibilityState.selected.size >= visibilityState.cap) {
+      // Shouldn't happen (disabled), but guard anyway.
+      renderVisibilityList(document.getElementById('visibility-search').value);
+      return;
+    }
+    visibilityState.selected.add(String(id));
+  } else {
+    visibilityState.selected.delete(String(id));
+  }
+  updateVisibilityCounter();
+  // Re-render so the at-cap disabled state on other rows updates.
+  const justHitCap = visibilityState.selected.size === visibilityState.cap;
+  const justLeftCap = visibilityState.selected.size === visibilityState.cap - 1;
+  if (justHitCap || justLeftCap) renderVisibilityList(document.getElementById('visibility-search').value);
+}
+
+function visibilityClearAll() {
+  if (!visibilityState) return;
+  visibilityState.selected.clear();
+  updateVisibilityCounter();
+  renderVisibilityList(document.getElementById('visibility-search').value);
+}
+
+async function saveVisibility() {
+  if (!visibilityState) return;
+  const btn = document.getElementById('visibility-save-btn');
+  const statusEl = document.getElementById('visibility-status');
+  statusEl.textContent = '';
+  if (visibilityState.selected.size > visibilityState.cap) {
+    statusEl.textContent = `Pick at most ${visibilityState.cap.toLocaleString()} products.`;
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const ids = [...visibilityState.selected];
+  try {
+    if (visibilityState.mode === 'pending') {
+      const fn = firebase.app().functions('asia-southeast1').httpsCallable('setRetainProducts');
+      await fn({ tid: TENANT_ID, productIds: ids });
+      closeVisibilityModal();
+      showToast(`Saved — ${ids.length} product${ids.length === 1 ? '' : 's'} will stay visible after the downgrade.`, 'success');
+    } else {
+      // Swap mode: write archived flags only for products whose state changes.
+      const keep = new Set(ids);
+      const writes = [];
+      (products || []).forEach(p => {
+        const shouldArchive = !keep.has(String(p.id));
+        if ((p.archived === true) !== shouldArchive) {
+          writes.push(tcol('products').doc(String(p.id)).set({ archived: shouldArchive }, { merge: true }));
+        }
+      });
+      await Promise.all(writes);
+      closeVisibilityModal();
+      showToast(`Storefront visibility updated (${writes.length} change${writes.length === 1 ? '' : 's'}).`, 'success');
+    }
+  } catch (err) {
+    console.error('saveVisibility failed:', err);
+    statusEl.textContent = (err && err.message) ? err.message : 'Could not save. Try again.';
+    btn.disabled = false; btn.textContent = 'Save';
+  }
 }
 
 // Suppliers cap — Free starts capped at 1 to nudge upgrades on a feature
@@ -10382,11 +10647,11 @@ function productRowHtml(p, lowThresh) {
     ? `<img src="${p.images[0]}" alt="${p.name}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:6px;object-fit:cover;">`
     : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
   return `
-        <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}" data-pid="${p.id}">
+        <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}${p.archived === true ? ' is-archived' : ''}" data-pid="${p.id}">
           <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
           <div class="pt-cell">${thumb}</div>
           <div class="pt-cell pt-name-col">
-            <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>
+            <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>${p.archived === true ? '<span class="pt-archived-badge" title="Hidden from your storefront by your plan limit. Kept in admin, not deleted.">Archived</span>' : ''}
             <div class="pt-pmeta">${p.category}${p.unit ? ' · ' + p.unit : ''}</div>
           </div>
           <div class="pt-cell pt-stock">${stockCell}</div>
