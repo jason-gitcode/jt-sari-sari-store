@@ -10714,6 +10714,7 @@ function editProduct(id) {
 
 async function saveProduct(e) {
   e.preventDefault();
+  const _tStart = performance.now(); // [TEMP DIAGNOSTIC v320]
 
   const selCat = document.getElementById('product-category').value;
   const customCat = document.getElementById('custom-category-input').value.trim();
@@ -10810,11 +10811,18 @@ async function saveProduct(e) {
   }
 
   try {
+    // [TEMP DIAGNOSTIC v320] measure each save phase to find the 6-7s stall.
+    const _t0 = performance.now();
     // Upload any newly-added base64 images to Storage and store URLs instead
     // — keeps the heavy image bytes out of the product doc (storefront speed).
     // Existing https: URLs pass through unchanged.
+    const _imgInfo = (formData.images || []).map(im => typeof im === 'string' ? (im.slice(0, 5)) : typeof im).join(',');
     formData.images = await uploadProductImages(TENANT_ID, String(formData.id), formData.images);
+    const _t1 = performance.now();
     await tcol('products').doc(String(formData.id)).set(formData);
+    const _t2 = performance.now();
+    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms images=[${_imgInfo}]`);
+    showToast(`pre ${Math.round(_t0 - _tStart)}ms · upload ${Math.round(_t1 - _t0)}ms · set ${Math.round(_t2 - _t1)}ms · img:${_imgInfo}`, 'success');
     // After the product doc is written, seed/update per-branch inventory
     // docs for any branch-specific products. Best-effort — if these
     // partial writes fail we still leave the product saved.
