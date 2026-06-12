@@ -7614,6 +7614,7 @@ function showAdmin() {
 function subscribeToProducts() {
   if (unsubscribeProducts) unsubscribeProducts();
   unsubscribeProducts = tcol('products').onSnapshot(snapshot => {
+    const _s0 = performance.now(); // [TEMP DIAGNOSTIC v323]
     const changes = snapshot.docChanges();
     // A metadata-only fire (e.g. the server ack of our own just-written
     // doc) carries no doc changes — nothing visual changed, so skip the
@@ -7621,22 +7622,33 @@ function subscribeToProducts() {
     if (changes.length === 0) return;
     products = snapshot.docs.map(doc => doc.data());
     products.sort((a, b) => a.id - b.id);
+    const _s1 = performance.now();
     renderAdminCategories();
+    const _s2 = performance.now();
     // Surgical fast-path: a pure-modify snapshot (Save Product, stock +/-,
     // availability/hide toggle) with no active list filter patches only the
     // changed rows. Rebuilding all ~851 rows on every change froze the admin
     // for several seconds on large catalogs (storefront syncCartButtons
     // lesson, applied to admin). Falls back to a full render otherwise.
     const onlyModified = changes.every(c => c.type === 'modified');
-    if (!(onlyModified && patchProductRows(changes.map(c => c.doc.data())))) {
+    const _patched = onlyModified && patchProductRows(changes.map(c => c.doc.data()));
+    if (!_patched) {
       renderProducts();
     }
+    const _s3 = performance.now();
     // Keep the Settings → Appearance category-order editor live as new
     // product categories appear (or last products of a category are deleted).
     if (typeof renderCategoryOrderEditor === 'function') renderCategoryOrderEditor();
+    const _s4 = performance.now();
     // Phase D: refresh product-cap pill + Add Product disabled state +
     // upgrade banner. Counts change with every snapshot.
     renderProductCapStatus();
+    const _s5 = performance.now();
+    if (_s5 - _s0 > 400) {
+      const msg = `SNAP map${Math.round(_s1 - _s0)} cats${Math.round(_s2 - _s1)} ${_patched ? 'patch' : 'FULL'}${Math.round(_s3 - _s2)} catord${Math.round(_s4 - _s3)} cap${Math.round(_s5 - _s4)} n=${changes.length}`;
+      console.log('[onSnapshot timing]', msg);
+      showToast(msg, 'success');
+    }
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
@@ -10845,10 +10857,11 @@ async function saveProduct(e) {
       }
     }
     const _t3 = performance.now();
-    // [TEMP DIAGNOSTIC v322] timing folded into the toast that reliably shows.
-    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms branch=${Math.round(_t3 - _t2)}ms images=[${_imgInfo}]`);
-    showToast(`pre${Math.round(_t0 - _tStart)} up${Math.round(_t1 - _t0)} set${Math.round(_t2 - _t1)} br${Math.round(_t3 - _t2)} · ${_imgInfo}`, 'success');
     closeProductModal();
+    const _t4 = performance.now();
+    // [TEMP DIAGNOSTIC v323] timing folded into the toast that reliably shows.
+    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms branch=${Math.round(_t3 - _t2)}ms close=${Math.round(_t4 - _t3)}ms images=[${_imgInfo}]`);
+    showToast(`pre${Math.round(_t0 - _tStart)} up${Math.round(_t1 - _t0)} set${Math.round(_t2 - _t1)} br${Math.round(_t3 - _t2)} close${Math.round(_t4 - _t3)} · ${_imgInfo}`, 'success');
   } catch (err) {
     console.error('Save error:', err);
     // Surface the underlying Firestore message so transient bugs
