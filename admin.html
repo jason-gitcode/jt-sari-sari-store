@@ -9466,6 +9466,18 @@ function copyOrder(orderId, btn) {
     ? storeSettingsData.storeName : 'Pabili Mart';
   const fulfillLabel = isPickup ? '🏬 Pick-up at store' : '🛵 Delivery';
   const DIV = '————————————';
+  // Pickup location — prefer the order's branch address (Pro multi-branch),
+  // else the tenant-level pickup address from Store Info.
+  let pickupAddr = '';
+  if (isPickup) {
+    if (o.branchId && Array.isArray(branchesData)) {
+      const b = branchesData.find(x => x.id === o.branchId);
+      if (b && b.address) pickupAddr = b.address;
+    }
+    if (!pickupAddr && typeof storeSettingsData !== 'undefined' && storeSettingsData && storeSettingsData.pickupAddress) {
+      pickupAddr = storeSettingsData.pickupAddress;
+    }
+  }
 
   let t = '';
   t += `🧾 ${storeName}\n`;
@@ -9475,6 +9487,7 @@ function copyOrder(orderId, btn) {
   t += `👤 ${o.customer?.name || '—'}\n`;
   t += `📞 ${o.customer?.phone || '—'}\n`;
   if (!isPickup) t += `📍 ${addr}\n`;
+  if (isPickup && pickupAddr) t += `📍 Pick up at: ${pickupAddr}\n`;
   if (o.notes) t += `📝 ${o.notes}\n`;
   t += `\n${DIV}\n`;
   t += `🛒 ITEMS\n`;
@@ -9494,7 +9507,8 @@ function copyOrder(orderId, btn) {
   }
 
   t += `\n${DIV}\n`;
-  t += `Salamat po sa pag-order! 🙏`;
+  t += `🛒 Order again:\n${storefrontShareUrl()}\n`;
+  t += `\nSalamat po sa pag-order! 🙏`;
 
   navigator.clipboard.writeText(t.trim()).then(() => {
     btn.textContent = '✓ Copied!';
