@@ -10821,8 +10821,6 @@ async function saveProduct(e) {
     const _t1 = performance.now();
     await tcol('products').doc(String(formData.id)).set(formData);
     const _t2 = performance.now();
-    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms images=[${_imgInfo}]`);
-    showToast(`pre ${Math.round(_t0 - _tStart)}ms · upload ${Math.round(_t1 - _t0)}ms · set ${Math.round(_t2 - _t1)}ms · img:${_imgInfo}`, 'success');
     // After the product doc is written, seed/update per-branch inventory
     // docs for any branch-specific products. Best-effort — if these
     // partial writes fail we still leave the product saved.
@@ -10846,7 +10844,10 @@ async function saveProduct(e) {
         showToast('Product saved, but seeding branch inventory partially failed. Check Firestore.', 'warn');
       }
     }
-    showToast(editingProductId ? 'Product updated' : 'Product added', 'success');
+    const _t3 = performance.now();
+    // [TEMP DIAGNOSTIC v322] timing folded into the toast that reliably shows.
+    console.log(`[saveProduct timing] pre=${Math.round(_t0 - _tStart)}ms upload=${Math.round(_t1 - _t0)}ms set=${Math.round(_t2 - _t1)}ms branch=${Math.round(_t3 - _t2)}ms images=[${_imgInfo}]`);
+    showToast(`pre${Math.round(_t0 - _tStart)} up${Math.round(_t1 - _t0)} set${Math.round(_t2 - _t1)} br${Math.round(_t3 - _t2)} · ${_imgInfo}`, 'success');
     closeProductModal();
   } catch (err) {
     console.error('Save error:', err);
