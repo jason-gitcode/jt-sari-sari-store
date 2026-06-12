@@ -9499,11 +9499,16 @@ function copyOrder(orderId, btn) {
   t += `${payLabel}\n`;
 
   if (unchecked.length) {
+    // Only call it "refunded" / show the refund amount when an actual GCash
+    // refund reference was entered — otherwise it's just unavailable.
+    const refunded = !!o.partialRefundRef;
     t += `\n${DIV}\n`;
-    t += `⚠️ UNAVAILABLE — refunded\n`;
+    t += `⚠️ UNAVAILABLE${refunded ? ' — refunded' : ''}\n`;
     unchecked.forEach(i => { t += `• ${i.qty}× ${i.productName} — ₱${parseFloat(i.lineTotal).toFixed(2)}\n`; });
-    t += `Refund — ₱${uncheckedTotal.toFixed(2)}\n`;
-    if (o.partialRefundRef) t += `✓ GCash refund ref: ${o.partialRefundRef}\n`;
+    if (refunded) {
+      t += `Refund — ₱${uncheckedTotal.toFixed(2)}\n`;
+      t += `✓ GCash refund ref: ${o.partialRefundRef}\n`;
+    }
   }
 
   t += `\n${DIV}\n`;
