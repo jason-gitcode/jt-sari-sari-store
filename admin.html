@@ -5218,14 +5218,17 @@ function renderBillingTab() {
         <div>After trial: <strong>${fmtPHP(info.amount)}/mo</strong></div>
       `;
     } else if (status === 'active') {
-      // Phase C-1: cancelAtPeriodEnd means tenant scheduled cancellation.
-      // They keep access until currentPeriodEnd; show "Ending {date}"
-      // instead of "Next bill" + flag the reactivate option in the body.
-      if (subscriptionData.cancelAtPeriodEnd === true) {
+      // A scheduled downgrade (scheduledTier set) keeps access until
+      // currentPeriodEnd, then grace, then the target tier. Show the target
+      // + the undo affordance instead of "Next bill".
+      const schedTier = subscriptionData.scheduledTier;
+      if (schedTier) {
+        const schedName = (TIER_INFO[schedTier] || TIER_INFO.free).name;
+        const graceDays = tier === 'pro' ? 15 : 7;
         statusBlock = `
-          <div style="color:#f59e0b;font-weight:600;">⏳ Cancellation scheduled</div>
-          <div style="margin-top:4px;">Your plan ends on <strong>${fmtBillingDate(subscriptionData.currentPeriodEnd)}</strong>. After that you'll drop to PabiliMart Free.</div>
-          <div style="margin-top:4px;font-size:12px;color:var(--muted);">Changed your mind? Click <strong style="color:#16a34a;">Reactivate</strong> below to keep your subscription.</div>
+          <div style="color:#f59e0b;font-weight:600;">⏳ Downgrade scheduled → ${schedName}</div>
+          <div style="margin-top:4px;">You keep <strong>${info.name}</strong> through <strong>${fmtBillingDate(subscriptionData.currentPeriodEnd)}</strong>, then a <strong>${graceDays}-day</strong> grace period before moving to <strong>${schedName}</strong>.</div>
+          <div style="margin-top:4px;font-size:12px;color:var(--muted);">Changed your mind? Click <strong style="color:#16a34a;">Undo downgrade</strong> below.</div>
         `;
       } else {
         statusBlock = `
@@ -5233,7 +5236,23 @@ function renderBillingTab() {
           <div style="margin-top:4px;">Next bill: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong> on ${fmtBillingDate(subscriptionData.currentPeriodEnd)}</div>
         `;
       }
-    } else if (status === 'past_due' || status === 'grace') {
+    } else if (status === 'grace') {
+      // Grace period: still on the current tier, counting down to the drop.
+      const toTier = subscriptionData.graceToTier || 'free';
+      const toName = (TIER_INFO[toTier] || TIER_INFO.free).name;
+      const toCap = (TIER_INFO[toTier] || TIER_INFO.free).productCap;
+      let graceLeft = null;
+      const gEnd = subscriptionData.graceEndsAt;
+      if (gEnd) {
+        const gd = gEnd.toDate ? gEnd.toDate() : (gEnd.seconds ? new Date(gEnd.seconds * 1000) : new Date(gEnd));
+        if (!isNaN(gd.getTime())) graceLeft = Math.max(0, Math.ceil((gd.getTime() - Date.now()) / (24*60*60*1000)));
+      }
+      statusBlock = `
+        <div style="color:#f59e0b;font-weight:700;">⏳ Grace period — moving to ${toName}</div>
+        <div style="margin-top:4px;">You're still on <strong>${info.name}</strong>${graceLeft != null ? ` for <strong>${graceLeft} more day${graceLeft === 1 ? '' : 's'}</strong>` : ''}${gEnd ? ` (until <strong>${fmtBillingDate(subscriptionData.graceEndsAt)}</strong>)` : ''}, then you drop to <strong>${toName}</strong>.</div>
+        <div style="margin-top:4px;font-size:12px;color:var(--muted);">On that day only <strong>${(toCap || 0).toLocaleString()}</strong> products stay visible — pick which ones in the <strong>Products</strong> tab. Extras are archived (kept in admin, not deleted). <strong>Pay now</strong> to stay on ${info.name} and keep your full catalog.</div>
+      `;
+    } else if (status === 'past_due') {
       statusBlock = `
         <div style="color:#dc2626;font-weight:700;">⚠️ Payment overdue</div>
         <div>Renew to keep your store open. Outstanding: <strong>${fmtPHP(subscriptionData.amount || info.amount)}</strong></div>
@@ -5277,11 +5296,15 @@ function renderBillingTab() {
     // Primary action sits in the bottom-LEFT. When the tenant has already
     // scheduled a cancellation (cancelAtPeriodEnd=true), we swap the
     // cancel link for a "Keep subscription" reactivate link.
-    const cancelAtEnd = subscriptionData.cancelAtPeriodEnd === true;
+    // A downgrade is scheduled when scheduledTier is set (or the legacy
+    // cancelAtPeriodEnd flag). Offer "Undo downgrade"; otherwise (active,
+    // paid, no schedule) offer "Cancel plan". Hidden during grace — there
+    // the path forward is Pay now, not undo.
+    const downgradeScheduled = !!subscriptionData.scheduledTier || subscriptionData.cancelAtPeriodEnd === true;
     let cancelLinkInline = '';
-    if (tier !== 'free' && status !== 'cancelled') {
-      if (cancelAtEnd) {
-        cancelLinkInline = `<button onclick="reactivateSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:#16a34a;cursor:pointer;text-decoration:underline;">Reactivate</button>`;
+    if (tier !== 'free' && status === 'active') {
+      if (downgradeScheduled) {
+        cancelLinkInline = `<button onclick="reactivateSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:#16a34a;cursor:pointer;text-decoration:underline;">Undo downgrade</button>`;
       } else {
         cancelLinkInline = `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>`;
       }
@@ -5340,7 +5363,8 @@ function renderBillingTab() {
     if (isCurrent) {
       ctaText = 'Current plan';
       ctaAction = '';
-    } else if (t === 'free') {
+    } else if ((TIER_RANK[t] ?? 9) < (TIER_RANK[currentTier] ?? 0)) {
+      // Lower than the current tier → a downgrade (Free, or Growth when on Pro).
       ctaText = 'Downgrade';
       ctaAction = `onclick="requestTierChange('${t}')"`;
     } else if (trialEligible) {
@@ -5564,9 +5588,13 @@ function openPayNowModal() {
   showPayNowModal();
 }
 
+const TIER_RANK = { free: 0, growth: 1, pro: 2 };
 function requestTierChange(tier) {
-  if (tier === 'free') {
-    alert('To downgrade to Free, cancel your current plan first. (Coming in the next update.)');
+  const current = (subscriptionData && subscriptionData.tier) || 'free';
+  // Lower rank than current = a downgrade → schedule at period end (no
+  // payment). Same/higher = an upgrade → pay flow.
+  if ((TIER_RANK[tier] ?? 9) < (TIER_RANK[current] ?? 0)) {
+    openDowngradeModal(tier);
     return;
   }
   payNowTargetTier = tier;
@@ -5584,22 +5612,42 @@ function requestTierChange(tier) {
 // Reactivate: a single-button modal for tenants who scheduled
 // cancellation but want to undo it before period end.
 // ============================================================
-function cancelSubscription() {
+// The "Cancel plan" link is just a downgrade to Free.
+function cancelSubscription() { openDowngradeModal('free'); }
+
+let pendingDowngradeTarget = 'free';
+function openDowngradeModal(targetTier) {
   if (!subscriptionData) return;
   const tier = subscriptionData.tier || 'free';
   const status = subscriptionData.status || 'active';
   if (tier === 'free') { showToast('You\'re already on Free.', 'info'); return; }
-  if (status === 'cancelled') { showToast('Subscription is already cancelled.', 'info'); return; }
-  const tierLabel = TIER_INFO[tier] ? TIER_INFO[tier].name : tier;
+  if ((TIER_RANK[targetTier] ?? 9) >= (TIER_RANK[tier] ?? 0)) { showToast('That isn\'t a downgrade.', 'info'); return; }
+  pendingDowngradeTarget = targetTier;
+  const fromInfo = TIER_INFO[tier] || TIER_INFO.free;
+  const toInfo = TIER_INFO[targetTier] || TIER_INFO.free;
   const isTrialing = status === 'trialing';
-  const periodEnd = subscriptionData.currentPeriodEnd;
-  const periodEndLabel = periodEnd ? fmtBillingDate(periodEnd) : '—';
-  document.getElementById('cancel-sub-title').textContent = isTrialing ? 'Cancel trial?' : 'Cancel subscription?';
-  document.getElementById('cancel-sub-body').innerHTML = isTrialing
-    ? `<div style="font-size:13px;color:var(--ink);line-height:1.55;">You're on a <strong>${escSupportText(tierLabel)}</strong> trial. Cancelling now will end the trial immediately and drop you back to <strong>PabiliMart Free</strong>. Your one-trial-per-tenant entitlement remains used — you'll need to pay directly to come back to a paid tier later.</div>`
-    : `<div style="font-size:13px;color:var(--ink);line-height:1.55;">Your <strong>${escSupportText(tierLabel)}</strong> subscription stays active through <strong>${escSupportText(periodEndLabel)}</strong>. After that, you drop to <strong>PabiliMart Free</strong> automatically. You can reactivate any time before that date — no need to repay.</div>`;
+  const graceDays = tier === 'pro' ? 15 : 7;
+  const periodEndLabel = subscriptionData.currentPeriodEnd ? fmtBillingDate(subscriptionData.currentPeriodEnd) : '—';
+  const cap = (toInfo.productCap || 0).toLocaleString();
+
+  document.getElementById('cancel-sub-title').textContent = isTrialing
+    ? 'Cancel trial?'
+    : (targetTier === 'free' ? 'Downgrade to Free?' : `Downgrade to ${toInfo.name}?`);
+
+  let body;
+  if (isTrialing) {
+    body = `You're on a <strong>${escSupportText(fromInfo.name)}</strong> trial. Cancelling now ends the trial immediately and drops you to <strong>PabiliMart Free</strong>. Only <strong>${cap}</strong> products stay visible on your storefront — any extras are <strong>archived</strong> (hidden from the storefront but kept in your admin, never deleted). Orders and customers are always kept. Your one-trial-per-tenant entitlement stays used.`;
+  } else {
+    body = `Your <strong>${escSupportText(fromInfo.name)}</strong> plan stays active through <strong>${escSupportText(periodEndLabel)}</strong>. After that you keep ${escSupportText(fromInfo.name)} for a <strong>${graceDays}-day grace period</strong>, then move to <strong>${escSupportText(toInfo.name)}</strong>.<br><br>During grace you pick which <strong>${cap}</strong> products stay visible (in the Products tab). Extras are <strong>archived</strong> — hidden from your storefront but kept in admin, never deleted, and brought back if you upgrade again. Orders and customers are always kept.<br><br>You can undo this any time before <strong>${escSupportText(periodEndLabel)}</strong>.`;
+  }
+  document.getElementById('cancel-sub-body').innerHTML = `<div style="font-size:13px;color:var(--ink);line-height:1.55;">${body}</div>`;
   document.getElementById('cancel-sub-reason').value = '';
   document.getElementById('cancel-sub-status').textContent = '';
+  const confirmBtn = document.getElementById('cancel-sub-confirm-btn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = isTrialing ? 'Yes, cancel trial' : (targetTier === 'free' ? 'Yes, downgrade to Free' : `Yes, downgrade to ${toInfo.name}`);
+  }
   document.getElementById('cancel-sub-modal').classList.add('show');
 }
 function closeCancelSubModal() { document.getElementById('cancel-sub-modal').classList.remove('show'); }
@@ -5608,30 +5656,34 @@ async function confirmCancelSubscription() {
   const reason = (document.getElementById('cancel-sub-reason').value || '').trim();
   const btn = document.getElementById('cancel-sub-confirm-btn');
   const statusEl = document.getElementById('cancel-sub-status');
-  btn.disabled = true; btn.textContent = 'Cancelling…';
+  const target = pendingDowngradeTarget || 'free';
+  const targetName = (TIER_INFO[target] || TIER_INFO.free).name;
+  btn.disabled = true; btn.textContent = 'Saving…';
   statusEl.textContent = '';
   try {
     const fn = firebase.app().functions('asia-southeast1').httpsCallable('cancelSubscription');
-    const res = await fn({ tid: TENANT_ID, reason });
+    const res = await fn({ tid: TENANT_ID, reason, targetTier: target });
     closeCancelSubModal();
     const mode = res && res.data && res.data.mode;
-    showToast(mode === 'immediate' ? 'Trial cancelled. You\'re now on Free.' : 'Subscription scheduled to end. You can reactivate any time before then.', 'success');
+    showToast(mode === 'immediate'
+      ? 'Trial cancelled. You\'re now on Free.'
+      : `Downgrade scheduled — you'll move to ${targetName} after your current period. Undo any time before then.`, 'success');
   } catch (err) {
     console.error('cancelSubscription failed:', err);
-    statusEl.textContent = (err && err.message) ? err.message : 'Cancel failed. Try again.';
-    btn.disabled = false; btn.textContent = 'Yes, cancel';
+    statusEl.textContent = (err && err.message) ? err.message : 'Could not schedule the change. Try again.';
+    btn.disabled = false; btn.textContent = 'Try again';
   }
 }
 async function reactivateSubscription() {
-  const ok = confirm('Reactivate your subscription? You\'ll be billed normally at the next period.');
+  const ok = confirm('Undo the scheduled downgrade and keep your current plan? You\'ll be billed normally at the next period.');
   if (!ok) return;
   try {
     const fn = firebase.app().functions('asia-southeast1').httpsCallable('reactivateSubscription');
     await fn({ tid: TENANT_ID });
-    showToast('Subscription reactivated.', 'success');
+    showToast('Downgrade cancelled — you\'re staying on your current plan.', 'success');
   } catch (err) {
     console.error('reactivateSubscription failed:', err);
-    showToast((err && err.message) ? err.message : 'Reactivation failed. Try again.', 'error');
+    showToast((err && err.message) ? err.message : 'Could not undo. Try again.', 'error');
   }
 }
 

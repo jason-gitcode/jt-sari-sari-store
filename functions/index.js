@@ -2264,7 +2264,15 @@ exports.cancelSubscription = onCall(async (request) => {
   const data = request.data || {};
   const tid = String(data.tid || '').trim();
   const reason = String(data.reason || '').trim().slice(0, 500);
+  // Target of the downgrade — defaults to Free ("Cancel plan"); a Pro tenant
+  // can also schedule a downgrade to Growth.
+  const targetTier = String(data.targetTier || 'free').toLowerCase();
   if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  const TIER_RANK = { free: 0, growth: 1, pro: 2 };
+  if (targetTier === 'pro' || !(targetTier in TIER_RANK)) {
+    throw new HttpsError('invalid-argument', 'You can only downgrade to Free or Growth.');
+  }
 
   const tref = db.collection('tenants').doc(tid);
   const tsnap = await tref.get();
@@ -2272,40 +2280,58 @@ exports.cancelSubscription = onCall(async (request) => {
   const tenant = tsnap.data() || {};
   const ownerEmails = Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : [];
   if (!isSuperadmin && !ownerEmails.includes(email)) {
-    throw new HttpsError('permission-denied', 'Only this store\'s owner can cancel its subscription.');
+    throw new HttpsError('permission-denied', 'Only this store\'s owner can change its subscription.');
   }
 
   const subRef = tref.collection('subscription').doc('current');
   const subSnap = await subRef.get();
-  if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription to cancel.');
+  if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription to change.');
   const sub = subSnap.data() || {};
   const status = (sub.status || 'active').toLowerCase();
   const tier = (sub.tier || 'free').toLowerCase();
 
   if (tier === 'free') throw new HttpsError('failed-precondition', 'You\'re already on the free plan.');
-  if (status === 'cancelled') throw new HttpsError('failed-precondition', 'Subscription is already cancelled.');
+  if (TIER_RANK[targetTier] >= TIER_RANK[tier]) {
+    throw new HttpsError('failed-precondition', 'That isn\'t a downgrade from your current plan.');
+  }
 
-  // Trialing → immediate cancel (nothing paid through). Otherwise →
-  // schedule for period end.
+  // Trialing → can't schedule (nothing paid through). A trial downgrade ends
+  // the trial NOW and drops straight to Free, archiving the catalog to the
+  // Free cap. (Downgrading a trial to Growth isn't supported — cancel and
+  // start a Growth plan instead.)
   if (status === 'trialing') {
+    try { await archiveProductsForTier(tid, 'free', []); }
+    catch (err) { console.warn('[cancelSubscription] trial archive failed for', tid, ':', err.message); }
     await subRef.update({
-      status: 'cancelled',
-      cancelledAt: FieldValue.serverTimestamp(),
-      cancellationReason: reason || 'trial_cancelled_by_tenant',
+      tier: 'free',
+      status: 'active',
+      amount: 0,
+      currentPeriodStart: FieldValue.serverTimestamp(),
+      currentPeriodEnd: null,
+      trialEndsAt: null,
+      scheduledTier: null,
+      graceSince: null, graceEndsAt: null, graceFromTier: null, graceToTier: null,
+      pendingRetainIds: null,
       cancelAtPeriodEnd: false,
-      tier: 'free'
+      cancellationReason: reason || 'trial_cancelled_by_tenant',
+      droppedAt: FieldValue.serverTimestamp(),
+      droppedFromTier: tier
     });
     await tref.update({ tier: 'free' });
     await tref.collection('settings').doc('store').set({ tier: 'free' }, { merge: true });
-    return { ok: true, mode: 'immediate' };
+    return { ok: true, mode: 'immediate', targetTier: 'free' };
   }
 
+  // Active → schedule the downgrade at period end. The daily lifecycle runs
+  // active→grace (when currentPeriodEnd passes) → drop to scheduledTier.
+  // Reversible via reactivateSubscription before period end.
   await subRef.update({
-    cancelAtPeriodEnd: true,
+    scheduledTier: targetTier,
+    cancelAtPeriodEnd: targetTier === 'free', // back-compat flag for to-Free
     cancellationRequestedAt: FieldValue.serverTimestamp(),
     cancellationReason: reason || 'tenant_requested'
   });
-  return { ok: true, mode: 'at_period_end' };
+  return { ok: true, mode: 'at_period_end', targetTier };
 });
 
 // ============================================================
@@ -2337,14 +2363,16 @@ exports.reactivateSubscription = onCall(async (request) => {
   const subSnap = await subRef.get();
   if (!subSnap.exists) throw new HttpsError('failed-precondition', 'No subscription found.');
   const sub = subSnap.data() || {};
-  if (sub.cancelAtPeriodEnd !== true) {
-    throw new HttpsError('failed-precondition', 'Subscription is not scheduled for cancellation.');
+  const hasSchedule = !!sub.scheduledTier || sub.cancelAtPeriodEnd === true;
+  if (!hasSchedule) {
+    throw new HttpsError('failed-precondition', 'No scheduled downgrade to undo.');
   }
   if ((sub.status || '').toLowerCase() !== 'active') {
-    throw new HttpsError('failed-precondition', 'Only active subscriptions can be reactivated. If you\'re past_due/grace/suspended, submit a new payment instead.');
+    throw new HttpsError('failed-precondition', 'Only an active subscription can undo a scheduled downgrade. If you\'re already in grace, submit a payment to stay on your current plan.');
   }
 
   await subRef.update({
+    scheduledTier: null,
     cancelAtPeriodEnd: false,
     cancellationRequestedAt: null,
     cancellationReason: null,
