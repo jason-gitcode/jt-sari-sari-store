@@ -1733,21 +1733,25 @@ function showToast(msg) {
 
 // Load products from Firestore, then render
 function loadProductsAndRender() {
-tcol('products').get().then(snapshot => {
-  if (!snapshot.empty) {
-    PRODUCTS = snapshot.docs.map(doc => doc.data());
-    PRODUCTS.sort((a, b) => a.id - b.id);
-  } else {
-    PRODUCTS = DEFAULT_PRODUCTS;
-  }
-  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init(); updatePaymentOptions(); updateWeatherWarning();
-}).catch(() => {
-  PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
-  if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
-  Object.keys(cart).forEach(key => { const id = key.split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
-  init(); updatePaymentOptions(); updateWeatherWarning();
-});
+  // Checkout only needs the products that are in the cart — fetch those by
+  // ID instead of downloading the whole (image-heavy) catalog. A store with
+  // hundreds of products was pulling all of them (megabytes of base64 image
+  // data) just to render a few cart lines.
+  const ids = [...new Set(Object.keys(cart).map(k => String(k).split('_v')[0]))];
+  const finish = () => { init(); updatePaymentOptions(); updateWeatherWarning(); };
+  if (ids.length === 0) { PRODUCTS = []; finish(); return; }
+  Promise.all(ids.map(id =>
+    tcol('products').doc(id).get().then(d => d.exists ? d.data() : null).catch(() => null)
+  )).then(rows => {
+    PRODUCTS = rows.filter(Boolean);
+    Object.keys(cart).forEach(key => { const id = String(key).split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
+    finish();
+  }).catch(() => {
+    PRODUCTS = JSON.parse(localStorage.getItem('sariProducts') || '[]');
+    if (!PRODUCTS.length) PRODUCTS = DEFAULT_PRODUCTS;
+    Object.keys(cart).forEach(key => { const id = String(key).split('_v')[0]; if (!PRODUCTS.find(x => x.id == id)) delete cart[key]; });
+    finish();
+  });
 }
 
 // Bootstrap — resolve tenant before kicking off Firestore reads.
