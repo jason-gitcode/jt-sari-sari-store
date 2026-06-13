@@ -345,10 +345,30 @@ async function seedCatalogStore({ force = false } = {}) {
     throw new HttpsError('not-found', `Tenant "${CATALOG_STORE_TID}" does not exist — create it first.`);
   }
 
+  // ALWAYS (idempotent): forever Pro + remove from the public store-finder
+  // directory so catalog-store never surfaces to customers. Runs even on the
+  // already-seeded skip path, so re-clicking the button enforces the lock.
+  await cref.collection('subscription').doc('current').set({
+    tier: 'pro', status: 'active', amount: 0,
+    currentPeriodStart: FieldValue.serverTimestamp(),
+    currentPeriodEnd: null,
+    trialEndsAt: null, trialUsedAt: FieldValue.serverTimestamp(),
+    scheduledTier: null, graceSince: null, graceEndsAt: null,
+    graceFromTier: null, graceToTier: null, pendingRetainIds: null,
+    cancelAtPeriodEnd: false, dunningStages: [],
+    paymentMethod: 'internal', internalForeverPro: true
+  }, { merge: true });
+  await cref.set({ tier: 'pro', internalCatalogStore: true }, { merge: true });
+  await cref.collection('settings').doc('store').set({ tier: 'pro' }, { merge: true });
+  let removedFromDirectory = false;
+  try { await removeDirectoryEntry(CATALOG_STORE_TID); removedFromDirectory = true; }
+  catch (err) { console.warn('[seedCatalogStore] directory remove failed:', err.message); }
+
+  // Products: copy from jsminimart only if catalog-store is empty (or forced).
   const targetCol = cref.collection('products');
   const existing = await targetCol.limit(1).get();
   if (!existing.empty && !force) {
-    return { skipped: 'already-seeded', note: 'catalog-store already has products; pass force:true to overwrite from jsminimart' };
+    return { skipped: 'already-seeded', tier: 'pro', removedFromDirectory };
   }
 
   // Copy jsminimart catalog → catalog-store (master; keep ids; not archived).
@@ -364,21 +384,7 @@ async function seedCatalogStore({ force = false } = {}) {
   }
   if (ops > 0) await batch.commit();
 
-  // Forever Pro (internal — never billed, never expires, never trials).
-  await cref.collection('subscription').doc('current').set({
-    tier: 'pro', status: 'active', amount: 0,
-    currentPeriodStart: FieldValue.serverTimestamp(),
-    currentPeriodEnd: null,
-    trialEndsAt: null, trialUsedAt: FieldValue.serverTimestamp(),
-    scheduledTier: null, graceSince: null, graceEndsAt: null,
-    graceFromTier: null, graceToTier: null, pendingRetainIds: null,
-    cancelAtPeriodEnd: false, dunningStages: [],
-    paymentMethod: 'internal', internalForeverPro: true
-  }, { merge: true });
-  await cref.set({ tier: 'pro', internalCatalogStore: true }, { merge: true });
-  await cref.collection('settings').doc('store').set({ tier: 'pro' }, { merge: true });
-
-  return { seeded: true, copied, forced: force, tier: 'pro' };
+  return { seeded: true, copied, forced: force, tier: 'pro', removedFromDirectory };
 }
 
 exports.createTenant = onCall(async (request) => {

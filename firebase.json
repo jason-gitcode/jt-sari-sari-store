@@ -42,7 +42,12 @@
     ],
     "redirects": [
       { "source": "/admin.html", "type": 302, "destination": "/jsminimart/admin/" },
-      { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" }
+      { "source": "/checkout.html", "type": 302, "destination": "/jsminimart/checkout/" },
+      { "source": "/catalog-store", "type": 302, "destination": "/signup" },
+      { "source": "/catalog-store/", "type": 302, "destination": "/signup" },
+      { "source": "/catalog-store/checkout", "type": 302, "destination": "/signup" },
+      { "source": "/catalog-store/checkout/", "type": 302, "destination": "/signup" },
+      { "source": "/catalog-store/checkout/**", "type": 302, "destination": "/signup" }
     ],
     "rewrites": [
       { "source": "/signup", "destination": "/signup/index.html" },
