@@ -44,12 +44,24 @@ const RESERVED_SLUGS = new Set([
   'jsminimart'
 ]);
 
-// Slugs held for ONE specific owner email — blocked for everyone else, but the
-// named owner may still claim it. Use this to pre-reserve a store URL before
-// the owner has actually signed up. Email compared case-insensitively.
-const EMAIL_RESERVED_SLUGS = new Map([
-  ['tindahan-ni-jason', 'jason.b.tubilag@gmail.com'],
+// Slugs held for the platform admins (SUPERADMIN_EMAILS) only — blocked for
+// every other signup. Covers the exact slugs below PLUS anything spelling the
+// brand "pabilimart" (hyphens ignored). Lets us pre-reserve store URLs before
+// an owner signs up. Email compared case-insensitively.
+const ADMIN_RESERVED_SLUGS = new Set([
+  'tindahan-ni-jason',
+  'tindahan-ni-manilyn',
+  'tindahan-ni-jacob',
+  'tindahan-ni-sabrina',
 ]);
+function isAdminReservedSlug(slug) {
+  if (ADMIN_RESERVED_SLUGS.has(slug)) return true;
+  // Brand protection: any slug whose letters spell "...pabilimart..." once
+  // hyphens are stripped — catches pabilimart, pabili-mart, admin-pabilimart,
+  // pabilimart-store, official-pabilimart-store, etc. "pabili" alone (a common
+  // Filipino word) is NOT blocked.
+  return slug.replace(/-/g, '').includes('pabilimart');
+}
 
 // Lowercase letters/numbers/hyphens, must start with a letter, 3–32 chars.
 // No trailing hyphen, no consecutive hyphens.
@@ -71,9 +83,9 @@ function validateSlug(raw, callerEmail) {
     throw new HttpsError('already-exists',
       'That store URL is reserved. Please choose another.');
   }
-  // Per-email reservation: only the named owner may claim it.
-  const reservedFor = EMAIL_RESERVED_SLUGS.get(slug);
-  if (reservedFor && String(callerEmail || '').trim().toLowerCase() !== reservedFor) {
+  // Admin-reserved (exact slug or brand "pabilimart"): only superadmins claim it.
+  if (isAdminReservedSlug(slug) &&
+      !SUPERADMIN_EMAILS.has(String(callerEmail || '').trim().toLowerCase())) {
     throw new HttpsError('already-exists',
       'That store URL is reserved. Please choose another.');
   }
