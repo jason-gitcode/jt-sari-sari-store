@@ -44,13 +44,20 @@ const RESERVED_SLUGS = new Set([
   'jsminimart'
 ]);
 
+// Slugs held for ONE specific owner email — blocked for everyone else, but the
+// named owner may still claim it. Use this to pre-reserve a store URL before
+// the owner has actually signed up. Email compared case-insensitively.
+const EMAIL_RESERVED_SLUGS = new Map([
+  ['tindahan-ni-jason', 'jason.b.tubilag@gmail.com'],
+]);
+
 // Lowercase letters/numbers/hyphens, must start with a letter, 3–32 chars.
 // No trailing hyphen, no consecutive hyphens.
 const SLUG_REGEX = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const SLUG_MIN = 3;
 const SLUG_MAX = 32;
 
-function validateSlug(raw) {
+function validateSlug(raw, callerEmail) {
   const slug = String(raw || '').trim().toLowerCase();
   if (slug.length < SLUG_MIN || slug.length > SLUG_MAX) {
     throw new HttpsError('invalid-argument',
@@ -61,6 +68,12 @@ function validateSlug(raw) {
       'Store URL can only contain lowercase letters, numbers, and single hyphens, and must start with a letter.');
   }
   if (RESERVED_SLUGS.has(slug)) {
+    throw new HttpsError('already-exists',
+      'That store URL is reserved. Please choose another.');
+  }
+  // Per-email reservation: only the named owner may claim it.
+  const reservedFor = EMAIL_RESERVED_SLUGS.get(slug);
+  if (reservedFor && String(callerEmail || '').trim().toLowerCase() !== reservedFor) {
     throw new HttpsError('already-exists',
       'That store URL is reserved. Please choose another.');
   }
@@ -225,7 +238,7 @@ exports.createTenant = onCall(async (request) => {
 
   // ---------- INPUT VALIDATION ----------
   const data = request.data || {};
-  const slug = validateSlug(data.slug);
+  const slug = validateSlug(data.slug, email);
   const name = validateName(data.name);
   const pickupAddress = validatePickupAddress(data.pickupAddress);
   const gcashAccountName = validateGcashAccountName(data.gcashAccountName);
