@@ -673,6 +673,7 @@
         <button class="btn btn-icon" onclick="runBackfill()" title="Backfill tier mirror on tenant root docs (idempotent)">⚙ Backfill</button>
         <button class="btn btn-icon" onclick="runBackfillClaims()" title="Set the { tenants:[...] } ownership auth claim on all tenant owners so they can upload product images (idempotent)">🔑 Backfill claims</button>
         <button class="btn btn-icon" onclick="runImageMigration()" title="Move a tenant's product images from base64 → Cloud Storage (idempotent, batched)">🖼 Migrate images</button>
+        <button class="btn btn-icon" onclick="runInjectCatalog()" title="Inject the JS Mini Mart catalog into a Pro tenant as HIDDEN products (once-only; force = clean re-run)">🛒 Inject catalog</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
       </div>
     </div>
@@ -937,6 +938,7 @@ const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
 const rejectManualPaymentFn  = functions.httpsCallable('rejectManualPayment');
 const backfillSubscriptionsFn = functions.httpsCallable('backfillSubscriptions');
 const migrateProductImagesFn  = functions.httpsCallable('migrateProductImages');
+const injectStarterCatalogForFn = functions.httpsCallable('injectStarterCatalogFor');
 
 // Keep in sync with firestore.rules isSuperadmin() and admin.html SUPERADMIN_EMAILS.
 const SUPERADMIN_EMAILS = new Set([
@@ -1251,6 +1253,28 @@ async function runImageMigration() {
   } catch (err) {
     console.error('image migration failed:', err);
     alert(`Image migration failed after ${batches} batch(es): ${(err && err.message) ? err.message : err}\nIt's idempotent — re-run to continue.`);
+  }
+}
+
+// Inject the JS Mini Mart catalog into a Pro tenant as HIDDEN products. Normal
+// run skips if already injected (once-only flag). Force = clean re-run: deletes
+// existing fromStarterCatalog products + clears the flag, then re-injects.
+async function runInjectCatalog() {
+  const tid = prompt('Inject hidden starter catalog — tenant slug?', '');
+  if (!tid) return;
+  if (!confirm(`Inject JS Mini Mart's catalog into "${tid}" as HIDDEN products?\n\nSkips if already injected (once-only).`)) return;
+  const force = confirm(`Use FORCE clean re-run?\n\nOK  = FORCE (delete existing starter-catalog products, then re-inject fresh)\nCancel = normal inject`);
+  try {
+    const res = await injectStarterCatalogForFn({ tid: tid.trim(), force });
+    const d = (res && res.data) || {};
+    console.log('[injectStarterCatalog]', d);
+    const lines = [`Starter catalog → "${tid.trim()}":`, `injected: ${d.injected || 0}`];
+    if (d.forced) lines.push(`forced re-run (removed ${d.removed || 0})`);
+    if (d.skipped) lines.push(`skipped: ${d.skipped}`);
+    alert(lines.join('\n'));
+  } catch (err) {
+    console.error('inject catalog failed:', err);
+    alert('Inject catalog failed: ' + (err && err.message ? err.message : err));
   }
 }
 
