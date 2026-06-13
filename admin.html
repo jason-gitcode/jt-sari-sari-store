@@ -11664,6 +11664,18 @@ async function handleAdminAuth(user) {
 
   const auth_result = await checkAdminAuthorization(user);
   if (auth_result.allowed) {
+    // Storage uploads (product images) need this tenant's ownership claim
+    // { tenants: [...] } in the ID token — Storage rules read the token, not
+    // Firestore. If it's missing (e.g. just granted via createTenant/backfill,
+    // or this is a fresh session), force one token refresh so the Storage SDK
+    // uses an up-to-date token. Superadmins bypass ownership entirely.
+    try {
+      if (TENANT_ID && auth_result.reason !== 'superadmin') {
+        const res = await user.getIdTokenResult();
+        const owned = (res && res.claims && Array.isArray(res.claims.tenants)) ? res.claims.tenants : [];
+        if (!owned.includes(TENANT_ID)) await user.getIdToken(true);
+      }
+    } catch (e) { console.warn('[admin] ownership-claim refresh check failed:', e && e.message); }
     showAdmin();
     const ae = document.getElementById('account-email');
     if (ae) ae.textContent = user.email;

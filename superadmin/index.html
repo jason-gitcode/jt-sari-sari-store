@@ -670,6 +670,7 @@
       <span>All tenants <span id="tenants-result-meta" class="tenants-result-meta"></span></span>
       <div class="actions">
         <button class="btn btn-icon" onclick="runBackfill()" title="Backfill tier mirror on tenant root docs (idempotent)">⚙ Backfill</button>
+        <button class="btn btn-icon" onclick="runBackfillClaims()" title="Set the { tenants:[...] } ownership auth claim on all tenant owners so they can upload product images (idempotent)">🔑 Backfill claims</button>
         <button class="btn btn-icon" onclick="runImageMigration()" title="Move a tenant's product images from base64 → Cloud Storage (idempotent, batched)">🖼 Migrate images</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
       </div>
@@ -928,6 +929,7 @@ const renameTenantFn         = functions.httpsCallable('renameTenant');
 const generateInviteCodeFn   = functions.httpsCallable('generateInviteCode');
 const listInviteCodesFn      = functions.httpsCallable('listInviteCodes');
 const revokeInviteCodeFn     = functions.httpsCallable('revokeInviteCode');
+const backfillOwnerClaimsFn  = functions.httpsCallable('backfillOwnerClaims');
 const listPendingPaymentsFn  = functions.httpsCallable('listPendingPayments');
 const listPaymentsAllFn      = functions.httpsCallable('listPaymentsAll');
 const confirmManualPaymentFn = functions.httpsCallable('confirmManualPayment');
@@ -1206,6 +1208,21 @@ async function runBackfill() {
   } catch (err) {
     console.error('backfill failed:', err);
     alert('Backfill failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// Set the { tenants:[...] } ownership auth claim on every tenant owner so the
+// claim-based Storage rules let them upload product images. Idempotent.
+async function runBackfillClaims() {
+  if (!confirm('Set the ownership auth claim on all tenant owners?\nIdempotent — safe to re-run. Owners pick it up on their next admin load (auto token refresh).')) return;
+  try {
+    const res = await backfillOwnerClaimsFn({});
+    const d = (res && res.data) || {};
+    console.log('[backfillOwnerClaims]', d);
+    alert(`Owner-claim backfill complete:\nupdated: ${d.updated || 0}\nunchanged: ${d.unchanged || 0}\nmissing user: ${d.missingUser || 0}\nerrored: ${d.errored || 0}\nowners: ${d.owners || 0} · tenants: ${d.tenants || 0}`);
+  } catch (err) {
+    console.error('backfill claims failed:', err);
+    alert('Backfill claims failed: ' + (err && err.message ? err.message : err));
   }
 }
 

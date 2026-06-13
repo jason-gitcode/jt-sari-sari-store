@@ -419,6 +419,22 @@ exports.createTenant = onCall(async (request) => {
     console.error('public directory upsert failed for tenant', slug, err);
   }
 
+  // Grant the creator a Storage-ownership claim for this tenant. Storage rules
+  // read ownership from the token (not Firestore), so without this the owner
+  // can't upload product images. Best-effort — never fail tenant creation over
+  // it; backfillOwnerClaims can repair any gaps. The client force-refreshes its
+  // token (handleAdminAuth) so the new claim takes effect without re-login.
+  try {
+    const u = await getAuth().getUser(uid);
+    const claims = (u && u.customClaims) || {};
+    const owned = Array.isArray(claims.tenants) ? claims.tenants : [];
+    if (!owned.includes(slug)) {
+      await getAuth().setCustomUserClaims(uid, { ...claims, tenants: [...owned, slug] });
+    }
+  } catch (err) {
+    console.warn('[createTenant] setCustomUserClaims failed for', uid, ':', err && err.message);
+  }
+
   return {
     slug,
     name,
@@ -641,6 +657,53 @@ exports.backfillSubscriptions = onCall(async (request) => {
     tierSynced++;
   }
   return { seeded, skipped, tierSynced, total: snap.size };
+});
+
+// ============================================================
+// backfillOwnerClaims — superadmin one-shot. Sets the { tenants: [...] }
+// custom auth claim on every existing tenant owner so the new claim-based
+// Storage rules let them upload product images. Idempotent (only writes when
+// the claim set changes). Owners must refresh their token afterward — the
+// admin app force-refreshes automatically (handleAdminAuth).
+// ============================================================
+exports.backfillOwnerClaims = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const snap = await db.collection('tenants').get();
+  // Build email -> set of owned tenant slugs.
+  const emailToTids = {};
+  snap.forEach(doc => {
+    const d = doc.data() || {};
+    (Array.isArray(d.ownerEmails) ? d.ownerEmails : []).forEach(e => {
+      const k = String(e || '').toLowerCase().trim();
+      if (!k) return;
+      (emailToTids[k] = emailToTids[k] || new Set()).add(doc.id);
+    });
+  });
+
+  let updated = 0, unchanged = 0, missingUser = 0, errored = 0;
+  for (const [email, tidsSet] of Object.entries(emailToTids)) {
+    try {
+      const u = await getAuth().getUserByEmail(email);
+      const claims = (u && u.customClaims) || {};
+      const existing = Array.isArray(claims.tenants) ? claims.tenants : [];
+      const merged = Array.from(new Set([...existing, ...tidsSet]));
+      const changed = merged.length !== existing.length || merged.some(t => !existing.includes(t));
+      if (changed) {
+        await getAuth().setCustomUserClaims(u.uid, { ...claims, tenants: merged });
+        updated++;
+      } else {
+        unchanged++;
+      }
+    } catch (err) {
+      if (err && err.code === 'auth/user-not-found') missingUser++;
+      else { errored++; console.warn('[backfillOwnerClaims]', email, ':', err && err.message); }
+    }
+  }
+  return { tenants: snap.size, owners: Object.keys(emailToTids).length, updated, unchanged, missingUser, errored };
 });
 
 // ============================================================

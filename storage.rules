@@ -20,11 +20,15 @@ service firebase.storage {
              ];
     }
 
+    // Ownership lives in a custom auth claim { tenants: [slug, ...] } set by
+    // createTenant / backfillOwnerClaims. Storage rules can't reliably
+    // cross-read Firestore (the old firestore.get() approach silently denied
+    // real owners — only superadmin worked), so ownership is checked from the
+    // ID token instead.
     function isOwner(tid) {
       return isSignedIn()
-          && firestore.exists(/databases/(default)/documents/tenants/$(tid))
-          && request.auth.token.email in
-             firestore.get(/databases/(default)/documents/tenants/$(tid)).data.ownerEmails;
+          && ('tenants' in request.auth.token)
+          && (tid in request.auth.token.tenants);
     }
 
     function isOwnerOrSuper(tid) {
