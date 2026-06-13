@@ -1260,18 +1260,27 @@ async function runImageMigration() {
 // run skips if already injected (once-only flag). Force = clean re-run: deletes
 // existing fromStarterCatalog products + clears the flag, then re-injects.
 async function runInjectCatalog() {
-  const tid = prompt('Inject hidden starter catalog — tenant slug?', '');
-  if (!tid) return;
-  if (!confirm(`Inject JS Mini Mart's catalog into "${tid}" as HIDDEN products?\n\nSkips if already injected (once-only).`)) return;
-  const force = confirm(`Use FORCE clean re-run?\n\nOK  = FORCE (delete existing starter-catalog products, then re-inject fresh)\nCancel = normal inject`);
+  const raw = prompt('Inject hidden starter catalog — tenant slug?', '');
+  if (!raw) return;
+  const tid = raw.trim();
+  if (!confirm(`Inject JS Mini Mart's catalog into "${tid}" as HIDDEN products?`)) return;
   try {
-    const res = await injectStarterCatalogForFn({ tid: tid.trim(), force });
-    const d = (res && res.data) || {};
+    let res = await injectStarterCatalogForFn({ tid, force: false });
+    let d = (res && res.data) || {};
     console.log('[injectStarterCatalog]', d);
-    const lines = [`Starter catalog → "${tid.trim()}":`, `injected: ${d.injected || 0}`];
-    if (d.forced) lines.push(`forced re-run (removed ${d.removed || 0})`);
-    if (d.skipped) lines.push(`skipped: ${d.skipped}`);
-    alert(lines.join('\n'));
+    // Already injected → tell them, and offer a clean FORCE re-run (testing).
+    if (d.skipped === 'already-injected') {
+      if (confirm(`"${tid}" already has the starter catalog.\n\nFORCE a clean re-run? This DELETES the existing starter-catalog products and re-injects fresh.`)) {
+        res = await injectStarterCatalogForFn({ tid, force: true });
+        d = (res && res.data) || {};
+        console.log('[injectStarterCatalog force]', d);
+        alert(`Starter catalog → "${tid}" (forced re-run):\nremoved: ${d.removed || 0}\ninjected: ${d.injected || 0}`);
+      } else {
+        alert(`"${tid}": already injected — skipped.`);
+      }
+      return;
+    }
+    alert(`Starter catalog → "${tid}":\ninjected: ${d.injected || 0}${d.skipped ? `\nskipped: ${d.skipped}` : ''}`);
   } catch (err) {
     console.error('inject catalog failed:', err);
     alert('Inject catalog failed: ' + (err && err.message ? err.message : err));
