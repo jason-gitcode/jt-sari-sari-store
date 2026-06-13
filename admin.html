@@ -11108,6 +11108,18 @@ async function saveProduct(e) {
     variants: []
   };
 
+  // Preserve per-product status flags the edit form doesn't manage. saveProduct
+  // writes with a full .set() (to cleanly drop branchIds etc.), which would
+  // otherwise WIPE these on every edit — un-archiving a product (silently
+  // breaking the tier cap), un-hiding a hidden one, or marking an out-of-stock
+  // item available again. (emoji is preserved the same way, above.)
+  if (editingProductId) {
+    const _existing = products.find(p => p.id === editingProductId) || {};
+    if (typeof _existing.available === 'boolean') formData.available = _existing.available;
+    if (_existing.hidden === true) formData.hidden = true;
+    if (_existing.archived === true) formData.archived = true;
+  }
+
   document.querySelectorAll('[data-variant-name]').forEach(field => {
     const idx = field.dataset.variantIndex;
     const name = field.value;
