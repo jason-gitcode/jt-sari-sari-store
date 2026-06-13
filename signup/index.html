@@ -1435,15 +1435,32 @@
     width: 24px; height: 24px;
   }
   .footer-meta { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
-  .footer-end { display: flex; align-items: center; gap: 16px; }
-  .footer-social {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-    color: #fff; background: rgba(255, 255, 255, 0.10);
-    transition: background 0.18s ease, transform 0.18s ease;
+  /* Contact Us — stacked rows of icon + clickable detail, above the footer bar */
+  .footer-contact {
+    max-width: 1120px; margin: 0 auto 28px; padding: 0 24px 26px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   }
-  .footer-social:hover { background: #1877F2; transform: translateY(-1px); }
-  .footer-social svg { width: 20px; height: 20px; fill: currentColor; }
+  .footer-contact-title {
+    color: #fff; font-size: 15px; font-weight: 700; margin-bottom: 14px;
+  }
+  .contact-row {
+    display: flex; align-items: center; gap: 12px; width: fit-content;
+    color: rgba(255, 255, 255, 0.80); text-decoration: none;
+    font-size: 14px; margin-bottom: 10px;
+    transition: color 0.18s ease;
+  }
+  .contact-row:last-child { margin-bottom: 0; }
+  .contact-row:hover { color: #fff; }
+  .contact-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.10); color: #fff;
+    transition: background 0.18s ease;
+  }
+  .contact-icon svg { width: 18px; height: 18px; fill: currentColor; }
+  .contact-row.fb:hover .contact-icon { background: #1877F2; }
+  .contact-row.mail:hover .contact-icon { background: var(--accent); }
+  .contact-text { word-break: break-all; }
 
   /* ============================================================
      Utilities
@@ -3156,17 +3173,23 @@
      Footer
      ============================================================ -->
 <footer>
+  <div class="footer-contact">
+    <h4 class="footer-contact-title">Contact Us</h4>
+    <a class="contact-row fb" href="https://www.facebook.com/pabilimart.official/" target="_blank" rel="noopener noreferrer">
+      <span class="contact-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 13.5h2.5l1-4H14v-2c0-1.03 0-2 2-2h1.5V2.14c-.326-.043-1.557-.14-2.857-.14C11.928 2 10 3.657 10 6.7v2.8H7v4h3V22h4v-8.5z"/></svg></span>
+      <span class="contact-text">https://www.facebook.com/pabilimart.official/</span>
+    </a>
+    <a class="contact-row mail" href="mailto:support@pabilimart.com">
+      <span class="contact-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></span>
+      <span class="contact-text">support@pabilimart.com</span>
+    </a>
+  </div>
   <div class="footer-inner">
     <a href="#" class="footer-brand">
       <img class="brand-mark" src="/pabilimart-logo.png" alt="" />
       Pabili Mart
     </a>
-    <div class="footer-end">
-      <div class="footer-meta">© 2026 Pabili Mart · Made in the Philippines 🇵🇭</div>
-      <a class="footer-social" href="https://www.facebook.com/pabilimart.official/" target="_blank" rel="noopener noreferrer" aria-label="Pabili Mart on Facebook" title="Follow us on Facebook">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 13.5h2.5l1-4H14v-2c0-1.03 0-2 2-2h1.5V2.14c-.326-.043-1.557-.14-2.857-.14C11.928 2 10 3.657 10 6.7v2.8H7v4h3V22h4v-8.5z"/></svg>
-      </a>
-    </div>
+    <div class="footer-meta">© 2026 Pabili Mart · Made in the Philippines 🇵🇭</div>
   </div>
 </footer>
 
