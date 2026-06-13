@@ -20,8 +20,10 @@
 <base href="/">
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
-<!-- No favicon — the signup page is platform-scoped, not tied to a tenant.
-     Avoids leaking the seed tenant's logo into browser tab switchers. -->
+<!-- Platform-scoped favicon (Pabili Mart logo). Safe to set here — this is the
+     SaaS brand, not a tenant; no risk of leaking the seed tenant's logo. -->
+<link rel="icon" href="/pabilimart-logo.png" />
+<link rel="apple-touch-icon" href="/pabilimart-logo.png" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -171,11 +173,9 @@
   }
   .brand-mark {
     width: 28px; height: 28px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-grad-end));
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 14px;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.30);
+    border-radius: 50%;
+    object-fit: contain;
+    display: block; flex-shrink: 0;
   }
   .nav-actions { display: flex; align-items: center; gap: 18px; flex-wrap: nowrap; }
   .nav-link {
@@ -1432,8 +1432,7 @@
     text-decoration: none;
   }
   .footer-brand .brand-mark {
-    width: 24px; height: 24px; border-radius: 6px; font-size: 12px;
-    box-shadow: none;
+    width: 24px; height: 24px;
   }
   .footer-meta { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
 
@@ -1713,7 +1712,7 @@
 <nav class="topbar">
   <div class="topbar-inner">
     <a href="#home" class="brand" data-page-link="home">
-      <span class="brand-mark">P</span>
+      <img class="brand-mark" src="/pabilimart-logo.png" alt="" />
       Pabili Mart
     </a>
     <button type="button" class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navMenu">
@@ -3150,7 +3149,7 @@
 <footer>
   <div class="footer-inner">
     <a href="#" class="footer-brand">
-      <span class="brand-mark">P</span>
+      <img class="brand-mark" src="/pabilimart-logo.png" alt="" />
       Pabili Mart
     </a>
     <div class="footer-meta">© 2026 Pabili Mart · Made in the Philippines 🇵🇭</div>

@@ -1,7 +1,8 @@
-const CACHE = 'sari-sari-v334';
+const CACHE = 'sari-sari-v335';
 const PRECACHE = [
   '/logo.PNG',
   '/newlogo.jpeg',
+  '/pabilimart-logo.png',
   '/manifest.json',
 ];
 
