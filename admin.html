@@ -5370,16 +5370,17 @@ function renderBillingTab() {
     // scheduled a cancellation (cancelAtPeriodEnd=true), we swap the
     // cancel link for a "Keep subscription" reactivate link.
     // A downgrade is scheduled when scheduledTier is set (or the legacy
-    // cancelAtPeriodEnd flag). Offer "Undo downgrade"; otherwise (active,
-    // paid, no schedule) offer "Cancel plan". Hidden during grace — there
-    // the path forward is Pay now, not undo.
+    // cancelAtPeriodEnd flag). Active + scheduled → "Undo downgrade"; active
+    // (no schedule) → "Cancel plan"; trialing → "Cancel trial" (ends the
+    // trial → Free). Hidden during grace — there the path forward is Pay now.
     const downgradeScheduled = !!subscriptionData.scheduledTier || subscriptionData.cancelAtPeriodEnd === true;
     let cancelLinkInline = '';
-    if (tier !== 'free' && status === 'active') {
-      if (downgradeScheduled) {
+    if (tier !== 'free' && (status === 'active' || status === 'trialing')) {
+      if (status === 'active' && downgradeScheduled) {
         cancelLinkInline = `<button onclick="reactivateSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:#16a34a;cursor:pointer;text-decoration:underline;">Undo downgrade</button>`;
       } else {
-        cancelLinkInline = `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancel plan</button>`;
+        const cancelText = status === 'trialing' ? 'Cancel trial' : 'Cancel plan';
+        cancelLinkInline = `<button onclick="cancelSubscription()" style="background:none;border:0;padding:4px 6px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;">${cancelText}</button>`;
       }
     }
 
