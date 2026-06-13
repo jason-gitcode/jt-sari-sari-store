@@ -1180,6 +1180,7 @@ exports.confirmManualPayment = onCall(async (request) => {
       graceToTier: null,
       scheduledTier: null,
       pendingRetainIds: null,
+      dunningStages: [], // payment confirmed → reset the reminder cycle
       suspendedAt: null,
       cancelledAt: null,
       cancellationReason: null,
@@ -2133,9 +2134,166 @@ async function archiveProductsForTier(tid, targetTier, retainIds) {
   return { total: docs.length, kept: keep.size, archived: docs.length - keep.size, cap };
 }
 
+// ============================================================
+// Dunning emails — branded payment reminders + downgrade notices sent by the
+// daily lifecycle. Reuses the Resend pipeline (noreply@mail.pabilimart.com) and
+// the same card shell as the sign-in email, so owners get a consistent look.
+//
+// A full paid lapse sends at most 4 emails; a trial lapse 2:
+//   renewal      — active, period ends within 3 days → "renews soon, pay to keep"
+//   trialEnding  — trialing, trial ends within 3 days → "trial ends soon"
+//   graceStarted — period ended, entered grace → "overdue, N days to pay"  (once)
+//   finalWarning — grace ends within ~1.5 days → "last chance before downgrade"
+//   dropped      — moved to target tier → "extra products are safe & archived,
+//                  restored when you upgrade"                               (once)
+//
+// Dedup: the time-window reminders (renewal/trialEnding/finalWarning) would
+// re-fire on every daily run while inside their window, so `dunningStages` on
+// subscription/current records which have been sent this cycle. The transition
+// emails (graceStarted/dropped) ride a one-time status change and need no
+// dedup. dunningStages is reset to [] on enter-grace, on drop, and on payment
+// (confirmManualPayment). At pilot scale the Resend free tier (3,000/mo,
+// 100/day) is never the constraint; revisit batching past ~100 drops/day.
+// ============================================================
+const DUNNING_TIER_LABEL = { free: 'Free', growth: 'Growth', pro: 'Pro' };
+
+function dunningEmailHtml(e) {
+  const bullets = (e.bullets && e.bullets.length)
+    ? `<ul style="margin:0 0 24px;padding-left:20px;font-size:15px;line-height:1.6;color:#4b5563;">${e.bullets.map(b => `<li style="margin:0 0 8px;">${b}</li>`).join('')}</ul>`
+    : '';
+  const cta = (e.ctaText && e.ctaHref)
+    ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:#2563eb;">
+          <a href="${escAttr(e.ctaHref)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${e.ctaText}</a>
+        </td></tr></table>`
+    : '';
+  const foot = e.footnote ? `<p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#9ca3af;">${e.footnote}</p>` : '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+      <tr><td style="background:linear-gradient(135deg,#2563eb,#1e40af);padding:26px 32px;">
+        <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">🛒 Pabili Mart</div>
+      </td></tr>
+      <tr><td style="padding:32px;">
+        <h1 style="margin:0 0 12px;font-size:20px;color:#111827;">${e.heading}</h1>
+        <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#4b5563;">${e.intro}</p>
+        ${bullets}${cta}${foot}
+      </td></tr>
+      <tr><td style="padding:18px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+        <div style="font-size:12px;color:#9ca3af;">Pabili Mart · Your neighborhood store, online.</div>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
+function dunningEmailText(e) {
+  const bullets = (e.bullets && e.bullets.length)
+    ? '\n\n' + e.bullets.map(b => '• ' + String(b).replace(/<[^>]+>/g, '')).join('\n')
+    : '';
+  const cta = (e.ctaText && e.ctaHref) ? `\n\n${e.ctaText.replace(/[→\s]+$/, '').trim()}: ${e.ctaHref}` : '';
+  const foot = e.footnote ? `\n\n${String(e.footnote).replace(/<[^>]+>/g, '')}` : '';
+  return `${e.heading}\n\n${String(e.intro).replace(/<[^>]+>/g, '')}${bullets}${cta}${foot}`;
+}
+
+// Build the per-stage copy. ctx: { tid, storeName, tier, amount, daysLeft?,
+// toTier?, cap?, archivedCount? }.
+function buildDunningEmail(stage, ctx) {
+  const adminUrl = `https://pabilimart.com/${ctx.tid}/admin/`;
+  const tierName = DUNNING_TIER_LABEL[ctx.tier] || ctx.tier;
+  const toName = DUNNING_TIER_LABEL[ctx.toTier] || ctx.toTier;
+  const d = ctx.daysLeft, dLabel = `${d} day${d === 1 ? '' : 's'}`;
+  const safeFoot = `Your orders and customer data are always safe. Already paid? You can ignore this — payments can take a little while to confirm.`;
+  switch (stage) {
+    case 'renewal':
+      return {
+        subject: `Your Pabili Mart ${tierName} plan renews in ${dLabel}`,
+        heading: `Your ${tierName} plan renews soon`,
+        intro: `Hi ${ctx.storeName}, your Pabili Mart ${tierName} plan (₱${ctx.amount}/month) is due in ${dLabel}. Send your GCash payment to keep your store running without interruption.`,
+        bullets: null,
+        ctaText: 'Open Billing →', ctaHref: adminUrl,
+        footnote: safeFoot
+      };
+    case 'trialEnding':
+      return {
+        subject: `Your Pabili Mart free trial ends in ${dLabel}`,
+        heading: `Your free trial ends in ${dLabel}`,
+        intro: `Hi ${ctx.storeName}, your ${tierName} free trial ends in ${dLabel}. To keep your ${tierName} features, send your first GCash payment (₱${ctx.amount}/month) before it ends — otherwise your store moves to Free.`,
+        bullets: null,
+        ctaText: `Keep ${tierName} →`, ctaHref: adminUrl,
+        footnote: safeFoot
+      };
+    case 'graceStarted':
+      return {
+        subject: `Action needed: your Pabili Mart payment is overdue`,
+        heading: `Your payment is overdue`,
+        intro: `Hi ${ctx.storeName}, we haven't received your ${tierName} payment, so your store is now in a ${ctx.graceDays}-day grace period. Pay now to stay on ${tierName} with everything as-is.`,
+        bullets: [
+          `If we don't receive payment by the end of the grace period, your store moves to <strong>${toName}</strong>.`,
+          `Products beyond the ${toName} limit of ${ctx.cap} would be <strong>archived, not deleted</strong> — hidden from your storefront but kept in your admin, and restored the moment you upgrade.`,
+          `Your orders and customer data are always safe.`
+        ],
+        ctaText: 'Pay & keep my plan →', ctaHref: adminUrl,
+        footnote: `Already paid? You can ignore this — payments can take a little while to confirm.`
+      };
+    case 'finalWarning':
+      return {
+        subject: `Final reminder: your store changes to ${toName} tomorrow`,
+        heading: `Last chance to keep ${tierName}`,
+        intro: `Hi ${ctx.storeName}, your grace period ends in about a day. Without payment, your store will automatically move to <strong>${toName}</strong> and any products beyond the limit of ${ctx.cap} will be archived (kept safe in your admin, not deleted).`,
+        bullets: null,
+        ctaText: 'Pay now →', ctaHref: adminUrl,
+        footnote: `Already paid? You can ignore this — payments can take a little while to confirm.`
+      };
+    case 'dropped':
+      return {
+        subject: `Your Pabili Mart plan is now ${toName}`,
+        heading: `Your store is now on ${toName}`,
+        intro: `Hi ${ctx.storeName}, your plan has changed to <strong>${toName}</strong>.`,
+        bullets: [
+          (ctx.archivedCount > 0
+            ? `${ctx.archivedCount} product${ctx.archivedCount === 1 ? ' was' : 's were'} archived to fit the ${toName} limit of ${ctx.cap}. They're hidden from your storefront but still in your admin — nothing was deleted.`
+            : `Your whole catalog fits within the ${toName} limit, so all your products are still visible.`),
+          `Upgrade anytime to instantly bring your archived products back.`,
+          `Your orders and customer data are untouched.`
+        ],
+        ctaText: 'View plans →', ctaHref: adminUrl,
+        footnote: null
+      };
+    default:
+      return null;
+  }
+}
+
+async function sendDunningEmail(recipients, stage, ctx) {
+  if (!recipients || recipients.length === 0) return false;
+  if (!process.env.RESEND_API_KEY) { console.warn('[dunning] RESEND_API_KEY missing — skipping', stage); return false; }
+  const e = buildDunningEmail(stage, ctx);
+  if (!e) return false;
+  let res;
+  try {
+    res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: MAIL_FROM, to: recipients, subject: e.subject, html: dunningEmailHtml(e), text: dunningEmailText(e) })
+    });
+  } catch (err) {
+    console.warn('[dunning] Resend request failed', stage, err.message);
+    return false;
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.warn('[dunning] Resend non-2xx', stage, res.status, body);
+    return false;
+  }
+  console.log('[dunning] sent', stage, 'to', recipients.join(','), 'for', ctx.tid);
+  return true;
+}
+
 exports.runSubscriptionLifecycle = onSchedule({
   schedule: 'every day 03:00',
-  timeZone: 'Asia/Manila'
+  timeZone: 'Asia/Manila',
+  secrets: ['RESEND_API_KEY']
 }, async () => {
   console.log('[runSubscriptionLifecycle] starting daily run');
   const now = new Date();
@@ -2182,6 +2340,20 @@ exports.runSubscriptionLifecycle = onSchedule({
     const graceEndsAt = sub.graceEndsAt;
     const scheduledTier = String(sub.scheduledTier || '').toLowerCase();
 
+    // Dunning setup — owner recipients + per-cycle sent-stage dedup. maybeDun
+    // only sends a window reminder once per cycle; transition emails are sent
+    // inline below (they ride one-time status changes, no dedup needed).
+    const recipients = (Array.isArray(tenantData.ownerEmails) ? tenantData.ownerEmails : [])
+      .map(e => String(e || '').trim().toLowerCase())
+      .filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+    const sentStages = Array.isArray(sub.dunningStages) ? sub.dunningStages.slice() : [];
+    const newlySent = [];
+    const baseCtx = { tid, storeName: tenantData.name || 'there', tier, amount: (SUBSCRIPTION_TIERS[tier] || {}).amount || 0 };
+    const maybeDun = async (stage, ctx) => {
+      if (sentStages.includes(stage)) return;
+      if (await sendDunningEmail(recipients, stage, ctx)) { sentStages.push(stage); newlySent.push(stage); }
+    };
+
     // Decide the single transition for this tenant today, if any.
     //   enterGrace : active period ended (unpaid OR scheduled downgrade) →
     //                keep the current tier through a grace window
@@ -2215,7 +2387,31 @@ exports.runSubscriptionLifecycle = onSchedule({
       action = { kind: 'drop', fromTier: String(sub.graceFromTier || tier).toLowerCase(), toTier, label: `grace→${toTier} (drop)` };
     }
 
-    if (!action) { unchanged++; continue; }
+    // No transition today → maybe send a time-window reminder, then move on.
+    // The boundaries are mutually exclusive with the transitions above (a
+    // reminder needs the deadline in the FUTURE; a transition needs it past),
+    // so reminders only land in this no-action branch.
+    if (!action) {
+      try {
+        if (status === 'active' && periodEnd) {
+          const daysLeft = Math.ceil(-_daysBetween(now, periodEnd));
+          if (daysLeft > 0 && daysLeft <= 3) await maybeDun('renewal', { ...baseCtx, daysLeft });
+        } else if (status === 'trialing' && trialEnd) {
+          const daysLeft = Math.ceil(-_daysBetween(now, trialEnd));
+          if (daysLeft > 0 && daysLeft <= 3) await maybeDun('trialEnding', { ...baseCtx, daysLeft });
+        } else if (status === 'grace' && graceEndsAt) {
+          const daysLeft = -_daysBetween(now, graceEndsAt);
+          if (daysLeft > 0 && daysLeft <= 1.5) {
+            const toTier = String(sub.graceToTier || 'free').toLowerCase();
+            await maybeDun('finalWarning', { ...baseCtx, toTier, cap: (SUBSCRIPTION_TIERS[toTier] || {}).productCap });
+          }
+        }
+        if (newlySent.length > 0) await subRef.set({ dunningStages: sentStages }, { merge: true });
+      } catch (derr) {
+        console.warn('[runSubscriptionLifecycle] dunning reminder failed for', tid, ':', derr.message);
+      }
+      unchanged++; continue;
+    }
 
     try {
       if (action.kind === 'enterGrace') {
@@ -2224,8 +2420,14 @@ exports.runSubscriptionLifecycle = onSchedule({
           graceSince: FieldValue.serverTimestamp(),
           graceEndsAt: action.graceEnds,
           graceFromTier: action.fromTier,
-          graceToTier: action.toTier
+          graceToTier: action.toTier,
+          dunningStages: [] // fresh window for the grace-period reminders
         });
+        // graceStarted notice (one-time — status just left 'active').
+        await maybeDun('graceStarted', {
+          ...baseCtx, toTier: action.toTier, graceDays: action.graceDays,
+          cap: (SUBSCRIPTION_TIERS[action.toTier] || {}).productCap
+        }).catch(() => {});
       } else { // drop
         const toTier = action.toTier;
         // Archive the catalog down to the target tier's cap (honoring the
@@ -2248,6 +2450,7 @@ exports.runSubscriptionLifecycle = onSchedule({
           graceSince: null, graceEndsAt: null, graceFromTier: null, graceToTier: null,
           pendingRetainIds: null,
           trialEndsAt: null,
+          dunningStages: [], // cycle ended; next paid cycle (Growth) starts clean
           droppedAt: FieldValue.serverTimestamp(),
           droppedFromTier: action.fromTier
         };
@@ -2266,6 +2469,12 @@ exports.runSubscriptionLifecycle = onSchedule({
         // Mirror the tier so storefront branding + admin cap revert.
         await tenantDoc.ref.update({ tier: toTier });
         await tenantDoc.ref.collection('settings').doc('store').set({ tier: toTier }, { merge: true });
+        // dropped notice (one-time — this transition only fires once).
+        await maybeDun('dropped', {
+          ...baseCtx, toTier,
+          cap: action.archiveInfo ? action.archiveInfo.cap : (SUBSCRIPTION_TIERS[toTier] || {}).productCap,
+          archivedCount: action.archiveInfo ? action.archiveInfo.archived : 0
+        }).catch(() => {});
       }
       transitions.push({
         tid,
