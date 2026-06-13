@@ -338,6 +338,29 @@ async function injectStarterCatalog(tid) {
 const CATALOG_STORE_TID = 'catalog-store';
 const CATALOG_SEED_SOURCE_TID = 'jsminimart';
 
+// setTenantForeverPro — pin a tenant to Pro permanently: internal (amount 0),
+// active, currentPeriodEnd=null so runSubscriptionLifecycle never expires or
+// downgrades it, and no trial/grace/dunning. Used for catalog-store and any
+// owner-internal store (e.g. jsminimart). Does NOT touch products or directory.
+async function setTenantForeverPro(tid) {
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', `Tenant "${tid}" does not exist.`);
+  await tref.collection('subscription').doc('current').set({
+    tier: 'pro', status: 'active', amount: 0,
+    currentPeriodStart: FieldValue.serverTimestamp(),
+    currentPeriodEnd: null,
+    trialEndsAt: null, trialUsedAt: FieldValue.serverTimestamp(),
+    scheduledTier: null, graceSince: null, graceEndsAt: null,
+    graceFromTier: null, graceToTier: null, pendingRetainIds: null,
+    cancelAtPeriodEnd: false, dunningStages: [],
+    paymentMethod: 'internal', internalForeverPro: true
+  }, { merge: true });
+  await tref.set({ tier: 'pro' }, { merge: true });
+  await tref.collection('settings').doc('store').set({ tier: 'pro' }, { merge: true });
+  return { tid, tier: 'pro', foreverPro: true };
+}
+
 async function seedCatalogStore({ force = false } = {}) {
   const cref = db.collection('tenants').doc(CATALOG_STORE_TID);
   const csnap = await cref.get();
@@ -348,18 +371,8 @@ async function seedCatalogStore({ force = false } = {}) {
   // ALWAYS (idempotent): forever Pro + remove from the public store-finder
   // directory so catalog-store never surfaces to customers. Runs even on the
   // already-seeded skip path, so re-clicking the button enforces the lock.
-  await cref.collection('subscription').doc('current').set({
-    tier: 'pro', status: 'active', amount: 0,
-    currentPeriodStart: FieldValue.serverTimestamp(),
-    currentPeriodEnd: null,
-    trialEndsAt: null, trialUsedAt: FieldValue.serverTimestamp(),
-    scheduledTier: null, graceSince: null, graceEndsAt: null,
-    graceFromTier: null, graceToTier: null, pendingRetainIds: null,
-    cancelAtPeriodEnd: false, dunningStages: [],
-    paymentMethod: 'internal', internalForeverPro: true
-  }, { merge: true });
-  await cref.set({ tier: 'pro', internalCatalogStore: true }, { merge: true });
-  await cref.collection('settings').doc('store').set({ tier: 'pro' }, { merge: true });
+  await setTenantForeverPro(CATALOG_STORE_TID);
+  await cref.set({ internalCatalogStore: true }, { merge: true });
   let removedFromDirectory = false;
   try { await removeDirectoryEntry(CATALOG_STORE_TID); removedFromDirectory = true; }
   catch (err) { console.warn('[seedCatalogStore] directory remove failed:', err.message); }
@@ -1437,6 +1450,12 @@ exports.injectStarterCatalogFor = onCall(async (request) => {
   // (Folded into this already-invoker-granted callable to avoid a new grant.)
   if (String(data.action || '') === 'seed-catalog-store') {
     return await seedCatalogStore({ force: data.force === true });
+  }
+  // Pin any tenant to forever Pro (e.g. jsminimart — Jason's own store).
+  if (String(data.action || '') === 'forever-pro') {
+    const ftid = String(data.tid || '').trim().toLowerCase();
+    if (!ftid) throw new HttpsError('invalid-argument', 'tid is required');
+    return await setTenantForeverPro(ftid);
   }
 
   const tid = String(data.tid || '').trim().toLowerCase();

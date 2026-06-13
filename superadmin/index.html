@@ -675,6 +675,7 @@
         <button class="btn btn-icon" onclick="runImageMigration()" title="Move a tenant's product images from base64 → Cloud Storage (idempotent, batched)">🖼 Migrate images</button>
         <button class="btn btn-icon" onclick="runInjectCatalog()" title="Inject the master catalog into a Pro tenant as HIDDEN products (once-only; force = clean re-run)">🛒 Inject catalog</button>
         <button class="btn btn-icon" onclick="runSeedCatalogStore()" title="One-time: copy JS Mini Mart's catalog into the master 'catalog-store' tenant + make it forever Pro">🏬 Seed catalog store</button>
+        <button class="btn btn-icon" onclick="runSetForeverPro()" title="Pin a tenant to Pro permanently (internal — never billed, never expires)">♾️ Forever Pro</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
       </div>
     </div>
@@ -1310,6 +1311,23 @@ async function runSeedCatalogStore() {
   } catch (err) {
     console.error('seed catalog store failed:', err);
     alert('Seed catalog store failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// Pin a tenant to forever Pro (internal — never billed, never expires).
+async function runSetForeverPro() {
+  const raw = prompt('Make which tenant FOREVER Pro (internal)?', 'jsminimart');
+  if (!raw) return;
+  const tid = raw.trim();
+  if (!confirm(`Set "${tid}" to FOREVER Pro?\n\ntier=pro, status=active, amount=0, never expires (currentPeriodEnd cleared).`)) return;
+  try {
+    const res = await injectStarterCatalogForFn({ action: 'forever-pro', tid });
+    const d = (res && res.data) || {};
+    console.log('[foreverPro]', d);
+    alert(`"${tid}" is now forever Pro.`);
+  } catch (err) {
+    console.error('forever pro failed:', err);
+    alert('Forever Pro failed: ' + (err && err.message ? err.message : err));
   }
 }
 
