@@ -70,6 +70,24 @@ function isAdminReservedSlug(slug) {
   return slug.replace(/-/g, '').includes('pabilimart');
 }
 
+// Store NAMES reserved for the platform admins (superadmins) only. Compared on
+// a normalized form (lowercased, non-alphanumerics stripped) so spacing,
+// apostrophes, and casing don't matter: "Jason's Store" == "Jasons Store" ==
+// "jasonsstore". Covers the exact names below PLUS any name spelling the brand
+// "pabilimart". Unrelated names (e.g. "Jason Cruz Store") stay open.
+const ADMIN_RESERVED_NAMES = new Set([
+  'jason',
+  'jasonsstore',
+]);
+function normalizeName(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+function isAdminReservedName(name) {
+  const n = normalizeName(name);
+  if (ADMIN_RESERVED_NAMES.has(n)) return true;
+  return n.includes('pabilimart'); // brand protection (matches the slug rule)
+}
+
 // Lowercase letters/numbers/hyphens, must start with a letter, 3–32 chars.
 // No trailing hyphen, no consecutive hyphens.
 const SLUG_REGEX = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -99,11 +117,17 @@ function validateSlug(raw, callerEmail) {
   return slug;
 }
 
-function validateName(raw) {
+function validateName(raw, callerEmail) {
   const name = String(raw || '').trim();
   if (name.length < 2 || name.length > 100) {
     throw new HttpsError('invalid-argument',
       'Store name must be 2–100 characters.');
+  }
+  // Admin-reserved name (exact normalized, or brand "pabilimart"): superadmins only.
+  if (isAdminReservedName(name) &&
+      !SUPERADMIN_EMAILS.has(String(callerEmail || '').trim().toLowerCase())) {
+    throw new HttpsError('already-exists',
+      'That store name is reserved. Please choose another.');
   }
   return name;
 }
@@ -258,7 +282,7 @@ exports.createTenant = onCall(async (request) => {
   // ---------- INPUT VALIDATION ----------
   const data = request.data || {};
   const slug = validateSlug(data.slug, email);
-  const name = validateName(data.name);
+  const name = validateName(data.name, email);
   const pickupAddress = validatePickupAddress(data.pickupAddress);
   const gcashAccountName = validateGcashAccountName(data.gcashAccountName);
   const gcashNumber = validateGcashNumber(data.gcashNumber);
@@ -515,7 +539,7 @@ exports.renameTenant = onCall(async (request) => {
   if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
   // validateName trims, length-checks (2..100), and rejects non-printable
   // characters — same validation used at signup time.
-  const newName = validateName(data.newName);
+  const newName = validateName(data.newName, token.email);
 
   const tref = db.collection('tenants').doc(tid);
   const settingsRef = tref.collection('settings').doc('store');
