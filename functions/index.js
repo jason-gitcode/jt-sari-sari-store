@@ -263,6 +263,61 @@ async function removeDirectoryEntry(slug) {
   }, { merge: true });
 }
 
+// ============================================================
+// injectStarterCatalog — copy the JS Mini Mart catalog into a Pro tenant as a
+// HIDDEN starter catalog the owner curates. Runs at most ONCE per tenant,
+// guarded by `starterCatalogInjected` on the tenant root doc (so
+// Pro→Growth→Pro never duplicates). Triggers: Pro signup (createTenant) and
+// reaching Pro via payment (confirmManualPayment).
+//
+// Each product is copied with a FRESH id (never clobbers the tenant's own
+// products), hidden:true + archived:false (invisible on the storefront until
+// the owner flips the per-row hide toggle), and tagged fromStarterCatalog:true.
+// Image URLs are REFERENCED (public download-token URLs), not re-uploaded — so
+// if JS Mini Mart later deletes a source image the copy shows a broken image
+// until the owner re-uploads (their edits write to their own storage path).
+// Branch-scoped fields are dropped so injected items are plain shared products.
+// Callers wrap this best-effort: a failure never blocks signup/payment.
+// ============================================================
+const STARTER_CATALOG_SOURCE_TID = 'jsminimart';
+
+async function injectStarterCatalog(tid) {
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) return { injected: 0, skipped: 'no-tenant' };
+  if ((tsnap.data() || {}).starterCatalogInjected === true) {
+    return { injected: 0, skipped: 'already-injected' };
+  }
+  if (tid === STARTER_CATALOG_SOURCE_TID) return { injected: 0, skipped: 'is-source' };
+
+  const srcSnap = await db.collection('tenants').doc(STARTER_CATALOG_SOURCE_TID)
+    .collection('products').get();
+  if (srcSnap.empty) return { injected: 0, skipped: 'empty-source' };
+
+  const targetCol = tref.collection('products');
+  const base = Date.now();
+  let batch = db.batch(), ops = 0, injected = 0, i = 0;
+  for (const doc of srcSnap.docs) {
+    const src = doc.data() || {};
+    const newId = base + i; i++;
+    const out = { ...src, id: newId, hidden: true, archived: false, fromStarterCatalog: true };
+    delete out.branchIds;       // not tied to this tenant's branches
+    delete out.branchInventory; // branch-scoped stock, if any
+    batch.set(targetCol.doc(String(newId)), out);
+    ops++; injected++;
+    // Conservative batch size — most images are URLs now, but stay well under
+    // Firestore's 10MB/batch ceiling in case any source doc still carries base64.
+    if (ops >= 200) { await batch.commit(); batch = db.batch(); ops = 0; }
+  }
+  if (ops > 0) await batch.commit();
+  await tref.update({
+    starterCatalogInjected: true,
+    starterCatalogInjectedAt: FieldValue.serverTimestamp(),
+    starterCatalogCount: injected
+  });
+  return { injected };
+}
+
 exports.createTenant = onCall(async (request) => {
   // ---------- AUTH ----------
   if (!request.auth) {
@@ -466,6 +521,20 @@ exports.createTenant = onCall(async (request) => {
     console.error('starter_pack copy failed for tenant', slug, err);
   }
 
+  // ---------- PRO STARTER CATALOG (hidden) ----------
+  // Pro signups additionally get the full JS Mini Mart catalog injected as a
+  // HIDDEN catalog to curate. The small starter_pack above stays as the
+  // visible day-one set. Best-effort — never fails the signup.
+  let starterCatalogInjected = 0;
+  if (initialTier === 'pro') {
+    try {
+      const r = await injectStarterCatalog(slug);
+      starterCatalogInjected = r.injected || 0;
+    } catch (err) {
+      console.error('starter catalog inject failed for tenant', slug, err);
+    }
+  }
+
   // ---------- ADD TO PUBLIC DIRECTORY ----------
   // Non-blocking: directory enables storefront discovery on the signup
   // page, but a failure here shouldn't roll back a successful tenant create.
@@ -497,6 +566,7 @@ exports.createTenant = onCall(async (request) => {
     url: `https://pabilimart.com/${slug}/`,
     adminUrl: `https://pabilimart.com/${slug}/admin/`,
     starterPackCopied,
+    starterCatalogInjected,
     tier: initialTier,
     tierName: SUBSCRIPTION_TIERS[initialTier].name,
     trialing: initialTier !== 'free'
@@ -1271,7 +1341,52 @@ exports.confirmManualPayment = onCall(async (request) => {
     catch (err) { console.warn('[confirmManualPayment] re-cap failed for', tid, ':', err.message); }
   }
 
+  // Reaching Pro (from Growth/Free/trial) injects the JS Mini Mart catalog as a
+  // HIDDEN starter catalog — once per tenant (flag-guarded in the helper).
+  if (confirmedTier === 'pro') {
+    try { await injectStarterCatalog(tid); }
+    catch (err) { console.warn('[confirmManualPayment] starter catalog inject failed for', tid, ':', err.message); }
+  }
+
   return { paymentId, tid, status: 'confirmed' };
+});
+
+// ============================================================
+// injectStarterCatalogFor — superadmin manual trigger for the Pro starter
+// catalog (testing / one-off backfill). `force: true` first deletes any prior
+// starter-catalog products + clears the flag for a clean re-run.
+// ============================================================
+exports.injectStarterCatalogFor = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
+
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
+
+  if (data.force === true) {
+    // Clean re-run: drop existing starter-catalog products + the once-only flag.
+    const tref = db.collection('tenants').doc(tid);
+    const prev = await tref.collection('products').where('fromStarterCatalog', '==', true).get();
+    let b = db.batch(), n = 0, removed = 0;
+    for (const d of prev.docs) {
+      b.delete(d.ref); removed++;
+      if (++n >= 400) { await b.commit(); b = db.batch(); n = 0; }
+    }
+    if (n > 0) await b.commit();
+    await tref.update({
+      starterCatalogInjected: FieldValue.delete(),
+      starterCatalogInjectedAt: FieldValue.delete(),
+      starterCatalogCount: FieldValue.delete()
+    }).catch(() => {});
+    const r = await injectStarterCatalog(tid);
+    return { tid, forced: true, removed, ...r };
+  }
+
+  const r = await injectStarterCatalog(tid);
+  return { tid, ...r };
 });
 
 // ============================================================
