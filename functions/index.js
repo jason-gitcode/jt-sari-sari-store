@@ -53,6 +53,7 @@ const ADMIN_RESERVED_SLUGS = new Set([
   'tindahan-ni-manilyn',
   'tindahan-ni-jacob',
   'tindahan-ni-sabrina',
+  'catalog-store', // internal master catalog (forever Pro) — see seedCatalogStore
   // "Jason" + slug variants of "Jason's Store" (apostrophe/space can't be in a
   // slug). Exact-match only, so names like jason-cruz / jason-bakery stay open.
   'jason',
@@ -279,7 +280,13 @@ async function removeDirectoryEntry(slug) {
 // Branch-scoped fields are dropped so injected items are plain shared products.
 // Callers wrap this best-effort: a failure never blocks signup/payment.
 // ============================================================
-const STARTER_CATALOG_SOURCE_TID = 'jsminimart';
+// The master reference catalog new subscribers are copied from. Seeded once
+// from jsminimart via seedCatalogStore(), then curated independently — so
+// catalog changes only affect FUTURE subscribers, never existing stores.
+const STARTER_CATALOG_SOURCE_TID = 'catalog-store';
+// Tenants that must NEVER receive an injection: the master itself + jsminimart
+// (the original real shop, whose own catalog must not be duplicated into it).
+const INJECT_EXCLUDED_TIDS = new Set(['catalog-store', 'jsminimart']);
 
 async function injectStarterCatalog(tid) {
   const tref = db.collection('tenants').doc(tid);
@@ -288,7 +295,7 @@ async function injectStarterCatalog(tid) {
   if ((tsnap.data() || {}).starterCatalogInjected === true) {
     return { injected: 0, skipped: 'already-injected' };
   }
-  if (tid === STARTER_CATALOG_SOURCE_TID) return { injected: 0, skipped: 'is-source' };
+  if (INJECT_EXCLUDED_TIDS.has(tid)) return { injected: 0, skipped: 'excluded' };
 
   const srcSnap = await db.collection('tenants').doc(STARTER_CATALOG_SOURCE_TID)
     .collection('products').get();
@@ -316,6 +323,62 @@ async function injectStarterCatalog(tid) {
     starterCatalogCount: injected
   });
   return { injected };
+}
+
+// ============================================================
+// seedCatalogStore — one-time bootstrap of the master `catalog-store` tenant:
+//   1. Copy jsminimart's current catalog into catalog-store (master copy,
+//      original ids kept, visible — this is the curate-here reference set).
+//   2. Make catalog-store FOREVER Pro: tier=pro, status=active, amount=0,
+//      currentPeriodEnd=null (so runSubscriptionLifecycle never expires it),
+//      trialUsedAt set so it can't claim a trial.
+// Guarded: refuses to overwrite an already-populated catalog-store unless
+// force:true — so a curated master is never silently clobbered.
+// ============================================================
+const CATALOG_STORE_TID = 'catalog-store';
+const CATALOG_SEED_SOURCE_TID = 'jsminimart';
+
+async function seedCatalogStore({ force = false } = {}) {
+  const cref = db.collection('tenants').doc(CATALOG_STORE_TID);
+  const csnap = await cref.get();
+  if (!csnap.exists) {
+    throw new HttpsError('not-found', `Tenant "${CATALOG_STORE_TID}" does not exist — create it first.`);
+  }
+
+  const targetCol = cref.collection('products');
+  const existing = await targetCol.limit(1).get();
+  if (!existing.empty && !force) {
+    return { skipped: 'already-seeded', note: 'catalog-store already has products; pass force:true to overwrite from jsminimart' };
+  }
+
+  // Copy jsminimart catalog → catalog-store (master; keep ids; not archived).
+  const srcSnap = await db.collection('tenants').doc(CATALOG_SEED_SOURCE_TID).collection('products').get();
+  let batch = db.batch(), ops = 0, copied = 0;
+  for (const doc of srcSnap.docs) {
+    const out = { ...(doc.data() || {}) };
+    delete out.fromStarterCatalog; // this IS the master, not an injected copy
+    delete out.archived;           // master is never tier-archived
+    batch.set(targetCol.doc(doc.id), out, { merge: true });
+    ops++; copied++;
+    if (ops >= 200) { await batch.commit(); batch = db.batch(); ops = 0; }
+  }
+  if (ops > 0) await batch.commit();
+
+  // Forever Pro (internal — never billed, never expires, never trials).
+  await cref.collection('subscription').doc('current').set({
+    tier: 'pro', status: 'active', amount: 0,
+    currentPeriodStart: FieldValue.serverTimestamp(),
+    currentPeriodEnd: null,
+    trialEndsAt: null, trialUsedAt: FieldValue.serverTimestamp(),
+    scheduledTier: null, graceSince: null, graceEndsAt: null,
+    graceFromTier: null, graceToTier: null, pendingRetainIds: null,
+    cancelAtPeriodEnd: false, dunningStages: [],
+    paymentMethod: 'internal', internalForeverPro: true
+  }, { merge: true });
+  await cref.set({ tier: 'pro', internalCatalogStore: true }, { merge: true });
+  await cref.collection('settings').doc('store').set({ tier: 'pro' }, { merge: true });
+
+  return { seeded: true, copied, forced: force, tier: 'pro' };
 }
 
 exports.createTenant = onCall(async (request) => {
@@ -1363,6 +1426,13 @@ exports.injectStarterCatalogFor = onCall(async (request) => {
   if (!SUPERADMIN_EMAILS.has(token.email)) throw new HttpsError('permission-denied', 'Superadmin only.');
 
   const data = request.data || {};
+
+  // One-time master setup: seed catalog-store from jsminimart + make it Pro.
+  // (Folded into this already-invoker-granted callable to avoid a new grant.)
+  if (String(data.action || '') === 'seed-catalog-store') {
+    return await seedCatalogStore({ force: data.force === true });
+  }
+
   const tid = String(data.tid || '').trim().toLowerCase();
   if (!tid) throw new HttpsError('invalid-argument', 'tid is required');
 

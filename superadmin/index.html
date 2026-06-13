@@ -673,7 +673,8 @@
         <button class="btn btn-icon" onclick="runBackfill()" title="Backfill tier mirror on tenant root docs (idempotent)">⚙ Backfill</button>
         <button class="btn btn-icon" onclick="runBackfillClaims()" title="Set the { tenants:[...] } ownership auth claim on all tenant owners so they can upload product images (idempotent)">🔑 Backfill claims</button>
         <button class="btn btn-icon" onclick="runImageMigration()" title="Move a tenant's product images from base64 → Cloud Storage (idempotent, batched)">🖼 Migrate images</button>
-        <button class="btn btn-icon" onclick="runInjectCatalog()" title="Inject the JS Mini Mart catalog into a Pro tenant as HIDDEN products (once-only; force = clean re-run)">🛒 Inject catalog</button>
+        <button class="btn btn-icon" onclick="runInjectCatalog()" title="Inject the master catalog into a Pro tenant as HIDDEN products (once-only; force = clean re-run)">🛒 Inject catalog</button>
+        <button class="btn btn-icon" onclick="runSeedCatalogStore()" title="One-time: copy JS Mini Mart's catalog into the master 'catalog-store' tenant + make it forever Pro">🏬 Seed catalog store</button>
         <button class="btn btn-icon" onclick="refresh()">↻ Refresh</button>
       </div>
     </div>
@@ -1284,6 +1285,31 @@ async function runInjectCatalog() {
   } catch (err) {
     console.error('inject catalog failed:', err);
     alert('Inject catalog failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+// One-time: seed the master catalog-store tenant from JS Mini Mart + forever Pro.
+async function runSeedCatalogStore() {
+  if (!confirm(`Seed "catalog-store" from JS Mini Mart's catalog and make it FOREVER Pro?\n\nCopies jsminimart's products into the master catalog-store and sets it Pro permanently.`)) return;
+  try {
+    let res = await injectStarterCatalogForFn({ action: 'seed-catalog-store', force: false });
+    let d = (res && res.data) || {};
+    console.log('[seedCatalogStore]', d);
+    if (d.skipped === 'already-seeded') {
+      if (confirm(`catalog-store already has products.\n\nOVERWRITE it from JS Mini Mart's CURRENT catalog?\nThis replaces catalog-store's products — any curation there is lost.`)) {
+        res = await injectStarterCatalogForFn({ action: 'seed-catalog-store', force: true });
+        d = (res && res.data) || {};
+        console.log('[seedCatalogStore force]', d);
+        alert(`catalog-store re-seeded:\ncopied: ${d.copied || 0}\nplan: forever Pro`);
+      } else {
+        alert('catalog-store already seeded — skipped.');
+      }
+      return;
+    }
+    alert(`catalog-store seeded:\ncopied: ${d.copied || 0}\nplan: forever Pro`);
+  } catch (err) {
+    console.error('seed catalog store failed:', err);
+    alert('Seed catalog store failed: ' + (err && err.message ? err.message : err));
   }
 }
 
