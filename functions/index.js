@@ -53,6 +53,13 @@ const ADMIN_RESERVED_SLUGS = new Set([
   'tindahan-ni-manilyn',
   'tindahan-ni-jacob',
   'tindahan-ni-sabrina',
+  // "Jason" + slug variants of "Jason's Store" (apostrophe/space can't be in a
+  // slug). Exact-match only, so names like jason-cruz / jason-bakery stay open.
+  'jason',
+  'jasons-store',
+  'jasonsstore',
+  'jason-store',
+  'jasonstore',
 ]);
 function isAdminReservedSlug(slug) {
   if (ADMIN_RESERVED_SLUGS.has(slug)) return true;
