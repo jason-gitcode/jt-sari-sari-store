@@ -1100,6 +1100,15 @@ exports.startFreeTrial = onCall(async (request) => {
     tx.update(tref, { tier: requestedTier });
   });
 
+  // Starting a PRO trial injects the catalog-store catalog as a HIDDEN starter
+  // catalog — same as a direct Pro signup / paid Pro upgrade. Trials have no
+  // confirmation step, so this is the only automatic hook. Once-only per tenant
+  // (flag-guarded in the helper); best-effort so it never fails the trial.
+  if (requestedTier === 'pro') {
+    try { await injectStarterCatalog(tid); }
+    catch (err) { console.warn('[startFreeTrial] starter catalog inject failed for', tid, ':', err.message); }
+  }
+
   return {
     ok: true,
     tier: requestedTier,
