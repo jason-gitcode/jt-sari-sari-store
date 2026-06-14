@@ -8562,7 +8562,7 @@ function openEmployeeInviteModal() {
   document.getElementById('emp-save-btn').textContent = 'Send invite';
   empRenderPermGroups({});
   applyEmpPreset('cashier');
-  document.getElementById('emp-modal').classList.add('active');
+  document.getElementById('emp-modal').classList.add('show');
 }
 
 function openEmployeeFromRow(btn) {
@@ -8589,10 +8589,10 @@ async function empOpenEditor(info) {
   empModalCtx.name = data.name || '';
   empRenderPermGroups(data.permissions || {});
   empSetActivePresetChip(data.preset || 'custom');
-  document.getElementById('emp-modal').classList.add('active');
+  document.getElementById('emp-modal').classList.add('show');
 }
 
-function closeEmployeeModal() { const m = document.getElementById('emp-modal'); if (m) m.classList.remove('active'); }
+function closeEmployeeModal() { const m = document.getElementById('emp-modal'); if (m) m.classList.remove('show'); }
 function empModalBackdrop(e) { if (e.target === e.currentTarget) closeEmployeeModal(); }
 
 async function saveEmployeeFromModal() {
