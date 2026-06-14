@@ -4474,9 +4474,9 @@
     </div>
     <div class="supp-modal-body" id="product-view-body"></div>
     <div class="supp-modal-footer">
-      <button type="button" class="supp-del-btn" onclick="deleteFromProductView()">Delete</button>
+      <button type="button" class="supp-del-btn" id="pv-delete-btn" onclick="deleteFromProductView()">Delete</button>
       <button type="button" class="btn-secondary" onclick="closeProductView()">Close</button>
-      <button type="button" class="btn-primary" onclick="editFromProductView()">Edit</button>
+      <button type="button" class="btn-primary" id="pv-edit-btn" onclick="editFromProductView()">Edit</button>
     </div>
   </div>
 </div>
@@ -11258,6 +11258,8 @@ function openProductView(id) {
   currentViewProductId = id;
   document.getElementById('product-view-title').textContent = p.name || 'Product Details';
   document.getElementById('product-view-body').innerHTML = renderProductViewBody(p);
+  const pvDel = document.getElementById('pv-delete-btn'); if (pvDel) pvDel.style.display = can('productdelete') ? '' : 'none';
+  const pvEdit = document.getElementById('pv-edit-btn'); if (pvEdit) pvEdit.style.display = can('productedit') ? '' : 'none';
   document.getElementById('product-view-modal').classList.add('show');
 }
 function closeProductView(e) {

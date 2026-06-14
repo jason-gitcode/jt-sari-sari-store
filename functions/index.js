@@ -1695,11 +1695,13 @@ exports.updateStaffPermissions = onCall(async (request) => {
   if (memberUid) {
     const mref = tref.collection('members').doc(memberUid);
     if (!(await mref.get()).exists) throw new HttpsError('not-found', 'Employee not found.');
-    await mref.set(patch, { merge: true });
+    // update() (NOT set-merge) so the permissions map is REPLACED wholesale —
+    // set+merge deep-merges maps, which would never remove a turned-off perm.
+    await mref.update(patch);
   } else {
     const iref = tref.collection('staff_invites').doc(staffEmailKey(inviteEmail));
     if (!(await iref.get()).exists) throw new HttpsError('not-found', 'Invite not found.');
-    await iref.set(patch, { merge: true });
+    await iref.update(patch);
   }
   return { ok: true, permissions };
 });
