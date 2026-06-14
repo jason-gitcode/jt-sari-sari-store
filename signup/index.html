@@ -269,7 +269,7 @@
     background: var(--accent-soft); color: var(--accent-dark);
     border-radius: 999px;
     font-size: 12px; font-weight: 600;
-    letter-spacing: 0.02em; text-transform: uppercase;
+    letter-spacing: 0.02em;
     margin-bottom: 22px;
   }
   .hero-eyebrow .dot {
@@ -317,6 +317,98 @@
   .hero-cta-note::before {
     content: '✓'; color: var(--success); font-weight: 700;
   }
+
+  /* New hero CTA buttons ("Ikaw ang boss" design) */
+  .hero-btns { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .btn-hero-primary { background: var(--accent); color: #fff; box-shadow: 0 8px 20px rgba(37,99,235,0.25); }
+  .btn-hero-primary:hover { background: var(--accent-dark); }
+  .btn-hero-ghost {
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line-strong);
+    padding: 14px 24px; border-radius: 10px;
+    font-size: 16px; font-weight: 600; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .btn-hero-ghost:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .hero-fineprint { display: block; font-size: 13px; color: var(--muted); }
+
+  /* Browser-window admin dashboard mockup (right side of the hero) */
+  .hero-mock-dash { position: relative; display: block; }
+  .browser-frame {
+    width: 100%; max-width: 600px; margin: 0 auto;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 40px 80px -28px rgba(15,23,42,0.30), 0 0 0 1px rgba(15,23,42,0.04);
+  }
+  .browser-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid var(--line);
+  }
+  .browser-dots { display: flex; gap: 6px; flex-shrink: 0; }
+  .browser-dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .browser-dots i:nth-child(1) { background: #ff5f57; }
+  .browser-dots i:nth-child(2) { background: #febc2e; }
+  .browser-dots i:nth-child(3) { background: #28c840; }
+  .browser-url {
+    flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 7px;
+    font-size: 12px; color: var(--muted); padding: 5px 12px; text-align: center;
+  }
+  .dash { padding: 16px; background: #f1f5f9; }
+  .dash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .dash-store { display: flex; align-items: center; gap: 10px; }
+  .dash-avatar {
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
+    color: #fff; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dash-store-name { font-weight: 700; color: var(--ink); font-size: 14px; display: block; line-height: 1.2; }
+  .dash-store-sub { font-size: 11px; color: var(--muted); }
+  .dash-pro {
+    background: #fef3c7; color: #b45309; font-weight: 700; font-size: 9px;
+    padding: 1px 6px; border-radius: 999px; margin-left: 5px; letter-spacing: 0.04em;
+  }
+  .dash-storefront {
+    background: #16a34a; color: #fff; font-weight: 600; font-size: 12px;
+    padding: 7px 13px; border-radius: 8px; white-space: nowrap; flex-shrink: 0;
+  }
+  .dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .dash-stat { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+  .dash-stat-lbl {
+    font-size: 9px; font-weight: 700; color: var(--muted);
+    letter-spacing: 0.03em; text-transform: uppercase; display: block; margin-bottom: 4px;
+  }
+  .dash-stat-val { font-size: 17px; font-weight: 800; color: var(--ink); }
+  .dash-stat-val.is-blue { color: #2563eb; }
+  .dash-stat-val.is-green { color: #16a34a; }
+  .dash-stat-val.is-orange { color: #d97706; }
+  .dash-charts { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 8px; }
+  .dash-panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .dash-panel-title { font-size: 11px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+  .dash-donut {
+    width: 92px; height: 92px; border-radius: 50%; margin: 4px auto 2px; position: relative;
+    background: conic-gradient(
+      #2563eb 0 14%, #f59e0b 14% 22%, #22c55e 22% 30%, #ef4444 30% 39%,
+      #8b5cf6 39% 46%, #ec4899 46% 53%, #14b8a6 53% 61%, #f97316 61% 68%,
+      #eab308 68% 75%, #06b6d4 75% 83%, #a855f7 83% 91%, #84cc16 91% 100%);
+  }
+  .dash-donut::after { content: ''; position: absolute; inset: 30%; background: #fff; border-radius: 50%; }
+  .dash-bars { display: flex; align-items: flex-end; gap: 4px; height: 92px; padding-top: 4px; }
+  .dash-bars span { flex: 1; background: #93b4f6; border-radius: 2px 2px 0 0; min-height: 2px; }
+  .dash-bars span.spike { background: #6f9af0; }
+  .dash-toast {
+    position: absolute; left: 10px; bottom: -16px; z-index: 4;
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; box-shadow: 0 16px 32px -10px rgba(15,23,42,0.28);
+  }
+  .dash-toast-ico {
+    width: 30px; height: 30px; border-radius: 8px; background: #dcfce7; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .dash-toast-t { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .dash-toast-s { font-size: 11px; color: #16a34a; }
 
   /* Phone mockup */
   .hero-mock { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; }
@@ -801,6 +893,30 @@
   .day-stat .val { font-size: 16px; font-weight: 700; color: var(--ink); }
   @media (max-width: 920px) { .day-grid { grid-template-columns: repeat(2, 1fr); max-width: 560px; } }
   @media (max-width: 560px) { .day-grid { grid-template-columns: 1fr; max-width: 420px; } }
+
+  /* "Para sa customer mo" — storefront showcase (relocated phone carousel) */
+  .cust { background: var(--surface); }
+  .cust-inner {
+    max-width: 1120px; margin: 0 auto; padding: 0 24px;
+    display: grid; grid-template-columns: 1fr 0.9fr; gap: 64px; align-items: center;
+  }
+  .cust-eyebrow {
+    display: block; color: var(--accent); font-weight: 700; font-size: 13px;
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 16px;
+  }
+  .cust-text h2 {
+    font-size: 40px; line-height: 1.08; letter-spacing: -0.025em;
+    color: var(--ink); font-weight: 700; margin-bottom: 18px;
+  }
+  .cust-sub { font-size: 18px; line-height: 1.55; color: var(--text); margin-bottom: 26px; max-width: 460px; }
+  .cust-checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+  .cust-checks li { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--ink); font-weight: 600; }
+  .cust-check-box {
+    width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+  }
 
   .how-it-works { background: var(--bg); }
   .step-grid {
@@ -1545,7 +1661,12 @@
     .hero-eyebrow { margin-bottom: 18px; }
     .hero h1 { font-size: 36px; }
     .hero-sub { margin-left: auto; margin-right: auto; }
-    .hero-cta-row { align-items: center; }
+    .hero-btns { justify-content: center; }
+    .hero-fineprint { text-align: center; }
+    .cust-inner { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+    .cust-text h2 { font-size: 32px; }
+    .cust-sub { margin-left: auto; margin-right: auto; }
+    .cust-checks { align-items: center; }
     .feature-grid { grid-template-columns: repeat(2, 1fr); }
     .pricing-grid { grid-template-columns: 1fr; max-width: 480px; }
     .plan-feat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1572,6 +1693,7 @@
     .step-visual { height: 84px; }
     .hero { padding: 36px 0 24px; }
     .hero h1 { font-size: 30px; }
+    .cust-text h2 { font-size: 26px; }
     .hero-sub { font-size: 16px; }
     .hero-inner { gap: 32px; padding: 0 18px; }
     .phone-frame { width: 230px; height: 466px; padding: 7px; border-radius: 32px; }
@@ -1828,13 +1950,90 @@
 <section class="hero is-active" data-page="home" id="home">
   <div class="hero-inner">
     <div class="hero-text">
-      <span class="hero-eyebrow"><span class="dot"></span> Built for Filipino small businesses</span>
-      <h1>Your store, <span class="grad">online in minutes.</span></h1>
-      <p class="hero-sub">A complete online storefront for neighborhood shops, carinderias, and cafés — delivery, pickup, GCash, and inventory all in one place.</p>
-      <div class="hero-cta-row">
-        <a href="#signup" class="btn-hero">Start your store free <span class="arrow">→</span></a>
-        <span class="hero-cta-note">No credit card. Live in 2 minutes.</span>
+      <span class="hero-eyebrow"><span class="dot"></span> Para sa tindahan, carinderia &amp; café ng Pilipinas</span>
+      <h1>Ikaw ang boss <span class="grad">ng tindahan mo.</span></h1>
+      <p class="hero-sub">Mga order, bayad, at stock — nasa <strong>isang dashboard</strong> lang. Buksan, sarado, o ulan mode? Isang pindot lang. Ikaw ang may hawak. 💪</p>
+      <div class="hero-btns">
+        <a href="#signup" class="btn-hero btn-hero-primary">Mag-simula — libre <span class="arrow">✦</span></a>
+        <a href="#guide" class="btn-hero-ghost" data-page-link="guide">Tingnan kung paano</a>
       </div>
+      <span class="hero-fineprint">Walang credit card · Libre habambuhay · Live in 2 minutes</span>
+    </div>
+    <div class="hero-mock hero-mock-dash" aria-hidden="true">
+      <div class="browser-frame">
+        <div class="browser-bar">
+          <span class="browser-dots"><i></i><i></i><i></i></span>
+          <span class="browser-url">🔒 pabilimart.com/admin</span>
+        </div>
+        <div class="dash">
+          <div class="dash-head">
+            <div class="dash-store">
+              <span class="dash-avatar">TJ</span>
+              <span>
+                <span class="dash-store-name">Tindahan ni Jason</span>
+                <span class="dash-store-sub">Admin Console<span class="dash-pro">PRO</span></span>
+              </span>
+            </div>
+            <span class="dash-storefront">🏠 Storefront</span>
+          </div>
+          <div class="dash-stats">
+            <div class="dash-stat"><span class="dash-stat-lbl">Total Products</span><span class="dash-stat-val is-blue">851</span></div>
+            <div class="dash-stat"><span class="dash-stat-lbl">Total Orders</span><span class="dash-stat-val">281</span></div>
+            <div class="dash-stat"><span class="dash-stat-lbl">✓ Confirmed</span><span class="dash-stat-val is-green">139</span></div>
+            <div class="dash-stat"><span class="dash-stat-lbl">Revenue</span><span class="dash-stat-val is-green">₱81,523</span></div>
+            <div class="dash-stat"><span class="dash-stat-lbl">Profit</span><span class="dash-stat-val is-orange">₱2,416</span></div>
+            <div class="dash-stat"><span class="dash-stat-lbl">⌛ Pending</span><span class="dash-stat-val is-orange">6</span></div>
+          </div>
+          <div class="dash-charts">
+            <div class="dash-panel">
+              <div class="dash-panel-title">📦 Products by Category</div>
+              <div class="dash-donut"></div>
+            </div>
+            <div class="dash-panel">
+              <div class="dash-panel-title">📈 Orders &amp; Revenue by Day</div>
+              <div class="dash-bars">
+                <span style="height:18%"></span><span style="height:42%"></span><span style="height:60%"></span><span style="height:28%"></span><span style="height:15%"></span><span style="height:38%"></span><span style="height:48%"></span><span style="height:10%"></span><span style="height:8%"></span><span class="spike" style="height:96%"></span><span style="height:44%"></span><span style="height:58%"></span><span style="height:22%"></span><span style="height:14%"></span><span style="height:70%"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-toast">
+        <span class="dash-toast-ico">🔔</span>
+        <span>
+          <span class="dash-toast-t">Bagong order — ₱245.00</span><br>
+          <span class="dash-toast-s">GCash bayad na ✓ · 2pm–6pm slot</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     Trust strip — part of the home page
+     ============================================================ -->
+<div class="trust-strip is-active" data-page="home">
+  <div class="trust-inner">
+    <div class="trust-item"><span class="trust-icon">⚡</span> Setup in 2 minutes</div>
+    <div class="trust-item"><span class="trust-icon">🆓</span> Free forever plan</div>
+    <div class="trust-item"><span class="trust-icon">🛡️</span> Cancel anytime</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     Home: "Para sa customer mo" — storefront ordering (phone carousel)
+     ============================================================ -->
+<section class="cust is-active" data-page="home">
+  <div class="cust-inner">
+    <div class="cust-text">
+      <span class="cust-eyebrow">Para sa customer mo</span>
+      <h2>Parang text lang ka-dali mag-order.</h2>
+      <p class="cust-sub">Isang link, kompletong tindahan. Grid o list view — ikaw bahala kung alin ang bagay sa store mo.</p>
+      <ul class="cust-checks">
+        <li><span class="cust-check-box">✓</span><span>Walang app na ida-download</span></li>
+        <li><span class="cust-check-box">✓</span><span>Gumagana kahit mahina ang signal</span></li>
+        <li><span class="cust-check-box">✓</span><span>GCash o cash — sila ang pipili</span></li>
+      </ul>
     </div>
     <div class="hero-mock" aria-hidden="true">
       <div class="phone-frame">
@@ -1995,21 +2194,10 @@
         <button type="button" class="mock-carousel-dot active" data-idx="0" aria-label="Grid layout"></button>
         <button type="button" class="mock-carousel-dot" data-idx="1" aria-label="List layout"></button>
       </div>
-      <div class="mock-carousel-caption" id="heroCarouselCaption">Grid layout — for product stores</div>
+      <div class="mock-carousel-caption" id="heroCarouselCaption">Grid view — para sa product stores</div>
     </div>
   </div>
 </section>
-
-<!-- ============================================================
-     Trust strip — part of the home page
-     ============================================================ -->
-<div class="trust-strip is-active" data-page="home">
-  <div class="trust-inner">
-    <div class="trust-item"><span class="trust-icon">⚡</span> Setup in 2 minutes</div>
-    <div class="trust-item"><span class="trust-icon">🆓</span> Free forever plan</div>
-    <div class="trust-item"><span class="trust-icon">🛡️</span> Cancel anytime</div>
-  </div>
-</div>
 
 <!-- ============================================================
      Home: How it works — 3-step illustrated guide
@@ -3708,8 +3896,8 @@ function showPlanPanel(plan) {
   const caption = document.getElementById('heroCarouselCaption');
   if (!track || !dots.length) return;
   const SLIDES = [
-    'Grid layout — for product stores',
-    'List layout — for restaurants & carinderias'
+    'Grid view — para sa product stores',
+    'List view — para sa karinderya at resto'
   ];
   let idx = 0, autoTimer = 0;
   function go(n) {
