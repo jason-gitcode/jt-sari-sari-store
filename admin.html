@@ -3246,9 +3246,9 @@
         </div>
         <div class="supp-modal-body" id="view-modal-body"></div>
         <div class="supp-modal-footer">
-          <button type="button" class="supp-del-btn" onclick="deleteFromSupplierView()">Delete</button>
+          <button type="button" class="supp-del-btn" id="supp-view-delete-btn" onclick="deleteFromSupplierView()">Delete</button>
           <button type="button" class="btn-secondary" onclick="closeSupplierView()">Close</button>
-          <button type="button" class="btn-primary" onclick="editFromView()">Edit</button>
+          <button type="button" class="btn-primary" id="supp-view-edit-btn" onclick="editFromView()">Edit</button>
         </div>
       </div>
     </div>
@@ -8189,6 +8189,8 @@ function renderSupplierCapStatus() {
   const bannerMsg = document.getElementById('supplier-cap-banner-msg');
   const bannerCompact = document.getElementById('supplier-cap-banner-msg-compact');
   if (!pill || !addBtn) return;
+  // Staff without 'supplieradd' never see the Add Supplier button.
+  addBtn.style.display = (IS_STAFF && !can('supplieradd')) ? 'none' : '';
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const info = TIER_INFO[tier] || TIER_INFO.free;
   const cap = info.supplierCap;
@@ -9633,7 +9635,7 @@ function renderSuppliers() {
               </td>
               <td>${s.contactPerson ? escText(s.contactPerson) : '<span class="row-muted">—</span>'}</td>
               <td>${s.contactNumber ? escText(s.contactNumber) : '<span class="row-muted">—</span>'}</td>
-              <td class="actions"><button class="supp-edit-btn" onclick="openSupplierEdit('${escAttr(s.id)}')">Edit</button></td>
+              <td class="actions">${can('supplieredit') ? `<button class="supp-edit-btn" onclick="openSupplierEdit('${escAttr(s.id)}')">Edit</button>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -9948,6 +9950,8 @@ function openSupplierView(id) {
   currentViewSupplierId = id;
   document.getElementById('view-modal-title').textContent = s.businessName || 'Supplier Details';
   document.getElementById('view-modal-body').innerHTML = renderSupplierViewBody(s);
+  const svDel = document.getElementById('supp-view-delete-btn'); if (svDel) svDel.style.display = can('supplierdelete') ? '' : 'none';
+  const svEdit = document.getElementById('supp-view-edit-btn'); if (svEdit) svEdit.style.display = can('supplieredit') ? '' : 'none';
   document.getElementById('supplier-view-modal').classList.add('show');
 }
 function closeSupplierView(e) {
@@ -10003,7 +10007,7 @@ function openSupplierEdit(id) {
   currentEditSupplierId = id;
   document.getElementById('edit-modal-title').textContent = 'Edit Supplier';
   document.getElementById('edit-modal-body').innerHTML = renderSupplierFormBody(s);
-  document.getElementById('edit-modal-delete-btn').style.display = '';
+  document.getElementById('edit-modal-delete-btn').style.display = can('supplierdelete') ? '' : 'none';
   const status = document.getElementById('edit-modal-status'); status.textContent = ''; status.style.color = '';
   document.getElementById('supplier-edit-modal').classList.add('show');
   document.querySelectorAll('#edit-modal-body .cat-chip-input').forEach(setupChipAutocomplete);
@@ -10449,14 +10453,14 @@ function renderOrders() {
 
     const actionsHtml = o.status === 'pending' ? `
       <div class="order-actions-row">
-        <button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm Order</button>
-        <button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>
-        <button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>
+        ${can('orderconfirm') ? `<button class="btn-confirm-order" onclick="confirmOrder('${o.orderId}')">✓ Confirm Order</button>` : ''}
+        ${can('ordercancel') ? `<button class="btn-cancel-order"  onclick="cancelOrder('${o.orderId}')">✗ Cancel</button>` : ''}
+        ${can('ordercopy') ? `<button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>` : ''}
       </div>` :
       o.status === 'confirmed' ? `
       <div class="order-actions-row">
-        <button class="btn-refund-order" onclick="refundAndRestock('${o.orderId}')">↩ Refund &amp; Restock</button>
-        <button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>
+        ${can('orderrefund') ? `<button class="btn-refund-order" onclick="refundAndRestock('${o.orderId}')">↩ Refund &amp; Restock</button>` : ''}
+        ${can('ordercopy') ? `<button class="btn-copy-order" onclick="copyOrder('${o.orderId}', this)">Copy Order</button>` : ''}
       </div>` : '';
 
     // Multi-branch (Pro): show a small branch tag when the order is
@@ -11083,7 +11087,7 @@ function productRowHtml(p, lowThresh) {
     : `<div style="width:44px;height:44px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font-size:22px;">${p.emoji || '📦'}</div>`;
   return `
         <div class="pt-row pt-data ${stockClass}${isHidden ? ' is-hidden' : ''}${p.archived === true ? ' is-archived' : ''}" data-pid="${p.id}">
-          <div class="pt-cell pt-check"><input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" /></div>
+          <div class="pt-cell pt-check">${can('productdelete') ? `<input type="checkbox" class="row-check" data-id="${p.id}" onchange="updateDeleteBtn()" />` : ''}</div>
           <div class="pt-cell">${thumb}</div>
           <div class="pt-cell pt-name-col">
             <button type="button" class="pt-pname" onclick="openProductView(${p.id})">${p.name}</button>${p.archived === true ? '<span class="pt-archived-badge" title="Hidden from your storefront by your plan limit. Kept in admin, not deleted.">Archived</span>' : ''}
@@ -11199,6 +11203,7 @@ function updateDeleteBtn() {
   const selected = document.querySelectorAll('.row-check:checked');
   const btn = document.getElementById('delete-sel-btn');
   const lbl = document.getElementById('delete-sel-label');
+  if (!can('productdelete')) { if (btn) btn.style.display = 'none'; return; }
   if (btn) {
     btn.disabled = selected.length === 0;
     btn.style.display = selected.length === 0 ? 'none' : '';
