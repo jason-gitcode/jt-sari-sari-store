@@ -811,6 +811,48 @@
     #suppliers-tab.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #reports-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #billing-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    #employee-tab.active  { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    /* ===== Employee (Staff Accounts) tab ===== */
+    .emp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .emp-h2 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0 0 4px; }
+    .emp-sub { font-size: 13px; color: var(--muted); margin: 0; max-width: 520px; line-height: 1.5; }
+    .emp-add-btn { flex-shrink: 0; background: var(--accent, #2563eb); color: #fff; border: 0; border-radius: 9px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .emp-add-btn:active { transform: translateY(1px); }
+    .emp-list { display: flex; flex-direction: column; gap: 10px; }
+    .emp-empty { color: var(--muted); font-size: 14px; padding: 24px; text-align: center; background: var(--surface-2, #f1f5f9); border-radius: 12px; }
+    .emp-row { display: flex; align-items: center; gap: 12px; background: var(--surface, #fff); border: 1px solid var(--line, #e2e8f0); border-radius: 12px; padding: 12px 14px; }
+    .emp-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, #6366f1, #7c3aed); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .emp-row-main { flex: 1; min-width: 0; }
+    .emp-row-name { font-size: 14px; font-weight: 700; color: var(--accent, #2563eb); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+    .emp-row-name:hover { text-decoration: underline; }
+    .emp-row-email { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .emp-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+    .emp-badge.active { background: #dcfce7; color: #15803d; }
+    .emp-badge.invited { background: #fef3c7; color: #b45309; }
+    .emp-role { flex-shrink: 0; font-size: 12px; color: var(--muted); text-transform: capitalize; }
+    /* Editor modal */
+    .emp-field { display: block; margin-bottom: 12px; }
+    .emp-field span { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+    .emp-field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; font-size: 14px; background: var(--surface, #fff); color: var(--ink); }
+    .emp-edit-head { font-size: 13px; color: var(--muted); margin-bottom: 14px; padding: 10px 12px; background: var(--surface-2, #f1f5f9); border-radius: 8px; }
+    .emp-edit-head strong { color: var(--ink); }
+    .emp-presets { margin: 4px 0 16px; }
+    .emp-presets-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+    .emp-preset-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .emp-chip { font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-strong, #cbd5e1); background: var(--surface, #fff); color: var(--ink); cursor: pointer; }
+    .emp-chip.active { background: var(--accent, #2563eb); color: #fff; border-color: var(--accent, #2563eb); }
+    .emp-perm-group { border-top: 1px solid var(--line, #e2e8f0); padding: 12px 0 4px; }
+    .emp-perm-group-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .emp-perm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; }
+    .emp-perm-label { font-size: 13px; color: var(--ink); }
+    .emp-perm-row.is-implied .emp-perm-label { color: var(--muted); }
+    .emp-toggle { position: relative; width: 40px; height: 23px; flex-shrink: 0; }
+    .emp-toggle input { opacity: 0; width: 0; height: 0; }
+    .emp-toggle .emp-slider { position: absolute; inset: 0; background: var(--line-strong, #cbd5e1); border-radius: 999px; transition: background .15s; cursor: pointer; }
+    .emp-toggle .emp-slider::before { content: ''; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; background: #fff; border-radius: 50%; transition: transform .15s; }
+    .emp-toggle input:checked + .emp-slider { background: var(--accent, #2563eb); }
+    .emp-toggle input:checked + .emp-slider::before { transform: translateX(17px); }
+    .emp-toggle input:disabled + .emp-slider { opacity: 0.55; cursor: default; }
     /* Supplier table — mirrors the Home Inventory ranking table (.dash-table)
        in font scale, padding, sticky header, and box treatment. Wrapper
        scrolls horizontally when the table is wider than the viewport so
@@ -3005,6 +3047,7 @@
     </button>
     <button class="more-sheet-item" data-tab="billing" role="menuitem" onclick="moreMenuGo('billing')">💳 Billing</button>
     <button class="more-sheet-item" data-tab="settings" role="menuitem" onclick="moreMenuGo('settings')">⚙️ Settings</button>
+    <button class="more-sheet-item" data-tab="employee" id="bn-employee-item" role="menuitem" onclick="moreMenuGo('employee')" style="display:none;">👥 Employee</button>
   </div>
 
   <div class="container">
@@ -3016,6 +3059,7 @@
       <button class="tab-btn" data-tab="reports" id="reports-tab-btn" onclick="switchTab('reports')">📊 Reports<span id="reports-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
       <button class="tab-btn" data-tab="billing" onclick="switchTab('billing')">💳 Billing</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
+      <button class="tab-btn" data-tab="employee" id="employee-tab-btn" onclick="switchTab('employee')" style="display:none;">👥 Employee</button>
     </nav>
 
     <!-- HOME (DASHBOARD) -->
@@ -3505,6 +3549,18 @@
           <div class="billing-empty">No payments yet. Your subscription is on the Free plan.</div>
         </div>
       </div>
+    </div>
+
+    <!-- EMPLOYEE (owner-only, Pro) -->
+    <div class="tab-panel" id="employee-tab">
+      <div class="emp-header">
+        <div>
+          <h2 class="emp-h2">Employees</h2>
+          <p class="emp-sub">Give staff their own login with only the access you choose. Each employee signs in with their own email — never share yours.</p>
+        </div>
+        <button type="button" class="emp-add-btn" onclick="openEmployeeInviteModal()">+ Invite employee</button>
+      </div>
+      <div id="emp-list" class="emp-list"><div class="emp-empty">Loading…</div></div>
     </div>
 
     <!-- SETTINGS -->
@@ -4271,6 +4327,39 @@
     <div class="supp-modal-footer">
       <button type="button" class="btn-secondary" onclick="closeCancelSubModal()">Keep my subscription</button>
       <button type="button" class="btn-danger" id="cancel-sub-confirm-btn" onclick="confirmCancelSubscription()">Yes, cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMPLOYEE EDITOR MODAL — invite a new employee or edit an existing one's permissions. -->
+<div class="supp-modal-overlay" id="emp-modal" onclick="empModalBackdrop(event)">
+  <div class="supp-modal" onclick="event.stopPropagation()">
+    <div class="supp-modal-header">
+      <h3 id="emp-modal-title">Invite employee</h3>
+      <button type="button" class="close-btn" onclick="closeEmployeeModal()">×</button>
+    </div>
+    <div class="supp-modal-body">
+      <div id="emp-invite-fields">
+        <label class="emp-field"><span>Name</span><input type="text" id="emp-name-input" placeholder="e.g. Juan dela Cruz" maxlength="80" autocomplete="off"></label>
+        <label class="emp-field"><span>Email</span><input type="email" id="emp-email-input" placeholder="employee@email.com" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+      </div>
+      <div id="emp-edit-head" class="emp-edit-head" style="display:none;"></div>
+      <div class="emp-presets">
+        <span class="emp-presets-label">Quick role</span>
+        <div class="emp-preset-chips" id="emp-preset-chips">
+          <button type="button" class="emp-chip" data-preset="cashier" onclick="applyEmpPreset('cashier')">Cashier</button>
+          <button type="button" class="emp-chip" data-preset="stockclerk" onclick="applyEmpPreset('stockclerk')">Stock clerk</button>
+          <button type="button" class="emp-chip" data-preset="manager" onclick="applyEmpPreset('manager')">Manager</button>
+          <button type="button" class="emp-chip" data-preset="custom" onclick="applyEmpPreset('custom')">Custom</button>
+        </div>
+      </div>
+      <div id="emp-perm-groups" class="emp-perm-groups"></div>
+    </div>
+    <div class="supp-modal-footer">
+      <button type="button" class="btn-danger emp-remove-btn" id="emp-remove-btn" style="display:none;" onclick="removeEmployeeFromModal()">Remove</button>
+      <span style="flex:1;"></span>
+      <button type="button" class="btn-secondary" onclick="closeEmployeeModal()">Cancel</button>
+      <button type="button" class="btn-primary" id="emp-save-btn" onclick="saveEmployeeFromModal()">Send invite</button>
     </div>
   </div>
 </div>
@@ -5167,6 +5256,7 @@ firebase.auth().onAuthStateChanged(user => {
     if (typeof renderCustomDomainSection === 'function') renderCustomDomainSection();
     if (typeof renderBranchesSection === 'function') renderBranchesSection();
     if (typeof syncBranchFilterUI === 'function') syncBranchFilterUI();
+    if (typeof applyEmployeeTabVisibility === 'function') applyEmployeeTabVisibility();
   }, err => {
     console.warn('[subscription] listener:', err);
   });
@@ -8269,6 +8359,266 @@ function lockedFeatureCta() {
 // Section is re-rendered by renderBillingTab() on every subscription
 // snapshot.
 // ============================================================
+// ============================================================
+// EMPLOYEE (Staff Accounts) — owner-side management UI (Pro feature).
+// Lists members + pending invites; invite/edit modal with role presets +
+// grouped permission toggles; calls the staff Cloud Functions. This is the
+// owner-side (Phase 1a). Staff login + permission gating land in a later phase.
+// IS_STAFF / STAFF_PERMS are placeholders for that phase.
+// ============================================================
+let IS_STAFF = false;
+let STAFF_PERMS = null;
+
+const EMP_PERM_GROUPS = [
+  { title: '💰 Financials (hidden from staff by default)', perms: [
+    ['totalprofitview', 'See Total Profit'], ['totalrevenueview', 'See Total Revenue'],
+    ['profitmarginview', 'See Profit Margin'], ['totalcostview', 'See Total Cost'],
+    ['deliverycollectedview', 'See Delivery Collected'] ] },
+  { title: '📋 Orders', perms: [
+    ['orderstabview', 'View the Orders tab'], ['orderconfirm', 'Confirm orders'],
+    ['ordercancel', 'Cancel orders'], ['ordercopy', 'Copy orders'],
+    ['orderrefund', 'Issue refunds ⚠️'], ['customerinfoview', 'See customer name / address / phone'] ] },
+  { title: '📦 Products', perms: [
+    ['productstabview', 'View the Products tab'], ['productadd', 'Add products'],
+    ['productedit', 'Edit products'], ['productdelete', 'Delete products ⚠️'],
+    ['stockdecrease', 'Decrease stock'], ['availabilitytoggle', 'Mark out of stock'],
+    ['visibilitytoggle', 'Hide from storefront'] ] },
+  { title: '🏭 Suppliers', perms: [
+    ['supplierstabview', 'View the Suppliers tab'], ['supplieradd', 'Add suppliers'],
+    ['supplieredit', 'Edit suppliers'], ['supplierdelete', 'Delete suppliers ⚠️'] ] },
+  { title: '📊 Reports', perms: [
+    ['reportstabview', 'View the Reports tab'], ['reportdownload', 'Download reports'],
+    ['reportprint', 'Print reports'] ] },
+  { title: '💳 Billing', perms: [
+    ['billingtabview', 'View the Billing tab'], ['billingpaymenthistoryview', 'View payment history'],
+    ['billingcontactsupport', 'Submit support tickets'], ['billingavailableplan', 'Change plan ⚠️'] ] },
+  { title: '⚙️ Store', perms: [
+    ['settingstabview', 'View the Settings tab'], ['settingsedit', 'Edit settings'],
+    ['modestoggle', 'Toggle Rain / Closed / Maintenance'], ['branchmanage', 'Manage branches'] ] },
+];
+const EMP_PERM_DEPS = {
+  orderconfirm: 'orderstabview', ordercancel: 'orderstabview', ordercopy: 'orderstabview',
+  orderrefund: 'orderstabview', customerinfoview: 'orderstabview',
+  productadd: 'productstabview', productedit: 'productstabview', productdelete: 'productstabview',
+  stockdecrease: 'productstabview', availabilitytoggle: 'productstabview', visibilitytoggle: 'productstabview',
+  supplieradd: 'supplierstabview', supplieredit: 'supplierstabview', supplierdelete: 'supplierstabview',
+  reportdownload: 'reportstabview', reportprint: 'reportstabview',
+  billingcontactsupport: 'billingtabview', billingavailableplan: 'billingtabview', billingpaymenthistoryview: 'billingtabview',
+  settingsedit: 'settingstabview',
+};
+const EMP_PRESETS = {
+  cashier:    ['orderstabview','orderconfirm','ordercancel','ordercopy','productstabview','availabilitytoggle','stockdecrease'],
+  stockclerk: ['productstabview','stockdecrease','availabilitytoggle','supplierstabview'],
+  manager:    ['orderstabview','orderconfirm','ordercancel','ordercopy','customerinfoview','productstabview','productadd','productedit','stockdecrease','availabilitytoggle','visibilitytoggle','supplierstabview','supplieradd','supplieredit','reportstabview','modestoggle'],
+};
+let empModalCtx = null;
+
+function empStaffFn(name) { return firebase.app().functions('asia-southeast1').httpsCallable(name); }
+function empEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function empInitials(s) { const t = String(s || '?').trim(); return (t[0] || '?').toUpperCase(); }
+// hex of lowercased email — MUST match functions staffEmailKey()
+function empEmailKeyHex(email) {
+  const e = String(email || '').trim().toLowerCase(); let hex = '';
+  for (let i = 0; i < e.length; i++) hex += e.charCodeAt(i).toString(16).padStart(2, '0');
+  return hex;
+}
+
+function applyEmployeeTabVisibility() {
+  const tier = (subscriptionData && subscriptionData.tier) || 'free';
+  const show = !IS_STAFF && tier === 'pro';
+  const btn = document.getElementById('employee-tab-btn');
+  const item = document.getElementById('bn-employee-item');
+  if (btn) btn.style.display = show ? '' : 'none';
+  if (item) item.style.display = show ? '' : 'none';
+}
+
+async function renderEmployeeList() {
+  const el = document.getElementById('emp-list');
+  if (!el || !TENANT_ID) return;
+  el.innerHTML = '<div class="emp-empty">Loading…</div>';
+  try {
+    const base = db.collection('tenants').doc(TENANT_ID);
+    const [members, invites] = await Promise.all([
+      base.collection('members').get(), base.collection('staff_invites').get()
+    ]);
+    const rows = [];
+    members.forEach(d => { const m = d.data() || {}; rows.push({ uid: d.id, email: m.email || '', name: m.name || '', preset: m.preset, status: m.status === 'suspended' ? 'suspended' : 'active', kind: 'member' }); });
+    invites.forEach(d => { const m = d.data() || {}; rows.push({ uid: null, email: m.email || '', name: m.name || '', preset: m.preset, status: 'invited', kind: 'invite' }); });
+    if (rows.length === 0) {
+      el.innerHTML = '<div class="emp-empty">No employees yet. Tap <strong>Invite employee</strong> to add your first staff login.</div>';
+      return;
+    }
+    el.innerHTML = rows.map(r => {
+      const display = r.name || r.email;
+      const badge = r.status === 'invited' ? '<span class="emp-badge invited">Invited</span>' : '<span class="emp-badge active">Active</span>';
+      const role = r.preset ? `<span class="emp-role">${empEsc(r.preset)}</span>` : '';
+      const payload = empEsc(JSON.stringify({ uid: r.uid, email: r.email, kind: r.kind }));
+      return `<div class="emp-row">
+        <div class="emp-avatar">${empEsc(empInitials(display))}</div>
+        <div class="emp-row-main">
+          <button type="button" class="emp-row-name" data-emp='${payload}' onclick="openEmployeeFromRow(this)">${empEsc(display)}</button>
+          <div class="emp-row-email">${empEsc(r.email)}</div>
+        </div>
+        ${role}${badge}
+      </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('[employee] list load failed:', err);
+    el.innerHTML = `<div class="emp-empty">Couldn't load employees: ${empEsc(err && err.message || err)}</div>`;
+  }
+}
+
+function empRenderPermGroups(perms) {
+  const wrap = document.getElementById('emp-perm-groups');
+  if (!wrap) return;
+  wrap.innerHTML = EMP_PERM_GROUPS.map(g => {
+    const rows = g.perms.map(([key, label]) => {
+      const on = perms[key] === true;
+      return `<div class="emp-perm-row" data-perm="${key}">
+        <span class="emp-perm-label">${empEsc(label)}</span>
+        <label class="emp-toggle"><input type="checkbox" ${on ? 'checked' : ''} onchange="empOnToggle()"><span class="emp-slider"></span></label>
+      </div>`;
+    }).join('');
+    return `<div class="emp-perm-group"><div class="emp-perm-group-title">${empEsc(g.title)}</div>${rows}</div>`;
+  }).join('');
+  empSyncImpliedViews();
+}
+
+function empGatherPerms() {
+  const out = {};
+  document.querySelectorAll('#emp-perm-groups .emp-perm-row').forEach(row => {
+    const inp = row.querySelector('input[type=checkbox]');
+    if (inp && inp.checked) out[row.getAttribute('data-perm')] = true;
+  });
+  Object.entries(EMP_PERM_DEPS).forEach(([action, view]) => { if (out[action]) out[view] = true; });
+  return out;
+}
+
+function empSyncImpliedViews() {
+  const impliedOn = {};
+  document.querySelectorAll('#emp-perm-groups .emp-perm-row').forEach(row => {
+    const inp = row.querySelector('input[type=checkbox]');
+    const view = EMP_PERM_DEPS[row.getAttribute('data-perm')];
+    if (view && inp && inp.checked) impliedOn[view] = true;
+  });
+  document.querySelectorAll('#emp-perm-groups .emp-perm-row').forEach(row => {
+    const key = row.getAttribute('data-perm');
+    const inp = row.querySelector('input[type=checkbox]');
+    if (!inp) return;
+    if (impliedOn[key]) { inp.checked = true; inp.disabled = true; row.classList.add('is-implied'); }
+    else { inp.disabled = false; row.classList.remove('is-implied'); }
+  });
+}
+
+function empOnToggle() { empSetActivePresetChip('custom'); empSyncImpliedViews(); }
+function empSetActivePresetChip(preset) {
+  document.querySelectorAll('#emp-preset-chips .emp-chip').forEach(c => c.classList.toggle('active', c.getAttribute('data-preset') === preset));
+}
+function applyEmpPreset(preset) {
+  empSetActivePresetChip(preset);
+  if (preset === 'custom') return;
+  const set = {}; (EMP_PRESETS[preset] || []).forEach(k => set[k] = true);
+  document.querySelectorAll('#emp-perm-groups .emp-perm-row').forEach(row => {
+    const inp = row.querySelector('input[type=checkbox]');
+    if (inp) inp.checked = set[row.getAttribute('data-perm')] === true;
+  });
+  empSyncImpliedViews();
+}
+
+function openEmployeeInviteModal() {
+  empModalCtx = { mode: 'invite' };
+  document.getElementById('emp-modal-title').textContent = 'Invite employee';
+  document.getElementById('emp-invite-fields').style.display = '';
+  document.getElementById('emp-edit-head').style.display = 'none';
+  document.getElementById('emp-name-input').value = '';
+  document.getElementById('emp-email-input').value = '';
+  document.getElementById('emp-remove-btn').style.display = 'none';
+  document.getElementById('emp-save-btn').textContent = 'Send invite';
+  empRenderPermGroups({});
+  applyEmpPreset('cashier');
+  document.getElementById('emp-modal').classList.add('active');
+}
+
+function openEmployeeFromRow(btn) {
+  let info; try { info = JSON.parse(btn.getAttribute('data-emp')); } catch (e) { return; }
+  empOpenEditor(info);
+}
+
+async function empOpenEditor(info) {
+  empModalCtx = { mode: 'edit', uid: info.uid, email: info.email, kind: info.kind };
+  document.getElementById('emp-modal-title').textContent = 'Edit employee';
+  document.getElementById('emp-invite-fields').style.display = 'none';
+  document.getElementById('emp-remove-btn').style.display = '';
+  document.getElementById('emp-save-btn').textContent = 'Save changes';
+  let data = {};
+  try {
+    const base = db.collection('tenants').doc(TENANT_ID);
+    const ref = info.kind === 'member' ? base.collection('members').doc(info.uid) : base.collection('staff_invites').doc(empEmailKeyHex(info.email));
+    const snap = await ref.get();
+    data = snap.exists ? (snap.data() || {}) : {};
+  } catch (e) { console.warn('[employee] load member failed', e); }
+  const head = document.getElementById('emp-edit-head');
+  head.style.display = '';
+  head.innerHTML = `<strong>${empEsc(data.name || info.email)}</strong><br>${empEsc(info.email)}${info.kind === 'invite' ? ' · <em>invited (not signed in yet)</em>' : ''}`;
+  empModalCtx.name = data.name || '';
+  empRenderPermGroups(data.permissions || {});
+  empSetActivePresetChip(data.preset || 'custom');
+  document.getElementById('emp-modal').classList.add('active');
+}
+
+function closeEmployeeModal() { const m = document.getElementById('emp-modal'); if (m) m.classList.remove('active'); }
+function empModalBackdrop(e) { if (e.target === e.currentTarget) closeEmployeeModal(); }
+
+async function saveEmployeeFromModal() {
+  const presetChip = document.querySelector('#emp-preset-chips .emp-chip.active');
+  const preset = presetChip ? presetChip.getAttribute('data-preset') : 'custom';
+  const presetArg = (preset && preset !== 'custom') ? preset : null;
+  const perms = presetArg ? undefined : empGatherPerms();
+  const saveBtn = document.getElementById('emp-save-btn');
+  saveBtn.disabled = true;
+  try {
+    if (empModalCtx.mode === 'invite') {
+      const email = document.getElementById('emp-email-input').value.trim().toLowerCase();
+      const name = document.getElementById('emp-name-input').value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter a valid email address.', 'error'); saveBtn.disabled = false; return; }
+      await empStaffFn('addStaffMember')({ tid: TENANT_ID, email, name, preset: presetArg, permissions: perms });
+      showToast('Invite sent — they sign in with this email to activate.');
+    } else {
+      const arg = { tid: TENANT_ID, preset: presetArg, permissions: perms, name: empModalCtx.name };
+      if (empModalCtx.kind === 'member') arg.uid = empModalCtx.uid; else arg.email = empModalCtx.email;
+      await empStaffFn('updateStaffPermissions')(arg);
+      showToast('Permissions updated.');
+    }
+    closeEmployeeModal();
+    renderEmployeeList();
+  } catch (err) {
+    console.error('[employee] save failed:', err);
+    showToast('Save failed: ' + (err && err.message || err), 'error');
+  } finally { saveBtn.disabled = false; }
+}
+
+function removeEmployeeFromModal() {
+  if (!empModalCtx || empModalCtx.mode !== 'edit') return;
+  confirmDestructive({
+    title: 'Remove employee?',
+    message: 'They lose access to your admin immediately. Their account is not deleted — you can re-invite them anytime.',
+    confirmLabel: 'Remove',
+    onConfirm: async () => {
+      try {
+        const arg = { tid: TENANT_ID };
+        if (empModalCtx.kind === 'member') arg.uid = empModalCtx.uid; else arg.email = empModalCtx.email;
+        await empStaffFn('removeStaffMember')(arg);
+        showToast('Employee removed.');
+        closeEmployeeModal();
+        renderEmployeeList();
+      } catch (err) {
+        console.error('[employee] remove failed:', err);
+        showToast('Remove failed: ' + (err && err.message || err), 'error');
+      }
+    }
+  });
+}
+
 function renderPrioritySupportSection() {
   const body = document.getElementById('priority-support-body');
   const lockBadge = document.getElementById('priority-support-lock-badge');
@@ -10430,6 +10780,8 @@ function switchTab(tab, reset = true) {
     });
   } else if (tab === 'settings') {
     setupSettingsScrollSpy();
+  } else if (tab === 'employee') {
+    renderEmployeeList();
   } else if (tab === 'reports') {
     // First open: seed default period (Last 30 Days). Subsequent re-opens
     // keep whatever range the owner left set.

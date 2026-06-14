@@ -1635,8 +1635,9 @@ exports.addStaffMember = onCall(async (request) => {
     throw new HttpsError('resource-exhausted', `You can have up to ${STAFF_CAP} employees.`);
   }
 
+  const name = String(data.name || '').trim().slice(0, 80) || null;
   await tref.collection('staff_invites').doc(staffEmailKey(email)).set({
-    tid, email, role: 'staff', preset, permissions, status: 'invited',
+    tid, email, name, role: 'staff', preset, permissions, status: 'invited',
     invitedBy: request.auth.token.email, invitedAt: FieldValue.serverTimestamp()
   });
   return { ok: true, email, status: 'invited' };
@@ -1666,7 +1667,7 @@ exports.acceptStaffInvite = onCall(async (request) => {
   const invite = inviteSnap.data() || {};
 
   await mref.set({
-    email, role: 'staff',
+    email, role: 'staff', name: invite.name || (token && token.name) || null,
     permissions: invite.permissions || {}, preset: invite.preset || null,
     status: 'active', addedBy: invite.invitedBy || null,
     addedAt: FieldValue.serverTimestamp(), acceptedAt: FieldValue.serverTimestamp()
@@ -1689,6 +1690,7 @@ exports.updateStaffPermissions = onCall(async (request) => {
   const preset = STAFF_ROLE_PRESETS[String(data.preset || '')] ? String(data.preset) : null;
   const permissions = preset ? presetPermissions(preset) : sanitizeStaffPermissions(data.permissions);
   const patch = { permissions, preset, updatedAt: FieldValue.serverTimestamp() };
+  if (typeof data.name === 'string') patch.name = data.name.trim().slice(0, 80) || null;
 
   if (memberUid) {
     const mref = tref.collection('members').doc(memberUid);
