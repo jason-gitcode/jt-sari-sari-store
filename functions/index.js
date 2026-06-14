@@ -1,4 +1,5 @@
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore');
@@ -3213,6 +3214,78 @@ exports.setRetainProducts = onCall(async (request) => {
 
   await subRef.update({ pendingRetainIds: productIds });
   return { ok: true, count: productIds.length, cap, targetTier };
+});
+
+// ============================================================
+// ACTIVITY LOG (audit trail) — Phase 0. Tamper-proof per-tenant history of
+// key events, written ONLY by Firestore triggers (Admin SDK) into the
+// immutable tenants/{tid}/activity/{id} collection (client write denied in
+// rules). Each entry sets expiresAt = +90d for a TTL policy. Idempotent via a
+// deterministic doc id. Actor comes from the `_actor` field the admin client
+// stamps on the write (falls back to confirmedBy/updatedBy, else system).
+// Plan: Obsidian "Activity Log (Audit Trail) - Plan.md".
+// ============================================================
+const ACTIVITY_TTL_DAYS = 90;
+
+async function logActivity(tid, eventId, entry) {
+  if (!tid || !eventId) return;
+  try {
+    await db.collection('tenants').doc(tid).collection('activity').doc(eventId).set({
+      ...entry,
+      tid,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: new Date(Date.now() + ACTIVITY_TTL_DAYS * 24 * 60 * 60 * 1000)
+    });
+  } catch (err) {
+    console.warn('[activity] write failed for', tid, eventId, ':', err.message);
+  }
+}
+
+// Derive the actor for an audit entry from a doc's data. Prefers the stamped
+// `_actor` {uid,email,role}; falls back to legacy actor fields; else system.
+function activityActor(data) {
+  const a = data && data._actor;
+  if (a && typeof a === 'object') {
+    return { uid: a.uid || null, email: a.email || null, role: a.role || 'owner' };
+  }
+  if (data && data.confirmedBy) return { uid: null, email: data.confirmedBy, role: 'owner' };
+  if (data && data.updatedBy)   return { uid: null, email: data.updatedBy, role: 'owner' };
+  return { uid: null, email: null, role: 'system' };
+}
+
+function shortOrderId(oid) { return String(oid || '').slice(-6).toUpperCase(); }
+
+// ---- Orders: created (customer placed) + status transitions ----
+exports.onOrderCreated = onDocumentCreated('tenants/{tid}/orders/{oid}', async (event) => {
+  const { tid, oid } = event.params;
+  const d = event.data ? event.data.data() : null;
+  if (!d) return;
+  const total = Number(d.total || 0);
+  const cust = (d.customer && d.customer.name) || 'a customer';
+  await logActivity(tid, `ord-new-${oid}`, {
+    type: 'order.placed', category: 'orders', targetId: oid,
+    summary: `New order #${shortOrderId(oid)} — ₱${total.toFixed(2)} from ${cust}`,
+    after: { status: d.status || 'pending', total },
+    actor: { uid: null, email: null, role: 'customer' },
+    source: 'trigger'
+  });
+});
+
+exports.onOrderUpdated = onDocumentUpdated('tenants/{tid}/orders/{oid}', async (event) => {
+  const { tid, oid } = event.params;
+  const before = event.data && event.data.before ? event.data.before.data() : null;
+  const after = event.data && event.data.after ? event.data.after.data() : null;
+  if (!before || !after) return;
+  if (before.status === after.status) return; // only log status transitions
+  const typeMap = { confirmed: 'order.confirmed', cancelled: 'order.cancelled', refunded: 'order.refunded' };
+  const type = typeMap[after.status] || 'order.updated';
+  const actor = activityActor(after);
+  await logActivity(tid, `ord-${after.status}-${oid}`, {
+    type, category: 'orders', targetId: oid,
+    summary: `Order #${shortOrderId(oid)} → ${after.status}${actor.email ? ' by ' + actor.email : ''}`,
+    before: { status: before.status }, after: { status: after.status },
+    actor, source: 'trigger'
+  });
 });
 
 // ============================================================

@@ -246,6 +246,15 @@ service cloud.firestore {
         allow read: if isOwnerOrSuper(tid);
         allow write: if false;
       }
+
+      // ---------- Activity log (audit trail) — immutable, written ONLY by
+      //            Firestore-trigger Cloud Functions (Admin SDK bypasses
+      //            rules). Owner/super read their own tenant's history; clients
+      //            can NEVER write/edit/delete it.
+      match /activity/{eventId} {
+        allow read: if isOwnerOrSuper(tid);
+        allow write: if false;
+      }
     }
 
     // ============================================================

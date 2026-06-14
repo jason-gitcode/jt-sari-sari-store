@@ -8445,6 +8445,16 @@ function can(perm) {
   return !!(STAFF_PERMS && STAFF_PERMS[perm] === true);
 }
 
+// Activity-log actor stamp — attached as `_actor` on key admin writes so the
+// audit-log Firestore triggers can record WHO did it (the rule that enforces
+// _actor.uid == auth.uid lands in a later hardening step).
+function actorStamp() {
+  const u = firebase.auth().currentUser;
+  const email = u ? u.email : null;
+  const role = IS_STAFF ? 'staff' : ((typeof SUPERADMIN_EMAILS !== 'undefined' && SUPERADMIN_EMAILS.includes(email)) ? 'superadmin' : 'owner');
+  return { uid: u ? u.uid : null, email, role };
+}
+
 // Phase 1b gating: hide tabs a staff member lacks the *view* permission for +
 // the owner-only Employee tab, then bounce off any now-hidden tab to Home.
 // (Per-button action gating + financial-stat hide land in Phase 2; the Firestore
@@ -10633,6 +10643,8 @@ async function confirmOrder(orderId) {
       status: 'confirmed',
       confirmedItems,
       uncheckedItems,
+      confirmedBy: (firebase.auth().currentUser && firebase.auth().currentUser.email) || null,
+      _actor: actorStamp(),
       confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     if (uncheckedItems.length > 0) {
@@ -10690,6 +10702,7 @@ async function cancelOrder(orderId) {
     const batch = db.batch();
     batch.update(tcol('orders').doc(orderId), {
       status: 'cancelled',
+      _actor: actorStamp(),
       cancelledAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     buildStockRestoreUpdates(order, batch);
@@ -10708,6 +10721,7 @@ async function refundAndRestock(orderId) {
     const batch = db.batch();
     batch.update(tcol('orders').doc(orderId), {
       status: 'refunded',
+      _actor: actorStamp(),
       refundedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     // Only restock confirmedItems — unchecked items were already restocked at confirm time
