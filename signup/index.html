@@ -734,6 +734,74 @@
   /* ============================================================
      How it works — Home page 3-step guide
      ============================================================ */
+  /* ============================================================
+     "Isang araw kasama ang Pabili Mart" — day-in-the-life timeline
+     ============================================================ */
+  .day { background: var(--surface); }
+  .day-eyebrow {
+    display: block; text-align: center;
+    color: var(--accent); font-weight: 700; font-size: 13px;
+    letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .day-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    max-width: 1180px; margin: 0 auto;
+  }
+  .day-card {
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); padding: 22px 22px 26px;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .day-card:hover {
+    border-color: var(--line-strong); box-shadow: var(--shadow); transform: translateY(-2px);
+  }
+  .day-time {
+    display: inline-block; background: var(--accent-soft); color: var(--accent-dark);
+    font-weight: 700; font-size: 13px; padding: 5px 12px; border-radius: 999px;
+  }
+  .day-visual { min-height: 42px; margin: 18px 0; display: flex; align-items: center; }
+  .day-card h3 {
+    font-size: 18px; font-weight: 700; color: var(--ink);
+    margin-bottom: 8px; letter-spacing: -0.01em;
+  }
+  .day-card p { font-size: 14px; color: var(--muted); line-height: 1.55; }
+  .day-pill-open {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #dcfce7; color: #15803d; font-weight: 600; font-size: 13px;
+    padding: 7px 13px; border-radius: 999px;
+  }
+  .day-pill-open .dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+  .day-order {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; font-size: 13px;
+  }
+  .day-order .name { font-weight: 600; color: var(--ink); }
+  .day-order .amt { color: var(--muted); }
+  .day-paid {
+    background: #dcfce7; color: #15803d; font-weight: 600; font-size: 11px;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .day-toggle-row { display: inline-flex; align-items: center; gap: 10px; }
+  .day-toggle {
+    width: 42px; height: 24px; border-radius: 999px; background: #f59e0b;
+    position: relative; flex-shrink: 0;
+  }
+  .day-toggle::after {
+    content: ''; position: absolute; top: 3px; right: 3px;
+    width: 18px; height: 18px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .day-rain { font-weight: 700; color: #b45309; font-size: 14px; }
+  .day-stat {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 14px; display: inline-block;
+  }
+  .day-stat .lbl { font-size: 11px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .day-stat .val { font-size: 20px; font-weight: 700; color: var(--ink); }
+  @media (max-width: 920px) { .day-grid { grid-template-columns: repeat(2, 1fr); max-width: 560px; } }
+  @media (max-width: 560px) { .day-grid { grid-template-columns: 1fr; max-width: 420px; } }
+
   .how-it-works { background: var(--bg); }
   .step-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
@@ -1986,6 +2054,53 @@
         </div>
         <h3>Share your link</h3>
         <p>Post it on Facebook, send via Viber, print it on a flyer. Customers order, you confirm, you deliver or they pick up.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     "Isang araw kasama ang Pabili Mart" — day-in-the-life timeline
+     ============================================================ -->
+<section class="day is-active" data-page="home">
+  <div class="container">
+    <div class="section-head">
+      <span class="day-eyebrow">Isang araw kasama ang Pabili Mart</span>
+      <h2>Mula bukas hanggang sara, kasama mo kami.</h2>
+      <p>Walang notebook, walang "PM kita sis." Lahat, automatic na.</p>
+    </div>
+    <div class="day-grid">
+      <div class="day-card">
+        <span class="day-time">6:00 AM</span>
+        <div class="day-visual">
+          <span class="day-pill-open"><span class="dot"></span>Bukas · 6am–4pm</span>
+        </div>
+        <h3>"Bukas na!"</h3>
+        <p>Awtomatikong nagbubukas sa store hours mo. Gising ka pa lang, bukas na ang tindahan online.</p>
+      </div>
+      <div class="day-card">
+        <span class="day-time">11:30 AM</span>
+        <div class="day-visual">
+          <span class="day-order"><span class="name">Maria S.</span><span class="amt">· ₱245</span><span class="day-paid">Bayad ✓</span></span>
+        </div>
+        <h3>Dumadagsa ang orders</h3>
+        <p>GCash? Auto-confirmed na, may reference code pa. Tap-tap lang, alam mo na kung sino ang bayad na.</p>
+      </div>
+      <div class="day-card">
+        <span class="day-time">2:00 PM</span>
+        <div class="day-visual">
+          <span class="day-toggle-row"><span class="day-toggle"></span><span class="day-rain">🌧 Rain Mode</span></span>
+        </div>
+        <h3>Umuulan? Isang pindot.</h3>
+        <p>Isang pindot, may abiso agad ang customer: konting delay lang ang delivery dahil sa ulan. Tuloy pa rin ang hatid — ikaw ang may kontrol.</p>
+      </div>
+      <div class="day-card">
+        <span class="day-time">8:00 PM</span>
+        <div class="day-visual">
+          <span class="day-stat"><span class="lbl">Benta ngayong araw</span><span class="val">₱6,340</span></span>
+        </div>
+        <h3>Sarado. Bilang tayo.</h3>
+        <p>Kompletong recap ng benta, orders, at stock. Pahinga ka na — kami na bahala sa tally.</p>
       </div>
     </div>
   </div>
