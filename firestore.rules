@@ -37,6 +37,30 @@ service cloud.firestore {
       return isSuperadmin() || isOwner(tid);
     }
 
+    // ---------- Staff (employee) access ----------
+    // A staff member has a doc at tenants/{tid}/members/{their-uid}. Accesses
+    // to that one doc are cached within a rule evaluation, so the multiple
+    // memberHas() checks below cost a single document read.
+    function isMember(tid) {
+      return isSignedIn()
+          && exists(/databases/$(database)/documents/tenants/$(tid)/members/$(request.auth.uid));
+    }
+    function memberHas(tid, perm) {
+      return isMember(tid)
+          && get(/databases/$(database)/documents/tenants/$(tid)/members/$(request.auth.uid))
+               .data.get('permissions', {}).get(perm, false) == true;
+    }
+    // Anti-fraud: a staff product write may NEVER increase stock (that's the
+    // "sell an item, re-add the stock to hide the sale" move). stockincrease is
+    // owner-only by design — staff can only leave stock unchanged or lower it.
+    function staffStockNotIncreased() {
+      let ch = request.resource.data.diff(resource.data).affectedKeys();
+      return !('stock' in ch)
+          || (resource.data.stock is number
+              && request.resource.data.stock is number
+              && request.resource.data.stock <= resource.data.stock);
+    }
+
     // Customer order create — strict field validation
     function isValidOrderCreate() {
       let d = request.resource.data;
@@ -89,49 +113,64 @@ service cloud.firestore {
 
     match /tenants/{tid} {
 
-      // Tenant doc: readable by owner/super, writable by super only
-      allow get: if isOwnerOrSuper(tid);
+      // Tenant doc: readable by owner/super/staff, writable by super only
+      allow get: if isOwnerOrSuper(tid) || isMember(tid);
       allow list: if isSuperadmin();
       allow create, update, delete: if isSuperadmin();
 
-      // ---------- products: public read, owner write, narrow customer stock-decrement
+      // ---------- products: public read; owner write; narrow customer
+      //            stock-decrement; staff write gated by permission AND the
+      //            anti-fraud stock-not-increased guard.
       match /products/{pid} {
         allow read: if true;
-        allow create, delete: if isOwnerOrSuper(tid);
-        allow update: if isOwnerOrSuper(tid) || isStockDecrement();
+        allow create: if isOwnerOrSuper(tid) || memberHas(tid, 'productadd');
+        allow delete: if isOwnerOrSuper(tid) || memberHas(tid, 'productdelete');
+        allow update: if isOwnerOrSuper(tid)
+                       || isStockDecrement()
+                       || (isMember(tid) && staffStockNotIncreased()
+                           && (memberHas(tid, 'productedit') || memberHas(tid, 'stockdecrease')
+                               || memberHas(tid, 'availabilitytoggle') || memberHas(tid, 'visibilitytoggle')));
       }
 
-      // ---------- settings: public read, owner write
+      // ---------- settings: public read; owner/super or staff with settingsedit
+      //            (mode toggles also via modestoggle) write.
       match /settings/{sid} {
         allow read: if true;
-        allow write: if isOwnerOrSuper(tid);
+        allow write: if isOwnerOrSuper(tid)
+                      || memberHas(tid, 'settingsedit') || memberHas(tid, 'modestoggle');
       }
 
-      // ---------- orders: customers create with strict validation; owners read/update/delete
+      // ---------- orders: customers create with strict validation; owner/super
+      //            full; staff read with orderstabview, update with confirm/cancel.
       match /orders/{oid} {
-        allow read, update, delete: if isOwnerOrSuper(tid);
+        allow read: if isOwnerOrSuper(tid) || memberHas(tid, 'orderstabview');
+        allow update: if isOwnerOrSuper(tid)
+                       || memberHas(tid, 'orderconfirm') || memberHas(tid, 'ordercancel') || memberHas(tid, 'orderrefund');
+        allow delete: if isOwnerOrSuper(tid);
         allow create: if isValidOrderCreate();
       }
 
-      // ---------- suppliers: private to the tenant's owners; never customer-facing
+      // ---------- suppliers: owner/super or staff with the matching permission.
       match /suppliers/{sid} {
-        allow read, write: if isOwnerOrSuper(tid);
+        allow read:   if isOwnerOrSuper(tid) || memberHas(tid, 'supplierstabview');
+        allow create: if isOwnerOrSuper(tid) || memberHas(tid, 'supplieradd');
+        allow update: if isOwnerOrSuper(tid) || memberHas(tid, 'supplieredit');
+        allow delete: if isOwnerOrSuper(tid) || memberHas(tid, 'supplierdelete');
       }
 
-      // ---------- subscription: read by owner/super; writes only via Cloud
-      //            Functions (admin SDK bypasses rules). Disallow client write
-      //            so tenants can't extend their own subscription by editing
-      //            the doc directly.
+      // ---------- subscription: read by owner/super or staff with a billing
+      //            view perm; writes only via Cloud Functions (admin SDK).
       match /subscription/{sid} {
-        allow read: if isOwnerOrSuper(tid);
+        allow read: if isOwnerOrSuper(tid)
+                     || memberHas(tid, 'billingtabview') || memberHas(tid, 'billingpaymenthistoryview');
         allow write: if false;
       }
 
-      // ---------- payments: per-payment record. Owner can create a
-      //            pending_verification submission (with receipt upload) but
-      //            cannot self-confirm. Superadmin confirms via Cloud Function.
+      // ---------- payments: owner can create a pending_verification submission;
+      //            staff with billing view can read; only Cloud Functions confirm.
       match /payments/{pid} {
-        allow read: if isOwnerOrSuper(tid);
+        allow read: if isOwnerOrSuper(tid)
+                     || memberHas(tid, 'billingtabview') || memberHas(tid, 'billingpaymenthistoryview');
         allow create: if isOwnerOrSuper(tid)
                        && request.resource.data.status == 'pending_verification'
                        && request.resource.data.amount is number

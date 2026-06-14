@@ -8432,6 +8432,32 @@ function applyEmployeeTabVisibility() {
   if (item) item.style.display = show ? '' : 'none';
 }
 
+// Owners + superadmins have full access; staff are gated by their permission map.
+function can(perm) {
+  if (!IS_STAFF) return true;
+  return !!(STAFF_PERMS && STAFF_PERMS[perm] === true);
+}
+
+// Phase 1b gating: hide tabs a staff member lacks the *view* permission for +
+// the owner-only Employee tab, then bounce off any now-hidden tab to Home.
+// (Per-button action gating + financial-stat hide land in Phase 2; the Firestore
+// rules already block unpermitted writes server-side in the meantime.)
+function applyStaffGating() {
+  applyEmployeeTabVisibility();
+  if (!IS_STAFF) return;
+  const TAB_VIEW = { orders: 'orderstabview', products: 'productstabview', suppliers: 'supplierstabview', reports: 'reportstabview', billing: 'billingtabview', settings: 'settingstabview' };
+  const activeBtn = document.querySelector('.tab-btn.active');
+  const activeTab = activeBtn ? activeBtn.getAttribute('data-tab') : 'home';
+  let activeStillVisible = (activeTab === 'home');
+  Object.entries(TAB_VIEW).forEach(([tab, perm]) => {
+    const show = can(perm);
+    document.querySelectorAll(`.tab-btn[data-tab="${tab}"], .bn-item[data-tab="${tab}"], .more-sheet-item[data-tab="${tab}"]`)
+      .forEach(b => { b.style.display = show ? '' : 'none'; });
+    if (tab === activeTab && show) activeStillVisible = true;
+  });
+  if (!activeStillVisible) switchTab('home');
+}
+
 async function renderEmployeeList() {
   const el = document.getElementById('emp-list');
   if (!el || !TENANT_ID) return;
@@ -11984,7 +12010,8 @@ async function ensureJsminimartTenantDoc(user) {
 }
 
 // Determine if the signed-in user is authorised to use this tenant's admin.
-// Order: superadmin (always allowed) → tenant ownerEmails → deny.
+// Order: superadmin → active STAFF member → tenant ownerEmails → first-time
+// staff (pending invite, auto-accepted) → deny. The OWNER path is unchanged.
 async function checkAdminAuthorization(user) {
   if (!user) return { allowed: false, reason: 'not-signed-in' };
   if (SUPERADMIN_EMAILS.includes(user.email)) {
@@ -11993,21 +12020,39 @@ async function checkAdminAuthorization(user) {
   if (!TENANT_ID) {
     return { allowed: false, reason: 'no-tenant-in-url' };
   }
+  // 1) Already an ACTIVE staff member of this store? (reads their own member doc)
+  try {
+    const msnap = await db.collection('tenants').doc(TENANT_ID).collection('members').doc(user.uid).get();
+    const m = msnap.exists ? (msnap.data() || {}) : null;
+    if (m && m.status === 'active') {
+      return { allowed: true, reason: 'staff', permissions: m.permissions || {} };
+    }
+  } catch (e) { /* no member doc / read denied — fall through */ }
+  // 2) OWNER (unchanged): read the tenant doc + match ownerEmails.
   try {
     const snap = await db.collection('tenants').doc(TENANT_ID).get();
-    if (!snap.exists) {
+    if (snap.exists) {
+      const owners = Array.isArray(snap.data().ownerEmails) ? snap.data().ownerEmails : [];
+      TENANT_OWNER_EMAILS = owners;
+      if (owners.includes(user.email)) {
+        return { allowed: true, reason: 'owner' };
+      }
+    } else {
       return { allowed: false, reason: 'tenant-not-found' };
     }
-    const owners = Array.isArray(snap.data().ownerEmails) ? snap.data().ownerEmails : [];
-    TENANT_OWNER_EMAILS = owners;
-    if (owners.includes(user.email)) {
-      return { allowed: true, reason: 'owner' };
-    }
-    return { allowed: false, reason: 'not-an-owner' };
   } catch (err) {
-    console.error('[auth] tenant ownership check failed:', err);
-    return { allowed: false, reason: 'lookup-failed' };
+    // Tenant-doc read denied → not an owner. Could still be a first-time staff
+    // member with a pending invite (no member doc yet) — try below before denying.
   }
+  // 3) First-time STAFF with a pending invite → accept it (the Cloud Function
+  //    creates the member doc + grants the access claim), then they're in.
+  try {
+    const res = await firebase.app().functions('asia-southeast1').httpsCallable('acceptStaffInvite')({ tid: TENANT_ID });
+    if (res && res.data && res.data.ok) {
+      return { allowed: true, reason: 'staff', permissions: res.data.permissions || {} };
+    }
+  } catch (e) { /* no invite for this account */ }
+  return { allowed: false, reason: 'not-an-owner' };
 }
 
 async function handleAdminAuth(user) {
@@ -12029,6 +12074,10 @@ async function handleAdminAuth(user) {
       }
     } catch (e) { console.warn('[admin] ownership-claim refresh check failed:', e && e.message); }
     showAdmin();
+    // Staff vs owner: load permissions + gate the UI for staff (owner = full access).
+    IS_STAFF = (auth_result.reason === 'staff');
+    STAFF_PERMS = IS_STAFF ? (auth_result.permissions || {}) : null;
+    if (typeof applyStaffGating === 'function') applyStaffGating();
     const ae = document.getElementById('account-email');
     if (ae) ae.textContent = user.email;
     const aec = document.getElementById('allowed-emails-count');
