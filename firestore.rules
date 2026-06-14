@@ -182,6 +182,22 @@ service cloud.firestore {
           allow update: if isOwnerOrSuper(tid) || isBranchStockDecrement();
         }
       }
+
+      // ---------- Staff Accounts (Pro feature) — per-person employee members
+      //            + pending invites. Written ONLY by the staff Cloud Functions
+      //            (addStaffMember / acceptStaffInvite / updateStaffPermissions
+      //            / removeStaffMember; Admin SDK bypasses these rules), so a
+      //            client can NEVER self-grant or edit permissions. Owner/super
+      //            read all; a staff member reads their OWN member doc to load
+      //            their permissions on login.
+      match /members/{uid} {
+        allow read: if isOwnerOrSuper(tid) || (isSignedIn() && request.auth.uid == uid);
+        allow write: if false;
+      }
+      match /staff_invites/{inviteId} {
+        allow read: if isOwnerOrSuper(tid);
+        allow write: if false;
+      }
     }
 
     // ============================================================

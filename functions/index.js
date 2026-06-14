@@ -1494,6 +1494,238 @@ exports.injectStarterCatalogFor = onCall(async (request) => {
 });
 
 // ============================================================
+// STAFF ACCOUNTS & ROLES (Pro feature) — Phase 0 backend plumbing.
+// Per-person employee logins + a permission matrix so the owner can see/limit
+// what each employee does. Membership lives at tenants/{tid}/members/{uid};
+// pending invites at tenants/{tid}/staff_invites/{emailKey}. Writes go ONLY
+// through these callables (Admin SDK) — clients can never self-grant. Plan:
+// Obsidian "Staff Accounts & Roles - Plan.md".
+//
+// NOTE: stockincrease is OWNER-ONLY and intentionally NOT a grantable key —
+// it's the anti-fraud lever (prevents "sell an item, re-add the stock").
+// ============================================================
+const STAFF_PERMISSION_KEYS = new Set([
+  // financials (hidden by default for staff)
+  'totalprofitview', 'totalrevenueview', 'profitmarginview', 'totalcostview', 'deliverycollectedview',
+  // orders
+  'orderstabview', 'orderconfirm', 'ordercancel', 'ordercopy', 'orderrefund', 'customerinfoview',
+  // products (stockincrease NOT here — owner-only)
+  'productstabview', 'productadd', 'productedit', 'productdelete', 'stockdecrease', 'availabilitytoggle', 'visibilitytoggle',
+  // suppliers
+  'supplierstabview', 'supplieradd', 'supplieredit', 'supplierdelete',
+  // reports
+  'reportstabview', 'reportdownload', 'reportprint',
+  // billing
+  'billingtabview', 'billingcontactsupport', 'billingavailableplan', 'billingpaymenthistoryview',
+  // store ops
+  'settingstabview', 'settingsedit', 'modestoggle', 'branchmanage'
+]);
+
+// Granting an action implies its tab-view (no impossible "can confirm but can't see Orders" states).
+const STAFF_PERMISSION_DEPS = {
+  orderconfirm: 'orderstabview', ordercancel: 'orderstabview', ordercopy: 'orderstabview',
+  orderrefund: 'orderstabview', customerinfoview: 'orderstabview',
+  productadd: 'productstabview', productedit: 'productstabview', productdelete: 'productstabview',
+  stockdecrease: 'productstabview', availabilitytoggle: 'productstabview', visibilitytoggle: 'productstabview',
+  supplieradd: 'supplierstabview', supplieredit: 'supplierstabview', supplierdelete: 'supplierstabview',
+  reportdownload: 'reportstabview', reportprint: 'reportstabview',
+  billingcontactsupport: 'billingtabview', billingavailableplan: 'billingtabview', billingpaymenthistoryview: 'billingtabview',
+  settingsedit: 'settingstabview'
+};
+
+const STAFF_ROLE_PRESETS = {
+  cashier:    ['orderstabview', 'orderconfirm', 'ordercancel', 'ordercopy', 'productstabview', 'availabilitytoggle', 'stockdecrease'],
+  stockclerk: ['productstabview', 'stockdecrease', 'availabilitytoggle', 'supplierstabview'],
+  manager:    ['orderstabview', 'orderconfirm', 'ordercancel', 'ordercopy', 'customerinfoview',
+               'productstabview', 'productadd', 'productedit', 'stockdecrease', 'availabilitytoggle', 'visibilitytoggle',
+               'supplierstabview', 'supplieradd', 'supplieredit', 'reportstabview', 'modestoggle']
+};
+
+const STAFF_CAP = 10; // max staff (members + pending invites) per tenant
+
+// Keep only valid `true` keys, then auto-add implied tab-views.
+function sanitizeStaffPermissions(input) {
+  const out = {};
+  if (input && typeof input === 'object') {
+    for (const k of Object.keys(input)) {
+      if (STAFF_PERMISSION_KEYS.has(k) && input[k] === true) out[k] = true;
+    }
+  }
+  for (const [action, view] of Object.entries(STAFF_PERMISSION_DEPS)) {
+    if (out[action]) out[view] = true;
+  }
+  return out;
+}
+
+function presetPermissions(preset) {
+  const keys = STAFF_ROLE_PRESETS[preset];
+  if (!Array.isArray(keys)) return null;
+  const obj = {}; keys.forEach(k => { obj[k] = true; });
+  return sanitizeStaffPermissions(obj);
+}
+
+function staffEmailKey(email) {
+  return Buffer.from(String(email || '').trim().toLowerCase()).toString('hex');
+}
+
+// Owner-of-Pro gate for staff-management callables. Superadmin bypasses tier.
+async function requireStaffManager(tid, token) {
+  if (!token || token.email_verified !== true) {
+    throw new HttpsError('failed-precondition', 'Email must be verified.');
+  }
+  const email = String(token.email || '').trim().toLowerCase();
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Store not found.');
+  const tenant = tsnap.data() || {};
+  const isSuper = SUPERADMIN_EMAILS.has(email);
+  const ownerEmails = (Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : []).map(e => String(e).toLowerCase());
+  if (!isSuper && !ownerEmails.includes(email)) {
+    throw new HttpsError('permission-denied', 'Only the store owner can manage staff.');
+  }
+  if (!isSuper) {
+    const sub = (await tref.collection('subscription').doc('current').get()).data() || {};
+    if (String(sub.tier || 'free').toLowerCase() !== 'pro') {
+      throw new HttpsError('failed-precondition', 'Staff accounts are a Pro feature. Upgrade to Pro to add employees.');
+    }
+  }
+  return { tref, tenant, email, isSuper, ownerEmails };
+}
+
+async function grantTenantClaim(uid, slug) {
+  const u = await getAuth().getUser(uid);
+  const claims = (u && u.customClaims) || {};
+  const owned = Array.isArray(claims.tenants) ? claims.tenants : [];
+  if (!owned.includes(slug)) await getAuth().setCustomUserClaims(uid, { ...claims, tenants: [...owned, slug] });
+}
+async function revokeTenantClaim(uid, slug) {
+  const u = await getAuth().getUser(uid);
+  const claims = (u && u.customClaims) || {};
+  const owned = Array.isArray(claims.tenants) ? claims.tenants : [];
+  if (owned.includes(slug)) await getAuth().setCustomUserClaims(uid, { ...claims, tenants: owned.filter(t => t !== slug) });
+}
+
+// ---- addStaffMember — owner invites an employee by email ----
+exports.addStaffMember = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  const email = String(data.email || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
+    throw new HttpsError('invalid-argument', 'Enter a valid email address.');
+  }
+  const { tref, ownerEmails } = await requireStaffManager(tid, request.auth.token);
+  if (ownerEmails.includes(email)) {
+    throw new HttpsError('failed-precondition', 'That email is already an owner of this store.');
+  }
+
+  // Permissions: explicit map OR a named preset.
+  const preset = STAFF_ROLE_PRESETS[String(data.preset || '')] ? String(data.preset) : null;
+  const permissions = preset ? presetPermissions(preset) : sanitizeStaffPermissions(data.permissions);
+
+  // Cap check (active members + pending invites).
+  const [membersSnap, invitesSnap] = await Promise.all([
+    tref.collection('members').get(),
+    tref.collection('staff_invites').get()
+  ]);
+  const alreadyMember = membersSnap.docs.some(d => String((d.data() || {}).email || '').toLowerCase() === email);
+  if (alreadyMember) throw new HttpsError('already-exists', 'That employee is already added.');
+  if (membersSnap.size + invitesSnap.size >= STAFF_CAP) {
+    throw new HttpsError('resource-exhausted', `You can have up to ${STAFF_CAP} employees.`);
+  }
+
+  await tref.collection('staff_invites').doc(staffEmailKey(email)).set({
+    tid, email, role: 'staff', preset, permissions, status: 'invited',
+    invitedBy: request.auth.token.email, invitedAt: FieldValue.serverTimestamp()
+  });
+  return { ok: true, email, status: 'invited' };
+});
+
+// ---- acceptStaffInvite — employee accepts on first admin login (self) ----
+exports.acceptStaffInvite = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const tid = String((request.data || {}).tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  const email = String(token.email || '').trim().toLowerCase();
+  const uid = request.auth.uid;
+  const tref = db.collection('tenants').doc(tid);
+
+  // Already an active member? Idempotent success.
+  const mref = tref.collection('members').doc(uid);
+  const msnap = await mref.get();
+  if (msnap.exists && (msnap.data() || {}).status === 'active') {
+    return { ok: true, status: 'active', permissions: (msnap.data() || {}).permissions || {} };
+  }
+
+  const inviteRef = tref.collection('staff_invites').doc(staffEmailKey(email));
+  const inviteSnap = await inviteRef.get();
+  if (!inviteSnap.exists) throw new HttpsError('not-found', 'No staff invite for this account.');
+  const invite = inviteSnap.data() || {};
+
+  await mref.set({
+    email, role: 'staff',
+    permissions: invite.permissions || {}, preset: invite.preset || null,
+    status: 'active', addedBy: invite.invitedBy || null,
+    addedAt: FieldValue.serverTimestamp(), acceptedAt: FieldValue.serverTimestamp()
+  });
+  await inviteRef.delete();
+  try { await grantTenantClaim(uid, tid); } catch (err) { console.warn('[acceptStaffInvite] claim grant failed:', err.message); }
+  return { ok: true, status: 'active', permissions: invite.permissions || {} };
+});
+
+// ---- updateStaffPermissions — owner edits an employee's permissions ----
+exports.updateStaffPermissions = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  const memberUid = String(data.uid || '').trim();
+  const inviteEmail = String(data.email || '').trim().toLowerCase();
+  if (!tid || (!memberUid && !inviteEmail)) throw new HttpsError('invalid-argument', 'tid and uid (or email) required.');
+  const { tref } = await requireStaffManager(tid, request.auth.token);
+
+  const preset = STAFF_ROLE_PRESETS[String(data.preset || '')] ? String(data.preset) : null;
+  const permissions = preset ? presetPermissions(preset) : sanitizeStaffPermissions(data.permissions);
+  const patch = { permissions, preset, updatedAt: FieldValue.serverTimestamp() };
+
+  if (memberUid) {
+    const mref = tref.collection('members').doc(memberUid);
+    if (!(await mref.get()).exists) throw new HttpsError('not-found', 'Employee not found.');
+    await mref.set(patch, { merge: true });
+  } else {
+    const iref = tref.collection('staff_invites').doc(staffEmailKey(inviteEmail));
+    if (!(await iref.get()).exists) throw new HttpsError('not-found', 'Invite not found.');
+    await iref.set(patch, { merge: true });
+  }
+  return { ok: true, permissions };
+});
+
+// ---- removeStaffMember — owner removes an employee or cancels an invite ----
+exports.removeStaffMember = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  const memberUid = String(data.uid || '').trim();
+  const inviteEmail = String(data.email || '').trim().toLowerCase();
+  if (!tid || (!memberUid && !inviteEmail)) throw new HttpsError('invalid-argument', 'tid and uid (or email) required.');
+  const { tref } = await requireStaffManager(tid, request.auth.token);
+
+  let removed = null;
+  if (memberUid) {
+    await tref.collection('members').doc(memberUid).delete();
+    try { await revokeTenantClaim(memberUid, tid); } catch (err) { console.warn('[removeStaffMember] claim revoke failed:', err.message); }
+    removed = 'member';
+  }
+  if (inviteEmail) {
+    await tref.collection('staff_invites').doc(staffEmailKey(inviteEmail)).delete();
+    removed = removed || 'invite';
+  }
+  return { ok: true, removed };
+});
+
+// ============================================================
 // rejectManualPayment — superadmin-only. Marks a payment rejected with
 // a reason. Does NOT modify the subscription doc.
 // ============================================================
