@@ -8469,6 +8469,23 @@ function applyStaffGating() {
   if (typeof renderProducts === 'function' && Array.isArray(products) && products.length) renderProducts();
   if (typeof renderOrders === 'function') renderOrders();
   if (typeof renderDashboard === 'function') renderDashboard();
+  applySettingsGating();
+}
+
+// Settings tab: read-only for staff without settingsedit (inputs disabled,
+// save button hidden); the Rain/Closed/Maintenance toggles depend separately
+// on modestoggle. Called on login + whenever the Settings tab opens.
+function applySettingsGating() {
+  if (!IS_STAFF) return;
+  const panel = document.getElementById('settings-tab');
+  if (!panel) return;
+  const canEdit = can('settingsedit');
+  const canModes = can('modestoggle');
+  panel.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = !canEdit; });
+  ['set-store-closed', 'set-rain-mode', 'set-maint-mode'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = !canModes;
+  });
+  const siSave = document.getElementById('si-save-btn'); if (siSave) siSave.style.display = canEdit ? '' : 'none';
 }
 
 async function renderEmployeeList() {
@@ -10821,6 +10838,7 @@ function switchTab(tab, reset = true) {
     });
   } else if (tab === 'settings') {
     setupSettingsScrollSpy();
+    applySettingsGating();
   } else if (tab === 'employee') {
     renderEmployeeList();
   } else if (tab === 'reports') {
