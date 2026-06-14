@@ -7907,6 +7907,8 @@ function renderProductCapStatus() {
   const bannerMsg = document.getElementById('product-cap-banner-msg');
   const bannerCompact = document.getElementById('product-cap-banner-msg-compact');
   if (!pill || !addBtn) return;
+  // Staff without 'productadd' never see the Add Product button.
+  addBtn.style.display = (IS_STAFF && !can('productadd')) ? 'none' : '';
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
   const info = TIER_INFO[tier] || TIER_INFO.free;
   const cap = info.productCap;
@@ -11061,9 +11063,9 @@ function productRowHtml(p, lowThresh) {
        </div>`
     : stockNum !== null
       ? `<div class="stock-adj">
-           <button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>
+           ${can('stockdecrease') ? `<button class="stock-btn" onclick="adjustStock(${p.id}, -1)">−</button>` : `<span class="stock-btn stock-spacer"></span>`}
            <span class="pt-stock-val">${stockNum}</span>
-           <button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>
+           ${can('stockincrease') ? `<button class="stock-btn" onclick="adjustStock(${p.id}, 1)">+</button>` : `<span class="stock-btn stock-spacer"></span>`}
          </div>`
       : `<div class="stock-adj">
            <span class="stock-btn stock-spacer"></span>
@@ -11083,16 +11085,16 @@ function productRowHtml(p, lowThresh) {
           </div>
           <div class="pt-cell pt-stock">${stockCell}</div>
           <div class="pt-cell pt-price-col">${(() => { if (p.variants && p.variants.length > 0) { const vp = p.variants.map(v => parseFloat(v.price || p.price)); const mn = Math.min(...vp), mx = Math.max(...vp); return mn === mx ? '₱' + mn.toFixed(2) : '₱' + mn.toFixed(2) + ' – ₱' + mx.toFixed(2); } return '₱' + parseFloat(p.price).toFixed(2); })()}</div>
-          <div class="pt-cell pt-edit-col"><button class="edit-btn" onclick="editProduct(${p.id})">Edit</button></div>
+          <div class="pt-cell pt-edit-col">${can('productedit') ? `<button class="edit-btn" onclick="editProduct(${p.id})">Edit</button>` : ''}</div>
           <div class="pt-cell pt-avail-col">
             <label class="toggle-sw" title="${available ? 'Mark as out of stock' : 'Mark as available'}">
-              <input type="checkbox" ${available ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
+              <input type="checkbox" ${available ? 'checked' : ''} ${can('availabilitytoggle') ? '' : 'disabled'} onclick="event.stopPropagation()" onchange="toggleAvailability(${p.id}, this.checked)" />
               <span class="toggle-sl"></span>
             </label>
           </div>
           <div class="pt-cell pt-hide-col">
             <label class="toggle-sw is-hide" title="${isHidden ? 'Show this product on the storefront' : 'Hide this product from the storefront'}">
-              <input type="checkbox" ${isHidden ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleHidden(${p.id}, this.checked)" />
+              <input type="checkbox" ${isHidden ? 'checked' : ''} ${can('visibilitytoggle') ? '' : 'disabled'} onclick="event.stopPropagation()" onchange="toggleHidden(${p.id}, this.checked)" />
               <span class="toggle-sl"></span>
             </label>
           </div>
@@ -12076,10 +12078,11 @@ async function handleAdminAuth(user) {
         if (!owned.includes(TENANT_ID)) await user.getIdToken(true);
       }
     } catch (e) { console.warn('[admin] ownership-claim refresh check failed:', e && e.message); }
-    showAdmin();
-    // Staff vs owner: load permissions + gate the UI for staff (owner = full access).
+    // Staff vs owner: set permissions BEFORE showAdmin so the first render
+    // already gates financials/buttons (owner = full access).
     IS_STAFF = (auth_result.reason === 'staff');
     STAFF_PERMS = IS_STAFF ? (auth_result.permissions || {}) : null;
+    showAdmin();
     if (typeof applyStaffGating === 'function') applyStaffGating();
     const ae = document.getElementById('account-email');
     if (ae) ae.textContent = user.email;
@@ -13253,12 +13256,12 @@ function renderDashboard() {
     { label: '✕ Cancelled',         value: canc.length,                                      cls: 'red'   },
     { label: '↩ Refunded',          value: refu.length,                                      cls: 'red'   },
     { label: 'Items Sold',          value: itemsSold,                                        cls: 'blue'  },
-    { label: 'Total Cost',          value: linesWithCost === 0 ? '—' : '₱' + fmt(totalCost), cls: 'amber' },
-    { label: 'Total Revenue',       value: '₱' + fmt(revenue),                               cls: 'green' },
-    { label: 'Total Profit',        value: linesWithCost === 0 ? '—' : '₱' + fmt(totalProfit), cls: profitCls },
-    { label: 'Profit Margin',       value: marginPct === null ? '—' : marginPct.toFixed(1) + '%', cls: marginCls },
-    { label: 'Delivery Collected',  value: '₱' + fmt(delivery),                              cls: ''      },
-  ].map(c => `<div class="dash-card">
+    { label: 'Total Cost',          value: linesWithCost === 0 ? '—' : '₱' + fmt(totalCost), cls: 'amber', perm: 'totalcostview' },
+    { label: 'Total Revenue',       value: '₱' + fmt(revenue),                               cls: 'green', perm: 'totalrevenueview' },
+    { label: 'Total Profit',        value: linesWithCost === 0 ? '—' : '₱' + fmt(totalProfit), cls: profitCls, perm: 'totalprofitview' },
+    { label: 'Profit Margin',       value: marginPct === null ? '—' : marginPct.toFixed(1) + '%', cls: marginCls, perm: 'profitmarginview' },
+    { label: 'Delivery Collected',  value: '₱' + fmt(delivery),                              cls: '', perm: 'deliverycollectedview' },
+  ].filter(c => !c.perm || can(c.perm)).map(c => `<div class="dash-card">
     <div class="dash-card-label">${c.label}</div>
     <div class="dash-card-value ${c.cls}">${c.value}</div>
   </div>`).join('');
@@ -13266,7 +13269,7 @@ function renderDashboard() {
   // Footnote about missing-cost exclusion, attached under the cards
   const cardsEl = document.getElementById('dash-cards');
   let footEl = document.getElementById('dash-cards-footnote');
-  if (linesMissingCost > 0) {
+  if (linesMissingCost > 0 && (can('totalcostview') || can('totalprofitview') || can('profitmarginview'))) {
     if (!footEl) {
       footEl = document.createElement('div');
       footEl.id = 'dash-cards-footnote';
