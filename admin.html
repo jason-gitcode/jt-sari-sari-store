@@ -906,6 +906,9 @@
     /* Supplier modal overlays */
     .supp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
     .supp-modal-overlay.show { display: flex; }
+    /* Destructive-confirm dialog must sit ABOVE any other supp-modal it's
+       triggered from (e.g. the Employee editor's Remove). */
+    #destructive-confirm-modal { z-index: 1000; }
     .supp-modal { background: var(--surface); border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.18); }
     .supp-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
     .supp-modal-header h2 { font-size: 17px; font-weight: 600; }
