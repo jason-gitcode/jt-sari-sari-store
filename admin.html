@@ -8462,6 +8462,11 @@ function applyStaffGating() {
       .forEach(b => { b.style.display = show ? '' : 'none'; });
     if (tab === activeTab && show) activeStillVisible = true;
   });
+  // Mobile "More" button: hide it if the staff has NO More-sheet items
+  // (Reports/Billing/Settings/Employee all hidden) — avoids an empty popup.
+  const anyMoreVisible = Array.from(document.querySelectorAll('.more-sheet-item')).some(el => el.style.display !== 'none');
+  const moreBtn = document.getElementById('bn-more-btn');
+  if (moreBtn) moreBtn.style.display = anyMoreVisible ? '' : 'none';
   if (!activeStillVisible) switchTab('home');
   // Re-render dynamic lists now that the staff permission state is known, so
   // any rows/cards/stats rendered before gating get re-evaluated through can().
