@@ -8461,6 +8461,12 @@ function applyStaffGating() {
     if (tab === activeTab && show) activeStillVisible = true;
   });
   if (!activeStillVisible) switchTab('home');
+  // Re-render dynamic lists now that the staff permission state is known, so
+  // any rows/cards/stats rendered before gating get re-evaluated through can().
+  // (Defensive against async render-timing; harmless for owners.)
+  if (typeof renderProducts === 'function' && Array.isArray(products) && products.length) renderProducts();
+  if (typeof renderOrders === 'function') renderOrders();
+  if (typeof renderDashboard === 'function') renderDashboard();
 }
 
 async function renderEmployeeList() {
