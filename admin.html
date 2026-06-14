@@ -10501,9 +10501,9 @@ function renderOrders() {
           <span class="order-time-label">${formatOrderTime(o.createdAt)}</span>
         </div>
         <div class="order-card-body">
-          <div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}${o.customer?.phone ? `<button class="copy-phone-btn" onclick="copyPhone(this,'${o.customer.phone}')">copy</button>` : ''}</div>
+          ${can('customerinfoview') ? `<div class="order-cust">${o.customer?.name || '—'} · ${o.customer?.phone || '—'}${o.customer?.phone ? `<button class="copy-phone-btn" onclick="copyPhone(this,'${o.customer.phone}')">copy</button>` : ''}</div>
           <div class="order-addr">${addr}</div>
-          ${navHtml}
+          ${navHtml}` : `<div class="order-cust" style="color:var(--muted);">👤 Customer details hidden</div>`}
           ${bodyHtml}
         </div>
         ${actionsHtml}
@@ -12061,11 +12061,19 @@ async function checkAdminAuthorization(user) {
   if (!TENANT_ID) {
     return { allowed: false, reason: 'no-tenant-in-url' };
   }
-  // 1) Already an ACTIVE staff member of this store? (reads their own member doc)
+  // 1) Already an ACTIVE staff member of this store? Staff access also requires
+  //    the store to still be on Pro — a downgrade suspends staff. Fail-OPEN on
+  //    an absent tier mirror so we never lock out staff of a real Pro store
+  //    (only an EXPLICIT free/growth suspends).
   try {
     const msnap = await db.collection('tenants').doc(TENANT_ID).collection('members').doc(user.uid).get();
     const m = msnap.exists ? (msnap.data() || {}) : null;
     if (m && m.status === 'active') {
+      let tier = null;
+      try { tier = ((await db.collection('tenants').doc(TENANT_ID).get()).data() || {}).tier || null; } catch (e) {}
+      if (tier === 'free' || tier === 'growth') {
+        return { allowed: false, reason: 'staff-suspended' };
+      }
       return { allowed: true, reason: 'staff', permissions: m.permissions || {} };
     }
   } catch (e) { /* no member doc / read denied — fall through */ }
@@ -12143,6 +12151,7 @@ async function handleAdminAuth(user) {
       'no-tenant-in-url': 'No store in the URL. Visit /<your-store>/admin/.',
       'tenant-not-found': 'Store not found. Check the URL or sign up at /signup/.',
       'not-an-owner': 'This account is not authorised for this store.',
+      'staff-suspended': 'Staff access is paused — this store is no longer on the Pro plan. Ask the owner to re-activate Pro.',
       'lookup-failed': 'Could not verify access. Try again.'
     })[auth_result.reason] || 'Access denied.';
     auth.signOut();

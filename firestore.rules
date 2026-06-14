@@ -60,6 +60,16 @@ service cloud.firestore {
               && request.resource.data.stock is number
               && request.resource.data.stock <= resource.data.stock);
     }
+    // A staff WITHOUT productedit may only touch the toggle fields their perms
+    // allow (stock↓ / available / hidden) — never name/price/etc. adjustStock
+    // also flips `available` when stock hits 0, so stockdecrease may set it too.
+    function staffToggleOnlyChange(tid) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return changed.hasOnly(['stock', 'available', 'hidden'])
+          && (!('stock' in changed)     || memberHas(tid, 'stockdecrease'))
+          && (!('available' in changed) || memberHas(tid, 'availabilitytoggle') || memberHas(tid, 'stockdecrease'))
+          && (!('hidden' in changed)    || memberHas(tid, 'visibilitytoggle'));
+    }
 
     // Customer order create — strict field validation
     function isValidOrderCreate() {
@@ -128,8 +138,7 @@ service cloud.firestore {
         allow update: if isOwnerOrSuper(tid)
                        || isStockDecrement()
                        || (isMember(tid) && staffStockNotIncreased()
-                           && (memberHas(tid, 'productedit') || memberHas(tid, 'stockdecrease')
-                               || memberHas(tid, 'availabilitytoggle') || memberHas(tid, 'visibilitytoggle')));
+                           && (memberHas(tid, 'productedit') || staffToggleOnlyChange(tid)));
       }
 
       // ---------- settings: public read; owner/super or staff with settingsedit
