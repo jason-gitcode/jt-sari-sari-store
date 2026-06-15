@@ -11036,10 +11036,20 @@ function historyRowHtml(e, d) {
   const role = (actor.role || 'system');
   const who = actor.email || (role === 'customer' ? 'Customer' : (role === 'system' ? 'System' : '—'));
   const time = d ? histClock(d) : '';
+  // The meta line already shows the actor, so drop a redundant trailing
+  // "by <actor email>" the trigger appended to the summary.
+  let summary = e.summary || e.type || 'Activity';
+  const aem = (actor.email || '').trim();
+  if (aem) {
+    const suffix = ' by ' + aem;
+    if (summary.toLowerCase().endsWith(suffix.toLowerCase())) {
+      summary = summary.slice(0, summary.length - suffix.length).trim();
+    }
+  }
   return `<div class="hist-row">
     <div class="hist-ico cat-${escHtml(cat)}">${ico}</div>
     <div class="hist-body">
-      <div class="hist-summary">${escHtml(e.summary || e.type || 'Activity')}</div>
+      <div class="hist-summary">${escHtml(summary)}</div>
       <div class="hist-meta"><span class="hist-actor">${escHtml(who)}</span><span class="hist-role ${escHtml(role)}">${escHtml(role)}</span></div>
     </div>
     <div class="hist-time">${escHtml(time)}</div>
