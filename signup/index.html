@@ -3507,6 +3507,19 @@
   </div>
 </div>
 
+<!-- Leave-store confirm — employee self-removes from a store -->
+<div class="notice-overlay" id="leave-overlay" hidden onclick="closeLeaveBackdrop(event)">
+  <div class="notice-card" role="alertdialog" aria-labelledby="leave-title" onclick="event.stopPropagation()">
+    <div class="notice-icon">🚪</div>
+    <div class="notice-title" id="leave-title">Leave this store?</div>
+    <div class="notice-message" id="leave-message"></div>
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button type="button" class="btn-hero" style="flex:1;background:#e5e7eb;color:#111;" onclick="closeLeaveOverlay()">Cancel</button>
+      <button type="button" class="btn-hero" style="flex:1;background:#b91c1c;" id="leave-confirm-btn" onclick="doLeaveStore()">Leave store</button>
+    </div>
+  </div>
+</div>
+
 <!-- Magic-link pop-up — enter email, get a passwordless sign-in link -->
 <div class="notice-overlay" id="magic-overlay" hidden onclick="closeMagicBackdrop(event)">
   <div class="notice-card" role="dialog" aria-labelledby="magic-title" onclick="event.stopPropagation()">
@@ -3555,6 +3568,7 @@ const functions = firebase.app().functions('asia-southeast1');
 const createTenant = functions.httpsCallable('createTenant');
 const getMyTenant  = functions.httpsCallable('getMyTenant');
 const sendStoreSignInLink = functions.httpsCallable('sendStoreSignInLink');
+const leaveStore   = functions.httpsCallable('leaveStore');
 
 // ============================================================
 // Store finder — discover existing storefronts by name
@@ -4330,6 +4344,7 @@ function escText(s) {
 
 function renderAlreadyOwner(email, tenants) {
   document.getElementById('owner-email').textContent = email;
+  window._landingTenants = tenants; // for confirmLeaveStore name lookup (avoids escaping names into onclick)
   const list = document.getElementById('already-owner-list');
   list.innerHTML = tenants.map(t => `
     <div class="owner-tenant-card">
@@ -4339,8 +4354,50 @@ function renderAlreadyOwner(email, tenants) {
       <div class="owner-tenant-actions">
         <a href="${escText(t.adminUrl)}" class="btn btn-primary">Open admin →</a>
       </div>
+      <button type="button" class="link-btn" style="margin-top:10px;color:#b91c1c;"
+        onclick="confirmLeaveStore('${escText(t.slug)}')">
+        Leave this store
+      </button>
     </div>
   `).join('');
+}
+
+let _pendingLeave = null;
+function confirmLeaveStore(slug) {
+  const t = (window._landingTenants || []).find(x => x.slug === slug);
+  const name = t ? t.name : 'this store';
+  _pendingLeave = { tid: slug, name };
+  document.getElementById('leave-message').textContent =
+    `You'll lose access to ${name}. Do this only if you've left this team — it frees your email to create your own store. The owner can always re-invite you.`;
+  document.getElementById('leave-overlay').hidden = false;
+}
+function closeLeaveOverlay() {
+  document.getElementById('leave-overlay').hidden = true;
+}
+function closeLeaveBackdrop(e) {
+  if (e.target === document.getElementById('leave-overlay')) closeLeaveOverlay();
+}
+async function doLeaveStore() {
+  if (!_pendingLeave) return;
+  const { tid, name } = _pendingLeave;
+  const btn = document.getElementById('leave-confirm-btn');
+  const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Leaving…';
+  try {
+    await leaveStore({ tid });
+    // Refresh the token so the revoked tenant claim drops out before re-routing
+    // (otherwise getMyTenant would still see this store via the stale claim).
+    try { if (auth.currentUser) await auth.currentUser.getIdToken(true); } catch (_) {}
+    closeLeaveOverlay();
+    _pendingLeave = null;
+    if (auth.currentUser) await proceedVerifiedUser(auth.currentUser);
+    showNotice(`You've left ${name}`, 'Your email is now free to sign up and create your own store.');
+  } catch (err) {
+    console.warn('leaveStore failed', err);
+    showNotice("Couldn't leave", (err && err.message) ? err.message : 'Please try again.');
+  } finally {
+    btn.disabled = false; btn.textContent = prev;
+  }
 }
 
 async function proceedVerifiedUser(user) {

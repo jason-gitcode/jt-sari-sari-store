@@ -1751,6 +1751,48 @@ exports.removeStaffMember = onCall(async (request) => {
   return { ok: true, removed };
 });
 
+// ---- leaveStore — an employee removes THEMSELVES from a store ----
+// For when someone resigned but the owner never removed them: self-service so
+// their email is freed to create their own store (otherwise the pabilimart.com
+// front door keeps routing them into that store). Owners can't "leave" — they'd
+// delete the store instead. Logged so the owner sees it in History.
+exports.leaveStore = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  if (token.email_verified !== true) throw new HttpsError('failed-precondition', 'Email must be verified.');
+  const tid = String((request.data || {}).tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  const uid = request.auth.uid;
+  const email = String(token.email || '').trim().toLowerCase();
+
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Store not found.');
+  const ownerEmails = Array.isArray((tsnap.data() || {}).ownerEmails) ? tsnap.data().ownerEmails : [];
+  if (ownerEmails.includes(email)) {
+    throw new HttpsError('failed-precondition', "You own this store, so you can't leave it.");
+  }
+
+  // Remove membership + any pending invite + claim + front-door lookup.
+  await tref.collection('members').doc(uid).delete().catch(() => {});
+  await tref.collection('staff_invites').doc(staffEmailKey(email)).delete().catch(() => {});
+  try { await revokeTenantClaim(uid, tid); } catch (err) { console.warn('[leaveStore] claim revoke failed:', err.message); }
+  try {
+    await db.collection('staff_invite_lookup').doc(staffEmailKey(email))
+      .update(new FieldPath('tenants', tid), FieldValue.delete());
+  } catch (err) { /* doc/key may not exist — fine */ }
+
+  try {
+    await logActivity(tid, `staff-left-${uid}`, {
+      type: 'staff.left', category: 'store', targetId: uid,
+      summary: `${email} left the store`,
+      actor: { uid, email, role: 'staff' }, source: 'self'
+    });
+  } catch (err) { /* non-fatal */ }
+
+  return { ok: true };
+});
+
 // ============================================================
 // rejectManualPayment — superadmin-only. Marks a payment rejected with
 // a reason. Does NOT modify the subscription doc.
