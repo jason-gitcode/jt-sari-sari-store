@@ -7336,7 +7336,7 @@ function syncOperatingModeToggles() {
 async function toggleRainMode() {
   rainModeActive = !rainModeActive;
   try {
-    await opRef().set({ rainMode: rainModeActive }, { merge: true });
+    await opRef().set({ rainMode: rainModeActive, ...actorFields() }, { merge: true });
   } catch (e) {
     console.error('Rain mode error:', e);
     showToast('Error updating rain mode', 'error');
@@ -7346,7 +7346,7 @@ async function toggleRainMode() {
 async function toggleOfflineMode() {
   offlineModeActive = !offlineModeActive;
   try {
-    await opRef().set({ offlineMode: offlineModeActive }, { merge: true });
+    await opRef().set({ offlineMode: offlineModeActive, ...actorFields() }, { merge: true });
   } catch (e) {
     console.error('Offline mode error:', e);
     showToast('Error updating offline mode', 'error');
@@ -7357,7 +7357,7 @@ async function toggleOfflineMode() {
 async function toggleMaintenanceMode() {
   maintenanceModeActive = !maintenanceModeActive;
   try {
-    await opRef().set({ maintenanceMode: maintenanceModeActive }, { merge: true });
+    await opRef().set({ maintenanceMode: maintenanceModeActive, ...actorFields() }, { merge: true });
   } catch (e) {
     console.error('Maintenance mode error:', e);
     showToast('Error updating maintenance mode', 'error');
@@ -7442,7 +7442,8 @@ async function toggleStoreClosed() {
     await opRef().set({
       storeClosed: newClosed,
       storeClosedSource: 'manual',
-      storeClosedPeriodId: getCurrentPeriodId()
+      storeClosedPeriodId: getCurrentPeriodId(),
+      ...actorFields()
     }, { merge: true });
   } catch (e) {
     console.error('Store closed error:', e);
@@ -8453,6 +8454,13 @@ function actorStamp() {
   const email = u ? u.email : null;
   const role = IS_STAFF ? 'staff' : ((typeof SUPERADMIN_EMAILS !== 'undefined' && SUPERADMIN_EMAILS.includes(email)) ? 'superadmin' : 'owner');
   return { uid: u ? u.uid : null, email, role };
+}
+// Activity-log attribution: spread into deliberate admin writes (products,
+// modes, settings) so the Firestore triggers can record WHO did it. `_actorAt`
+// is the freshness marker the trigger checks (a stale merged `_actor` left on a
+// doc must not cause a later customer/system write to be mis-attributed).
+function actorFields() {
+  return { _actor: actorStamp(), _actorAt: firebase.firestore.FieldValue.serverTimestamp() };
 }
 
 // Phase 1b gating: hide tabs a staff member lacks the *view* permission for +
@@ -10789,7 +10797,7 @@ async function adjustStock(id, delta) {
   }
   if (product.stock === null || product.stock === undefined) return;
   const newStock = Math.max(0, product.stock + delta);
-  const upd = { stock: newStock };
+  const upd = { stock: newStock, ...actorFields() };
   if (newStock === 0) upd.available = false;
   else if (product.stock === 0 && newStock > 0) upd.available = true;
   try {
@@ -11052,7 +11060,7 @@ function handleUnitChange(val) {
 
 async function toggleAvailability(id, available) {
   try {
-    await tcol('products').doc(String(id)).update({ available });
+    await tcol('products').doc(String(id)).update({ available, ...actorFields() });
   } catch (err) {
     console.error('Toggle error:', err);
     showToast('Error updating availability', 'error');
@@ -11065,7 +11073,7 @@ async function toggleAvailability(id, available) {
 // because hidden === true is the only condition that hides.
 async function toggleHidden(id, hidden) {
   try {
-    await tcol('products').doc(String(id)).update({ hidden });
+    await tcol('products').doc(String(id)).update({ hidden, ...actorFields() });
     showToast(hidden ? 'Product hidden from storefront' : 'Product visible on storefront', 'success');
   } catch (err) {
     console.error('Toggle hidden error:', err);
@@ -11622,6 +11630,7 @@ async function saveProduct(e) {
     // — keeps the heavy image bytes out of the product doc (storefront speed).
     // Existing https: URLs pass through unchanged.
     formData.images = await uploadProductImages(TENANT_ID, String(formData.id), formData.images);
+    Object.assign(formData, actorFields()); // activity-log attribution (who added/edited)
     await tcol('products').doc(String(formData.id)).set(formData);
     // After the product doc is written, seed/update per-branch inventory
     // docs for any branch-specific products. Best-effort — if these

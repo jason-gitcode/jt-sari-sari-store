@@ -1,5 +1,5 @@
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore');
@@ -3286,6 +3286,157 @@ exports.onOrderUpdated = onDocumentUpdated('tenants/{tid}/orders/{oid}', async (
     before: { status: before.status }, after: { status: after.status },
     actor, source: 'trigger'
   });
+});
+
+// The admin client stamps `_actor` + `_actorAt` (serverTimestamp) on deliberate
+// writes. Because Firestore merges persist `_actor` on the doc, a LATER write by
+// a customer (checkout stock decrement) or the system (storefront auto-close)
+// would still carry the stale `_actor` — so presence alone is not enough. We log
+// only when `_actorAt` ADVANCED in this write, i.e. an admin freshly stamped it.
+function actorIsFresh(before, after) {
+  const b = before && before._actorAt;
+  const a = after && after._actorAt;
+  if (!a) return false;          // no fresh-actor marker → customer/system write
+  if (!b) return true;           // first stamp on this doc
+  try { return !a.isEqual(b); } catch (e) {
+    try { return a.toMillis() !== b.toMillis(); } catch (e2) { return true; }
+  }
+}
+
+function pickProductFields(d) {
+  return {
+    name: d.name != null ? d.name : null,
+    price: d.price != null ? d.price : null,
+    stock: d.stock != null ? d.stock : null,
+    available: d.available != null ? d.available : null,
+    hidden: d.hidden != null ? d.hidden : null
+  };
+}
+
+// ---- Products: create / delete / field changes (admin-driven only) ----
+// Logged only when an admin freshly stamped the write, which excludes bulk
+// starter-catalog seeds, server seeds, customer checkout decrements, and
+// order-cancel/confirm restocks (none advance `_actorAt`).
+exports.onProductCreated = onDocumentCreated('tenants/{tid}/products/{pid}', async (event) => {
+  const { tid, pid } = event.params;
+  const d = event.data ? event.data.data() : null;
+  if (!d || !d._actorAt) return; // admin-added only (bulk/seed creates carry no _actorAt)
+  const actor = activityActor(d);
+  await logActivity(tid, `prod-create-${pid}`, {
+    type: 'product.created', category: 'products', targetId: String(pid),
+    summary: `Added product "${d.name || pid}"${actor.email ? ' by ' + actor.email : ''}`,
+    after: pickProductFields(d),
+    actor, source: 'trigger'
+  });
+});
+
+exports.onProductDeleted = onDocumentDeleted('tenants/{tid}/products/{pid}', async (event) => {
+  const { tid, pid } = event.params;
+  const d = event.data ? event.data.data() : null; // the deleted doc's last data
+  if (!d) return;
+  if (d.fromStarterCatalog === true) return; // skip bulk-catalog removals / re-seeds
+  const actor = activityActor(d); // best-effort: last stamped _actor on the doc
+  await logActivity(tid, `prod-delete-${pid}`, {
+    type: 'product.deleted', category: 'products', targetId: String(pid),
+    summary: `Deleted product "${d.name || pid}"${actor.email ? ' by ' + actor.email : ''}`,
+    before: pickProductFields(d),
+    actor, source: 'trigger'
+  });
+});
+
+exports.onProductUpdated = onDocumentUpdated('tenants/{tid}/products/{pid}', async (event) => {
+  const { tid, pid } = event.params;
+  const before = event.data && event.data.before ? event.data.before.data() : null;
+  const after = event.data && event.data.after ? event.data.after.data() : null;
+  if (!before || !after) return;
+  if (!actorIsFresh(before, after)) return; // admin action only (skips customer/restock)
+  const changes = [];
+  if (Number(before.stock) !== Number(after.stock)) {
+    changes.push(`stock ${before.stock != null ? before.stock : '—'}→${after.stock != null ? after.stock : '—'}`);
+  }
+  if (Number(before.price) !== Number(after.price)) changes.push(`price ₱${before.price}→₱${after.price}`);
+  if (before.name !== after.name) changes.push(`renamed "${before.name}"→"${after.name}"`);
+  if ((before.available !== false) !== (after.available !== false)) {
+    changes.push(after.available === false ? 'marked out of stock' : 'marked available');
+  }
+  if (!!before.hidden !== !!after.hidden) changes.push(after.hidden ? 'hidden from storefront' : 'shown on storefront');
+  if (changes.length === 0) return; // metadata-only / no meaningful change
+  const onlyStock = changes.length === 1 && Number(before.stock) !== Number(after.stock);
+  const actor = activityActor(after);
+  await logActivity(tid, `prod-upd-${pid}-${event.id}`, {
+    type: onlyStock ? 'stock.adjusted' : 'product.updated', category: 'products', targetId: String(pid),
+    summary: `${after.name || before.name || 'Product'} — ${changes.join(', ')}${actor.email ? ' by ' + actor.email : ''}`,
+    before: pickProductFields(before), after: pickProductFields(after),
+    actor, source: 'trigger'
+  });
+});
+
+// ---- Payments: manual GCash confirm / reject (server-written) ----
+exports.onPaymentUpdated = onDocumentUpdated('tenants/{tid}/payments/{ref}', async (event) => {
+  const { tid, ref } = event.params;
+  const before = event.data && event.data.before ? event.data.before.data() : null;
+  const after = event.data && event.data.after ? event.data.after.data() : null;
+  if (!before || !after || before.status === after.status) return;
+  const type = after.status === 'confirmed' ? 'payment.received'
+             : after.status === 'rejected' ? 'payment.rejected' : null;
+  if (!type) return;
+  const amount = Number(after.amount || 0);
+  const by = after.confirmedBy || after.rejectedBy || null;
+  const actor = by ? { uid: null, email: by, role: 'superadmin' } : activityActor(after);
+  await logActivity(tid, `pay-${after.status}-${ref}`, {
+    type, category: 'payments', targetId: String(ref),
+    summary: `Payment ${after.status} — ₱${amount.toFixed(2)}${after.tier ? ' (' + after.tier + ')' : ''}${by ? ' by ' + by : ''}`,
+    before: { status: before.status }, after: { status: after.status, amount, tier: after.tier || null },
+    actor, source: 'trigger'
+  });
+});
+
+// ---- Subscription: plan (tier) change ----
+exports.onSubscriptionUpdated = onDocumentUpdated('tenants/{tid}/subscription/{sid}', async (event) => {
+  if (event.params.sid !== 'current') return;
+  const { tid } = event.params;
+  const before = event.data && event.data.before ? event.data.before.data() : {};
+  const after = event.data && event.data.after ? event.data.after.data() : {};
+  if (!before || !after || before.tier === after.tier) return; // tier changes only
+  await logActivity(tid, `plan-${after.tier}-${event.id}`, {
+    type: 'plan.changed', category: 'billing', targetId: 'subscription',
+    summary: `Plan changed: ${before.tier || '—'} → ${after.tier || '—'}`,
+    before: { tier: before.tier || null, status: before.status || null },
+    after: { tier: after.tier || null, status: after.status || null },
+    actor: { uid: null, email: null, role: 'system' }, source: 'trigger'
+  });
+});
+
+// ---- Operating modes (admin toggle only) — modes live on settings/store
+// (tenant default) AND on each branches/{id} doc, so we watch both. ----
+const OP_MODE_LABELS = { rainMode: 'Rain Mode', maintenanceMode: 'Maintenance Mode', offlineMode: 'Offline Mode', storeClosed: 'Store Closed' };
+async function logModeChanges(tid, before, after, eventId, targetId, scopeLabel) {
+  if (!actorIsFresh(before, after)) return; // admin toggle only (skip auto-close + server mirrors)
+  const actor = activityActor(after);
+  const changes = [];
+  Object.keys(OP_MODE_LABELS).forEach(f => {
+    if (!!before[f] !== !!after[f]) changes.push(`${OP_MODE_LABELS[f]} ${after[f] ? 'ON' : 'OFF'}`);
+  });
+  if (changes.length === 0) return;
+  await logActivity(tid, `mode-${eventId}`, {
+    type: 'mode.changed', category: 'store', targetId,
+    summary: `${changes.join(', ')}${scopeLabel ? ' [' + scopeLabel + ']' : ''}${actor.email ? ' by ' + actor.email : ''}`,
+    actor, source: 'trigger'
+  });
+}
+
+exports.onSettingsUpdated = onDocumentUpdated('tenants/{tid}/settings/{sid}', async (event) => {
+  if (event.params.sid !== 'store') return;
+  const before = event.data && event.data.before ? event.data.before.data() : {};
+  const after = event.data && event.data.after ? event.data.after.data() : {};
+  await logModeChanges(event.params.tid, before || {}, after || {}, event.id, 'settings', null);
+});
+
+exports.onBranchUpdated = onDocumentUpdated('tenants/{tid}/branches/{bid}', async (event) => {
+  const before = event.data && event.data.before ? event.data.before.data() : {};
+  const after = event.data && event.data.after ? event.data.after.data() : {};
+  const label = (after && after.name) ? after.name : event.params.bid;
+  await logModeChanges(event.params.tid, before || {}, after || {}, event.id, event.params.bid, label);
 });
 
 // ============================================================

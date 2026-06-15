@@ -63,9 +63,11 @@ service cloud.firestore {
     // A staff WITHOUT productedit may only touch the toggle fields their perms
     // allow (stock↓ / available / hidden) — never name/price/etc. adjustStock
     // also flips `available` when stock hits 0, so stockdecrease may set it too.
+    // (_actor/_actorAt are activity-log attribution metadata the admin client
+    // stamps on every deliberate write — always permitted alongside the toggles.)
     function staffToggleOnlyChange(tid) {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return changed.hasOnly(['stock', 'available', 'hidden'])
+      return changed.hasOnly(['stock', 'available', 'hidden', '_actor', '_actorAt'])
           && (!('stock' in changed)     || memberHas(tid, 'stockdecrease'))
           && (!('available' in changed) || memberHas(tid, 'availabilitytoggle') || memberHas(tid, 'stockdecrease'))
           && (!('hidden' in changed)    || memberHas(tid, 'visibilitytoggle'));
