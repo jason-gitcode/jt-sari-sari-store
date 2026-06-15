@@ -277,6 +277,16 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // STAFF INVITE LOOKUP — reverse index (email-hash → {tenants}) so an
+    // employee can sign in via the pabilimart.com front door. Fully closed
+    // to clients (would otherwise leak which stores an email belongs to);
+    // only addStaffMember/removeStaffMember/getMyTenant (admin SDK) touch it.
+    // ============================================================
+    match /staff_invite_lookup/{k} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
     // PUBLIC DIRECTORY — anonymous-readable list of {slug, name}
     // pairs used by the signup-page store-finder. Writes happen only
     // through Cloud Functions (admin SDK) which bypass these rules,

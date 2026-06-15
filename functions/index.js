@@ -1641,6 +1641,14 @@ exports.addStaffMember = onCall(async (request) => {
     tid, email, name, role: 'staff', preset, permissions, status: 'invited',
     invitedBy: request.auth.token.email, invitedAt: FieldValue.serverTimestamp()
   });
+  // Reverse lookup (server-only) so this employee can sign in via the
+  // pabilimart.com front door — getMyTenant resolves their stores by email
+  // hash without a collection-group query. Keyed by the same email hash.
+  try {
+    await db.collection('staff_invite_lookup').doc(staffEmailKey(email)).set(
+      { email, tenants: { [tid]: true } }, { merge: true }
+    );
+  } catch (err) { console.warn('[addStaffMember] lookup write failed:', err.message); }
   return { ok: true, email, status: 'invited' };
 });
 
@@ -1718,14 +1726,27 @@ exports.removeStaffMember = onCall(async (request) => {
   const { tref } = await requireStaffManager(tid, request.auth.token);
 
   let removed = null;
+  let cleanupEmail = inviteEmail || null;
   if (memberUid) {
-    await tref.collection('members').doc(memberUid).delete();
+    const mref = tref.collection('members').doc(memberUid);
+    if (!cleanupEmail) {
+      const msnap = await mref.get();
+      cleanupEmail = String((msnap.data() || {}).email || '').toLowerCase() || null;
+    }
+    await mref.delete();
     try { await revokeTenantClaim(memberUid, tid); } catch (err) { console.warn('[removeStaffMember] claim revoke failed:', err.message); }
     removed = 'member';
   }
   if (inviteEmail) {
     await tref.collection('staff_invites').doc(staffEmailKey(inviteEmail)).delete();
     removed = removed || 'invite';
+  }
+  // Drop this tenant from the employee's front-door reverse lookup (best-effort).
+  if (cleanupEmail) {
+    try {
+      await db.collection('staff_invite_lookup').doc(staffEmailKey(cleanupEmail))
+        .update(new FieldPath('tenants', tid), FieldValue.delete());
+    } catch (err) { /* doc/key may not exist — fine */ }
   }
   return { ok: true, removed };
 });
@@ -1884,19 +1905,58 @@ exports.getMyTenant = onCall(async (request) => {
     .limit(10)
     .get();
 
+  const ownedSlugs = new Set(snap.docs.map(d => d.id));
+  const tenants = snap.docs.map(d => {
+    const data = d.data() || {};
+    return {
+      slug: d.id,
+      name: data.name || d.id,
+      url: `https://pabilimart.com/${d.id}/`,
+      adminUrl: `https://pabilimart.com/${d.id}/admin/`
+    };
+  });
+
+  // Staff memberships — so an employee can use the SAME front door as owners.
+  // Two complementary sources, so no backfill is needed:
+  //   (a) staff_invite_lookup mirror (email-hash → tenants) — covers pending
+  //       invites (the employee's very first sign-in) + anyone added after this
+  //       feature shipped; kept in sync by addStaffMember/removeStaffMember.
+  //   (b) the {tenants:[...]} custom claim — covers active members added BEFORE
+  //       the mirror existed (the claim is granted on accept, revoked on remove).
+  // A stale entry is harmless: clicking through to /admin/ re-checks membership
+  // and bounces a non-member, so this only ever offers a (possibly dead) link.
+  let staffTenants = [];
+  try {
+    const staffTids = new Set();
+    const lref = await db.collection('staff_invite_lookup').doc(staffEmailKey(email)).get();
+    const map = (lref.exists && (lref.data() || {}).tenants) || {};
+    Object.keys(map).forEach(tid => { if (tid && !ownedSlugs.has(tid)) staffTids.add(tid); });
+    const claimTenants = Array.isArray(token.tenants) ? token.tenants : [];
+    claimTenants.forEach(tid => { if (tid && !ownedSlugs.has(tid)) staffTids.add(tid); });
+    if (staffTids.size > 0) {
+      const tids = [...staffTids];
+      const docs = await Promise.all(tids.map(tid => db.collection('tenants').doc(tid).get()));
+      staffTenants = docs.filter(d => d.exists).map(d => {
+        const data = d.data() || {};
+        return {
+          slug: d.id,
+          name: data.name || d.id,
+          url: `https://pabilimart.com/${d.id}/`,
+          adminUrl: `https://pabilimart.com/${d.id}/admin/`,
+          role: 'staff'
+        };
+      });
+    }
+  } catch (err) {
+    console.warn('[getMyTenant] staff lookup failed:', err.message);
+  }
+
   return {
     email,
     isSuperadmin,
     cap: isSuperadmin ? null : MAX_TENANTS_PER_EMAIL,
-    tenants: snap.docs.map(d => {
-      const data = d.data() || {};
-      return {
-        slug: d.id,
-        name: data.name || d.id,
-        url: `https://pabilimart.com/${d.id}/`,
-        adminUrl: `https://pabilimart.com/${d.id}/admin/`
-      };
-    })
+    tenants,
+    staffTenants
   };
 });
 

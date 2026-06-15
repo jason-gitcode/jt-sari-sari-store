@@ -2757,18 +2757,18 @@
 
   <!-- STEP 2b: ALREADY OWNS A STORE (replaces the form when cap is hit) -->
   <div id="step-already-owner" class="hidden">
-    <div class="step-title">🎉 Your store is ready</div>
+    <div class="step-title">👋 Welcome to your team</div>
     <div class="step-body">
       <div class="signed-in-as">
         <span>Signed in as <strong id="owner-email">—</strong></span>
         <button class="link-btn" onclick="signOut()">Switch account</button>
       </div>
       <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">
-        This Google account already owns a store. Jump straight into it:
+        You've been added as staff. Open the admin to start working:
       </p>
       <div id="already-owner-list"></div>
       <p style="font-size:12px;color:var(--muted);margin-top:14px;">
-        Each Google account can manage 1 store. To create another store, switch to a different Google account.
+        Use your own email to sign in — never share the owner's login. Wrong account? Switch above.
       </p>
     </div>
   </div>
@@ -4333,8 +4333,9 @@ function renderAlreadyOwner(email, tenants) {
   const list = document.getElementById('already-owner-list');
   list.innerHTML = tenants.map(t => `
     <div class="owner-tenant-card">
-      <div class="owner-tenant-name">${escText(t.name)}</div>
-      <div class="owner-tenant-url">${escText(t.url)}</div>
+      <div class="owner-tenant-name">${escText(t.name)}
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle;">Staff</span>
+      </div>
       <div class="owner-tenant-actions">
         <a href="${escText(t.adminUrl)}" class="btn btn-primary">Open admin →</a>
       </div>
@@ -4362,6 +4363,14 @@ async function proceedVerifiedUser(user) {
         seededText: 'Welcome back! Manage your products and orders from the admin.',
         showSwitch: true
       });
+      return;
+    }
+    // Not an owner — but they may be staff of one or more stores. Route them to
+    // the same front door instead of pushing them into "create a store".
+    const staffTenants = Array.isArray(data?.staffTenants) ? data.staffTenants : [];
+    if (staffTenants.length > 0) {
+      renderAlreadyOwner(user.email, staffTenants);
+      showStep('step-already-owner');
       return;
     }
   } catch (err) {
