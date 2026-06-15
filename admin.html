@@ -814,7 +814,10 @@
     #employee-tab.active  { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #history-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     /* ===== History (activity log) tab ===== */
-    .hist-header { margin-bottom: 14px; }
+    .hist-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .hist-refresh-btn { flex-shrink: 0; background: var(--surface-2, #f1f5f9); color: var(--ink); border: 1px solid var(--border, #e2e8f0); border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .hist-refresh-btn:active { transform: translateY(1px); }
+    .hist-refresh-btn:disabled { opacity: .6; cursor: default; }
     .hist-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .hist-chip { background: var(--surface-2, #f1f5f9); color: var(--muted); border: 1px solid transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .hist-chip.active { background: var(--accent, #2563eb); color: #fff; }
@@ -3596,6 +3599,7 @@
           <h2 class="emp-h2">Activity History</h2>
           <p class="emp-sub">A tamper-proof record of key actions — who did what and when. Kept for 90 days.</p>
         </div>
+        <button type="button" class="hist-refresh-btn" id="hist-refresh-btn" onclick="refreshHistory()" title="Refresh">↻ Refresh</button>
       </div>
       <div class="hist-filters" id="hist-filters">
         <button type="button" class="hist-chip active" data-cat="all" onclick="setHistoryFilter('all')">All</button>
@@ -11062,6 +11066,20 @@ function renderHistoryTab() {
   const list = document.getElementById('hist-list');
   if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
   loadHistoryPage(true);
+}
+
+// Manual refresh — reload from the server, keeping the current filter.
+async function refreshHistory() {
+  const btn = document.getElementById('hist-refresh-btn');
+  if (historyLoading) return;
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
+  const list = document.getElementById('hist-list');
+  if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
+  try {
+    await loadHistoryPage(true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
 }
 
 function setHistoryFilter(cat) {
