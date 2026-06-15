@@ -818,24 +818,45 @@
     .hist-refresh-btn { flex-shrink: 0; background: var(--surface-2, #f1f5f9); color: var(--ink); border: 1px solid var(--border, #e2e8f0); border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .hist-refresh-btn:active { transform: translateY(1px); }
     .hist-refresh-btn:disabled { opacity: .6; cursor: default; }
-    .hist-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    .hist-chip { background: var(--surface-2, #f1f5f9); color: var(--muted); border: 1px solid transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .hist-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .hist-filters { display: flex; gap: 8px; align-items: center; }
+    .hist-chip { background: var(--surface-2, #f1f5f9); color: var(--muted); border: 1px solid transparent; border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .hist-chip.active { background: var(--accent, #2563eb); color: #fff; }
-    .hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .hist-more-wrap { position: relative; }
+    .hist-more-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; background: var(--surface, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.12); padding: 6px; min-width: 150px; display: flex; flex-direction: column; }
+    .hist-more-menu[hidden] { display: none; }
+    .hist-more-opt { background: none; border: 0; text-align: left; padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+    .hist-more-opt:hover, .hist-more-opt:active { background: var(--surface-2, #f1f5f9); }
+    .hist-search-input { flex: 1; min-width: 150px; background: var(--surface-2, #f1f5f9); border: 1px solid var(--border, #e2e8f0); border-radius: 999px; padding: 8px 16px; font-size: 13px; color: var(--ink); -webkit-appearance: none; }
+    .hist-search-input:focus { outline: none; border-color: var(--accent, #2563eb); }
+    .hist-list { display: flex; flex-direction: column; }
     .hist-empty { color: var(--muted); font-size: 14px; padding: 24px; text-align: center; background: var(--surface-2, #f1f5f9); border-radius: 12px; }
-    .hist-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 12px 14px; }
-    .hist-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; background: var(--surface-2, #f1f5f9); }
+    .hist-day { position: sticky; top: 0; z-index: 5; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--bg, #f8fafc); padding: 10px 2px 6px; }
+    .hist-row { display: flex; gap: 12px; align-items: center; padding: 11px 4px; border-bottom: 1px solid var(--border, #eef2f7); }
+    .hist-row:last-child { border-bottom: 0; }
+    .hist-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; background: var(--surface-2, #f1f5f9); }
+    .hist-ico.cat-orders { background: #dbeafe; }
+    .hist-ico.cat-products { background: #dcfce7; }
+    .hist-ico.cat-payments { background: #fef9c3; }
+    .hist-ico.cat-store { background: #ede9fe; }
+    .hist-ico.cat-billing { background: #ffe4e6; }
     .hist-body { flex: 1; min-width: 0; }
-    .hist-summary { font-size: 14px; color: var(--ink); line-height: 1.4; word-break: break-word; }
-    .hist-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 4px; font-size: 12px; color: var(--muted); }
-    .hist-actor { font-weight: 600; }
-    .hist-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 5px; background: var(--surface-2, #f1f5f9); color: var(--muted); }
+    .hist-summary { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.35; word-break: break-word; }
+    .hist-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .hist-actor { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .hist-role { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 5px; background: var(--surface-2, #f1f5f9); color: var(--muted); }
     .hist-role.staff { background: #fef3c7; color: #92400e; }
     .hist-role.owner { background: #dbeafe; color: #1e40af; }
     .hist-role.superadmin { background: #ede9fe; color: #6d28d9; }
     .hist-role.customer { background: #dcfce7; color: #166534; }
-    .hist-more-btn { align-self: center; margin-top: 16px; background: var(--surface-2, #f1f5f9); color: var(--ink); border: 1px solid var(--border, #e2e8f0); border-radius: 9px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .hist-more-btn:active { transform: translateY(1px); }
+    .hist-time { flex-shrink: 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .hist-capnote { text-align: center; font-size: 12px; color: var(--muted); padding: 14px 0 2px; }
+    .hist-pager { display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 18px; }
+    .hist-pg { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--border, #e2e8f0); background: var(--surface, #fff); color: var(--ink); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .hist-pg.active { background: var(--accent, #2563eb); color: #fff; border-color: var(--accent, #2563eb); }
+    .hist-pg.nav { font-size: 16px; line-height: 1; }
+    .hist-pg.gap { border: 0; background: none; cursor: default; min-width: 18px; }
+    .hist-pg:disabled { opacity: .4; cursor: default; }
     /* ===== Employee (Staff Accounts) tab ===== */
     .emp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
     .emp-h2 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0 0 4px; }
@@ -3601,16 +3622,24 @@
         </div>
         <button type="button" class="hist-refresh-btn" id="hist-refresh-btn" onclick="refreshHistory()" title="Refresh">↻ Refresh</button>
       </div>
-      <div class="hist-filters" id="hist-filters">
-        <button type="button" class="hist-chip active" data-cat="all" onclick="setHistoryFilter('all')">All</button>
-        <button type="button" class="hist-chip" data-cat="orders" onclick="setHistoryFilter('orders')">Orders</button>
-        <button type="button" class="hist-chip" data-cat="products" onclick="setHistoryFilter('products')">Products</button>
-        <button type="button" class="hist-chip" data-cat="payments" onclick="setHistoryFilter('payments')">Payments</button>
-        <button type="button" class="hist-chip" data-cat="store" onclick="setHistoryFilter('store')">Store</button>
-        <button type="button" class="hist-chip" data-cat="billing" onclick="setHistoryFilter('billing')">Billing</button>
+      <div class="hist-toolbar">
+        <div class="hist-filters" id="hist-filters">
+          <button type="button" class="hist-chip active" data-cat="all" onclick="setHistoryFilter('all')">All</button>
+          <button type="button" class="hist-chip" data-cat="orders" onclick="setHistoryFilter('orders')">Orders</button>
+          <button type="button" class="hist-chip" data-cat="products" onclick="setHistoryFilter('products')">Products</button>
+          <div class="hist-more-wrap">
+            <button type="button" class="hist-chip" id="hist-more-chip" onclick="toggleHistMoreMenu(event)">More ▾</button>
+            <div class="hist-more-menu" id="hist-more-menu" hidden>
+              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('payments')">Payments</button>
+              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('store')">Store</button>
+              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('billing')">Billing</button>
+            </div>
+          </div>
+        </div>
+        <input type="search" id="hist-search" class="hist-search-input" placeholder="Search history…" oninput="onHistorySearch(this.value)" autocomplete="off">
       </div>
       <div id="hist-list" class="hist-list"><div class="hist-empty">Loading…</div></div>
-      <button type="button" class="hist-more-btn" id="hist-more-btn" style="display:none;" onclick="loadHistoryPage(false)">Load more</button>
+      <div id="hist-pager" class="hist-pager"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -10969,31 +10998,25 @@ function moreMenuGo(tab) {
 // filtering is client-side over the loaded entries so no composite index is
 // needed — fine at pilot volume; switch to indexed queries if it grows.
 // ============================================================
-const HISTORY_PAGE = 25;
-let historyEntries = [];     // loaded docs (newest-first)
-let historyCursor = null;    // last doc snapshot for startAfter
+// Loads the recent log ONCE (newest-first, capped) then does filtering, search
+// and numbered pagination in-memory — gives true <1 2 3> pages + instant search
+// without per-page Firestore reads or a count() (unavailable in this SDK). Fine
+// at pilot volume; the 90-day TTL keeps the set bounded.
+const HISTORY_PER_PAGE = 20;
+const HISTORY_FETCH_CAP = 500;
+let historyAll = [];          // all loaded docs (newest-first)
 let historyFilter = 'all';
-let historyDone = false;
+let historySearch = '';
+let historyPageNum = 1;
 let historyLoading = false;
+let historyCapped = false;
 
 const HIST_ICONS = {
   'order.placed': '🛒', 'order.confirmed': '✅', 'order.cancelled': '🚫', 'order.refunded': '↩️',
   'product.created': '➕', 'product.updated': '✏️', 'product.deleted': '🗑️', 'stock.adjusted': '📦',
   'payment.received': '💰', 'payment.rejected': '⛔',
-  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️'
+  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️', 'staff.left': '🚪'
 };
-
-function histTimeLabel(ts) {
-  let d = null;
-  try { d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null); } catch (_) { d = null; }
-  if (!d || isNaN(d.getTime())) return '';
-  const diff = Date.now() - d.getTime();
-  if (diff < 60000) return 'just now';
-  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-  if (diff < 7 * 86400000) return Math.floor(diff / 86400000) + 'd ago';
-  return d.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
@@ -11001,99 +11024,188 @@ function escHtml(s) {
   ));
 }
 
-function historyRowHtml(e) {
+function histDate(ts) {
+  let d = null;
+  try { d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null); } catch (_) { d = null; }
+  return (d && !isNaN(d.getTime())) ? d : null;
+}
+function histDayKey(d) { return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); } // YYYY-MM-DD
+function histDayLabel(d) {
+  const k = histDayKey(d);
+  if (k === histDayKey(new Date())) return 'Today';
+  if (k === histDayKey(new Date(Date.now() - 86400000))) return 'Yesterday';
+  return d.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', weekday: 'short', month: 'short', day: 'numeric' });
+}
+function histClock(d) { return d.toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' }); }
+
+function historyRowHtml(e, d) {
   const ico = HIST_ICONS[e.type] || '•';
+  const cat = e.category || 'other';
   const actor = e.actor || {};
   const role = (actor.role || 'system');
-  const who = actor.email || (role === 'customer' ? 'customer' : (role === 'system' ? 'system' : '—'));
-  const roleTag = `<span class="hist-role ${escHtml(role)}">${escHtml(role)}</span>`;
-  const when = histTimeLabel(e.createdAt);
+  const who = actor.email || (role === 'customer' ? 'Customer' : (role === 'system' ? 'System' : '—'));
+  const time = d ? histClock(d) : '';
   return `<div class="hist-row">
-    <div class="hist-ico">${ico}</div>
+    <div class="hist-ico cat-${escHtml(cat)}">${ico}</div>
     <div class="hist-body">
       <div class="hist-summary">${escHtml(e.summary || e.type || 'Activity')}</div>
-      <div class="hist-meta">
-        <span class="hist-actor">${escHtml(who)}</span>${roleTag}
-        ${when ? `<span>${escHtml(when)}</span>` : ''}
-      </div>
+      <div class="hist-meta"><span class="hist-actor">${escHtml(who)}</span><span class="hist-role ${escHtml(role)}">${escHtml(role)}</span></div>
     </div>
+    <div class="hist-time">${escHtml(time)}</div>
   </div>`;
 }
 
-function renderHistoryList() {
+function getFilteredHistory() {
+  let arr = historyAll;
+  if (historyFilter !== 'all') arr = arr.filter(e => e.category === historyFilter);
+  const q = historySearch.trim().toLowerCase();
+  if (q) {
+    arr = arr.filter(e => {
+      const a = e.actor || {};
+      return (e.summary || '').toLowerCase().includes(q)
+          || (a.email || '').toLowerCase().includes(q)
+          || (e.type || '').toLowerCase().includes(q);
+    });
+  }
+  return arr;
+}
+
+function histPagerWindow(page, total) {
+  const out = [];
+  const lo = Math.max(2, page - 1), hi = Math.min(total - 1, page + 1);
+  out.push(1);
+  if (lo > 2) out.push('…');
+  for (let p = lo; p <= hi; p++) out.push(p);
+  if (hi < total - 1) out.push('…');
+  if (total > 1) out.push(total);
+  return out;
+}
+
+function renderHistoryPager(page, total) {
+  const el = document.getElementById('hist-pager');
+  if (!el) return;
+  if (total <= 1) { el.innerHTML = ''; return; }
+  let html = `<button class="hist-pg nav" ${page <= 1 ? 'disabled' : ''} onclick="gotoHistoryPage(${page - 1})">‹</button>`;
+  histPagerWindow(page, total).forEach(p => {
+    html += (p === '…')
+      ? `<span class="hist-pg gap">…</span>`
+      : `<button class="hist-pg ${p === page ? 'active' : ''}" onclick="gotoHistoryPage(${p})">${p}</button>`;
+  });
+  html += `<button class="hist-pg nav" ${page >= total ? 'disabled' : ''} onclick="gotoHistoryPage(${page + 1})">›</button>`;
+  el.innerHTML = html;
+}
+
+function renderHistoryPage() {
   const list = document.getElementById('hist-list');
   if (!list) return;
-  const rows = historyFilter === 'all'
-    ? historyEntries
-    : historyEntries.filter(e => e.category === historyFilter);
-  if (rows.length === 0) {
-    list.innerHTML = `<div class="hist-empty">${historyLoading ? 'Loading…' : 'No activity yet for this filter.'}</div>`;
-  } else {
-    list.innerHTML = rows.map(historyRowHtml).join('');
+  const data = getFilteredHistory();
+  const total = Math.max(1, Math.ceil(data.length / HISTORY_PER_PAGE));
+  if (historyPageNum > total) historyPageNum = total;
+  if (historyPageNum < 1) historyPageNum = 1;
+  if (data.length === 0) {
+    list.innerHTML = `<div class="hist-empty">${historyLoading ? 'Loading…' : 'No matching activity.'}</div>`;
+    renderHistoryPager(1, 1);
+    return;
   }
-  const moreBtn = document.getElementById('hist-more-btn');
-  if (moreBtn) moreBtn.style.display = historyDone ? 'none' : '';
+  const start = (historyPageNum - 1) * HISTORY_PER_PAGE;
+  const pageItems = data.slice(start, start + HISTORY_PER_PAGE);
+  let html = '', lastDay = null;
+  pageItems.forEach(e => {
+    const d = histDate(e.createdAt);
+    const day = d ? histDayLabel(d) : '—';
+    if (day !== lastDay) { html += `<div class="hist-day">${escHtml(day)}</div>`; lastDay = day; }
+    html += historyRowHtml(e, d);
+  });
+  if (historyCapped) html += `<div class="hist-capnote">Showing the most recent ${HISTORY_FETCH_CAP} entries.</div>`;
+  list.innerHTML = html;
+  renderHistoryPager(historyPageNum, total);
 }
 
-async function loadHistoryPage(reset) {
-  if (historyLoading) return;
+function gotoHistoryPage(p) {
+  historyPageNum = p;
+  renderHistoryPage();
+  const list = document.getElementById('hist-list');
+  if (list) list.scrollIntoView({ block: 'nearest' });
+}
+
+async function loadHistoryAll() {
   historyLoading = true;
-  if (reset) { historyEntries = []; historyCursor = null; historyDone = false; }
   try {
-    let q = tcol('activity').orderBy('createdAt', 'desc');
-    if (historyCursor) q = q.startAfter(historyCursor);
-    q = q.limit(HISTORY_PAGE);
-    const snap = await q.get();
-    snap.forEach(doc => historyEntries.push({ id: doc.id, ...doc.data() }));
-    if (snap.size > 0) historyCursor = snap.docs[snap.docs.length - 1];
-    if (snap.size < HISTORY_PAGE) historyDone = true;
+    const snap = await tcol('activity').orderBy('createdAt', 'desc').limit(HISTORY_FETCH_CAP).get();
+    historyAll = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    historyCapped = snap.size >= HISTORY_FETCH_CAP;
   } catch (err) {
     console.error('History load error:', err);
+    historyAll = [];
     const list = document.getElementById('hist-list');
-    if (list && historyEntries.length === 0) {
-      list.innerHTML = `<div class="hist-empty">Couldn't load history${err && err.message ? ' — ' + escHtml(err.message) : ''}.</div>`;
-    }
+    if (list) list.innerHTML = `<div class="hist-empty">Couldn't load history${err && err.message ? ' — ' + escHtml(err.message) : ''}.</div>`;
   } finally {
     historyLoading = false;
-    renderHistoryList();
   }
 }
 
-function renderHistoryTab() {
-  historyFilter = 'all';
-  document.querySelectorAll('#hist-filters .hist-chip').forEach(c =>
-    c.classList.toggle('active', c.dataset.cat === 'all'));
-  const list = document.getElementById('hist-list');
-  if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
-  loadHistoryPage(true);
+function resetHistFilterChips(cat) {
+  document.querySelectorAll('#hist-filters .hist-chip[data-cat]').forEach(c =>
+    c.classList.toggle('active', c.dataset.cat === cat));
+  const moreCats = ['payments', 'store', 'billing'];
+  const moreChip = document.getElementById('hist-more-chip');
+  if (moreChip) {
+    if (moreCats.includes(cat)) {
+      moreChip.classList.add('active');
+      moreChip.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + ' ▾';
+    } else {
+      moreChip.classList.remove('active');
+      moreChip.textContent = 'More ▾';
+    }
+  }
 }
 
-// Manual refresh — reload from the server, keeping the current filter.
+async function renderHistoryTab() {
+  historyFilter = 'all'; historySearch = ''; historyPageNum = 1;
+  const si = document.getElementById('hist-search'); if (si) si.value = '';
+  resetHistFilterChips('all');
+  closeHistMoreMenu();
+  const list = document.getElementById('hist-list');
+  if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
+  await loadHistoryAll();
+  renderHistoryPage();
+}
+
 async function refreshHistory() {
-  const btn = document.getElementById('hist-refresh-btn');
   if (historyLoading) return;
+  const btn = document.getElementById('hist-refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
   const list = document.getElementById('hist-list');
   if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
-  try {
-    await loadHistoryPage(true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
-  }
+  try { await loadHistoryAll(); historyPageNum = 1; renderHistoryPage(); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; } }
 }
 
 function setHistoryFilter(cat) {
-  historyFilter = cat;
-  document.querySelectorAll('#hist-filters .hist-chip').forEach(c =>
-    c.classList.toggle('active', c.dataset.cat === cat));
-  renderHistoryList();
-  // If the current filter has nothing loaded yet but more pages exist,
-  // pull another page so the owner isn't staring at an empty filter.
-  if (cat !== 'all' && !historyDone &&
-      historyEntries.filter(e => e.category === cat).length === 0) {
-    loadHistoryPage(false);
-  }
+  historyFilter = cat; historyPageNum = 1;
+  resetHistFilterChips(cat);
+  closeHistMoreMenu();
+  renderHistoryPage();
 }
+
+function onHistorySearch(v) {
+  historySearch = v || ''; historyPageNum = 1;
+  renderHistoryPage();
+}
+
+function toggleHistMoreMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('hist-more-menu');
+  if (m) m.hidden = !m.hidden;
+}
+function closeHistMoreMenu() {
+  const m = document.getElementById('hist-more-menu');
+  if (m) m.hidden = true;
+}
+document.addEventListener('click', (e) => {
+  const m = document.getElementById('hist-more-menu');
+  if (m && !m.hidden && !e.target.closest('.hist-more-wrap')) closeHistMoreMenu();
+});
 
 // ---------- PRODUCTS ----------
 // Debounced search — batch keystrokes into ~180ms windows so typing in a
