@@ -11448,7 +11448,12 @@ async function confirmDelete() {
   let errors = 0;
   for (const id of ids) {
     try {
-      await tcol('products').doc(String(id)).delete();
+      const ref = tcol('products').doc(String(id));
+      // Stamp WHO is deleting onto the doc first, so the delete trigger's
+      // snapshot carries a fresh actor (an _actor-only update logs nothing —
+      // onProductUpdated skips when no real field changed). Best-effort.
+      try { await ref.update(actorFields()); } catch (_) {}
+      await ref.delete();
     } catch (err) {
       console.error('Delete error:', err);
       errors++;
