@@ -818,16 +818,9 @@
     .hist-refresh-btn { flex-shrink: 0; background: var(--surface-2, #f1f5f9); color: var(--ink); border: 1px solid var(--border, #e2e8f0); border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .hist-refresh-btn:active { transform: translateY(1px); }
     .hist-refresh-btn:disabled { opacity: .6; cursor: default; }
-    .hist-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-    .hist-filters { display: flex; gap: 8px; align-items: center; }
-    .hist-chip { background: var(--surface-2, #f1f5f9); color: var(--muted); border: 1px solid transparent; border-radius: 999px; padding: 7px 15px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .hist-chip.active { background: var(--accent, #2563eb); color: #fff; }
-    .hist-more-wrap { position: relative; }
-    .hist-more-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; background: var(--surface, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.12); padding: 6px; min-width: 150px; display: flex; flex-direction: column; }
-    .hist-more-menu[hidden] { display: none; }
-    .hist-more-opt { background: none; border: 0; text-align: left; padding: 9px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
-    .hist-more-opt:hover, .hist-more-opt:active { background: var(--surface-2, #f1f5f9); }
-    .hist-search-input { flex: 1; min-width: 150px; background: var(--surface-2, #f1f5f9); border: 1px solid var(--border, #e2e8f0); border-radius: 999px; padding: 8px 16px; font-size: 13px; color: var(--ink); -webkit-appearance: none; }
+    /* Filter chips reuse .orders-filter / .orders-filter-btn / .dash-more-* so
+       the font, size and More-dropdown match the Orders tab exactly. */
+    .hist-search-input { width: 100%; box-sizing: border-box; margin-bottom: 14px; background: var(--surface-2, #f1f5f9); border: 1px solid var(--line, #e2e8f0); border-radius: var(--radius-sm, 8px); padding: 8px 14px; font-size: var(--fs-sm, 13px); font-family: inherit; color: var(--ink); -webkit-appearance: none; }
     .hist-search-input:focus { outline: none; border-color: var(--accent, #2563eb); }
     .hist-list { display: flex; flex-direction: column; }
     .hist-empty { color: var(--muted); font-size: 14px; padding: 24px; text-align: center; background: var(--surface-2, #f1f5f9); border-radius: 12px; }
@@ -3622,22 +3615,18 @@
         </div>
         <button type="button" class="hist-refresh-btn" id="hist-refresh-btn" onclick="refreshHistory()" title="Refresh">↻ Refresh</button>
       </div>
-      <div class="hist-toolbar">
-        <div class="hist-filters" id="hist-filters">
-          <button type="button" class="hist-chip active" data-cat="all" onclick="setHistoryFilter('all')">All</button>
-          <button type="button" class="hist-chip" data-cat="orders" onclick="setHistoryFilter('orders')">Orders</button>
-          <button type="button" class="hist-chip" data-cat="products" onclick="setHistoryFilter('products')">Products</button>
-          <div class="hist-more-wrap">
-            <button type="button" class="hist-chip" id="hist-more-chip" onclick="toggleHistMoreMenu(event)">More ▾</button>
-            <div class="hist-more-menu" id="hist-more-menu" hidden>
-              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('payments')">Payments</button>
-              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('store')">Store</button>
-              <button type="button" class="hist-more-opt" onclick="setHistoryFilter('billing')">Billing</button>
-            </div>
-          </div>
+      <div class="orders-filter" id="hist-filters">
+        <button class="orders-filter-btn active" data-cat="all"      onclick="setHistoryFilter('all')">All</button>
+        <button class="orders-filter-btn"        data-cat="orders"   onclick="setHistoryFilter('orders')">Orders</button>
+        <button class="orders-filter-btn"        data-cat="products" onclick="setHistoryFilter('products')">Products</button>
+        <button type="button" class="dash-more-btn" id="hist-more-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleFilterMore('hist-more-panel','hist-more-btn')"><span class="dash-more-label">More</span><span class="dash-more-caret" aria-hidden="true">▾</span></button>
+        <div class="dash-more-panel" id="hist-more-panel">
+          <button class="orders-filter-btn" data-cat="payments" onclick="setHistoryFilter('payments')">Payments</button>
+          <button class="orders-filter-btn" data-cat="store"    onclick="setHistoryFilter('store')">Store</button>
+          <button class="orders-filter-btn" data-cat="billing"  onclick="setHistoryFilter('billing')">Billing</button>
         </div>
-        <input type="search" id="hist-search" class="hist-search-input" placeholder="Search history…" oninput="onHistorySearch(this.value)" autocomplete="off">
       </div>
+      <input type="search" id="hist-search" class="hist-search-input" placeholder="Search history…" oninput="onHistorySearch(this.value)" autocomplete="off">
       <div id="hist-list" class="hist-list"><div class="hist-empty">Loading…</div></div>
       <div id="hist-pager" class="hist-pager"></div>
     </div>
@@ -10303,7 +10292,9 @@ function copyItemsToBuy() {
 
 function setOrdersFilter(filter) {
   ordersFilter = filter;
-  document.querySelectorAll('.orders-filter-btn').forEach(btn => {
+  // Scoped to #orders-filter so it doesn't clobber the History tab's reused
+  // .orders-filter-btn chips (which share the class for identical styling).
+  document.querySelectorAll('#orders-filter .orders-filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
   renderOrders();
@@ -11144,27 +11135,32 @@ async function loadHistoryAll() {
   }
 }
 
-function resetHistFilterChips(cat) {
-  document.querySelectorAll('#hist-filters .hist-chip[data-cat]').forEach(c =>
-    c.classList.toggle('active', c.dataset.cat === cat));
-  const moreCats = ['payments', 'store', 'billing'];
-  const moreChip = document.getElementById('hist-more-chip');
-  if (moreChip) {
-    if (moreCats.includes(cat)) {
-      moreChip.classList.add('active');
-      moreChip.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + ' ▾';
-    } else {
-      moreChip.classList.remove('active');
-      moreChip.textContent = 'More ▾';
-    }
+// Mirror of syncOrdersMoreBtn — reflect the active overflow filter
+// (Payments/Store/Billing) onto the "More" button so a hidden selection is
+// never invisible.
+function syncHistoryMoreBtn() {
+  const btn = document.getElementById('hist-more-btn');
+  if (!btn) return;
+  const label = btn.querySelector('.dash-more-label');
+  const active = document.querySelector('#hist-filters .orders-filter-btn.active');
+  const key = active ? active.dataset.cat : null;
+  const inline = ['all', 'orders', 'products'];
+  if (!key || inline.includes(key)) {
+    btn.classList.remove('active');
+    if (label) label.textContent = 'More';
+  } else {
+    btn.classList.add('active');
+    if (label) label.textContent = active.textContent.trim();
   }
 }
 
 async function renderHistoryTab() {
   historyFilter = 'all'; historySearch = ''; historyPageNum = 1;
   const si = document.getElementById('hist-search'); if (si) si.value = '';
-  resetHistFilterChips('all');
-  closeHistMoreMenu();
+  document.querySelectorAll('#hist-filters .orders-filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cat === 'all'));
+  closePeriodPanels();
+  syncHistoryMoreBtn();
   const list = document.getElementById('hist-list');
   if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
   await loadHistoryAll();
@@ -11183,8 +11179,10 @@ async function refreshHistory() {
 
 function setHistoryFilter(cat) {
   historyFilter = cat; historyPageNum = 1;
-  resetHistFilterChips(cat);
-  closeHistMoreMenu();
+  document.querySelectorAll('#hist-filters .orders-filter-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cat === cat));
+  closePeriodPanels();   // shared dropdown close (also closes the More panel)
+  syncHistoryMoreBtn();
   renderHistoryPage();
 }
 
@@ -11192,20 +11190,6 @@ function onHistorySearch(v) {
   historySearch = v || ''; historyPageNum = 1;
   renderHistoryPage();
 }
-
-function toggleHistMoreMenu(e) {
-  if (e) e.stopPropagation();
-  const m = document.getElementById('hist-more-menu');
-  if (m) m.hidden = !m.hidden;
-}
-function closeHistMoreMenu() {
-  const m = document.getElementById('hist-more-menu');
-  if (m) m.hidden = true;
-}
-document.addEventListener('click', (e) => {
-  const m = document.getElementById('hist-more-menu');
-  if (m && !m.hidden && !e.target.closest('.hist-more-wrap')) closeHistMoreMenu();
-});
 
 // ---------- PRODUCTS ----------
 // Debounced search — batch keystrokes into ~180ms windows so typing in a
@@ -12596,7 +12580,7 @@ function syncOrdersMoreBtn() {
   const btn = document.getElementById('orders-more-btn');
   if (!btn) return;
   const label = btn.querySelector('.dash-more-label');
-  const active = document.querySelector('.orders-filter-btn.active');
+  const active = document.querySelector('#orders-filter .orders-filter-btn.active');
   const key = active ? active.dataset.filter : null;
   const inline = ['all', 'pending', 'items-to-buy'];
   if (!key || inline.includes(key)) {
