@@ -70,6 +70,14 @@ service cloud.firestore {
           && (!('available' in changed) || memberHas(tid, 'availabilitytoggle') || memberHas(tid, 'stockdecrease'))
           && (!('hidden' in changed)    || memberHas(tid, 'visibilitytoggle'));
     }
+    // A staff with an order-processing permission may RESTOCK products
+    // (stock/available/variants only — never name/price) as part of
+    // cancel/refund/confirm. This is a legitimate stock INCREASE the anti-fraud
+    // rule would otherwise block; the increase is recorded by the activity log.
+    function staffRestockChange(tid) {
+      return (memberHas(tid, 'ordercancel') || memberHas(tid, 'orderrefund') || memberHas(tid, 'orderconfirm'))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'available', 'variants']);
+    }
 
     // Customer order create — strict field validation
     function isValidOrderCreate() {
@@ -138,7 +146,8 @@ service cloud.firestore {
         allow update: if isOwnerOrSuper(tid)
                        || isStockDecrement()
                        || (isMember(tid) && staffStockNotIncreased()
-                           && (memberHas(tid, 'productedit') || staffToggleOnlyChange(tid)));
+                           && (memberHas(tid, 'productedit') || staffToggleOnlyChange(tid)))
+                       || (isMember(tid) && staffRestockChange(tid));
       }
 
       // ---------- settings: public read; owner/super or staff with settingsedit
