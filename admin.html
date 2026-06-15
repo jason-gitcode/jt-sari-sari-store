@@ -812,6 +812,27 @@
     #reports-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #billing-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
     #employee-tab.active  { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    #history-tab.active   { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none; padding-bottom: 32px; }
+    /* ===== History (activity log) tab ===== */
+    .hist-header { margin-bottom: 14px; }
+    .hist-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .hist-chip { background: var(--surface-2, #f1f5f9); color: var(--muted); border: 1px solid transparent; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .hist-chip.active { background: var(--accent, #2563eb); color: #fff; }
+    .hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .hist-empty { color: var(--muted); font-size: 14px; padding: 24px; text-align: center; background: var(--surface-2, #f1f5f9); border-radius: 12px; }
+    .hist-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 12px; padding: 12px 14px; }
+    .hist-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; background: var(--surface-2, #f1f5f9); }
+    .hist-body { flex: 1; min-width: 0; }
+    .hist-summary { font-size: 14px; color: var(--ink); line-height: 1.4; word-break: break-word; }
+    .hist-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+    .hist-actor { font-weight: 600; }
+    .hist-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 5px; background: var(--surface-2, #f1f5f9); color: var(--muted); }
+    .hist-role.staff { background: #fef3c7; color: #92400e; }
+    .hist-role.owner { background: #dbeafe; color: #1e40af; }
+    .hist-role.superadmin { background: #ede9fe; color: #6d28d9; }
+    .hist-role.customer { background: #dcfce7; color: #166534; }
+    .hist-more-btn { align-self: center; margin-top: 16px; background: var(--surface-2, #f1f5f9); color: var(--ink); border: 1px solid var(--border, #e2e8f0); border-radius: 9px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .hist-more-btn:active { transform: translateY(1px); }
     /* ===== Employee (Staff Accounts) tab ===== */
     .emp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
     .emp-h2 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0 0 4px; }
@@ -3050,6 +3071,7 @@
     </button>
     <button class="more-sheet-item" data-tab="billing" role="menuitem" onclick="moreMenuGo('billing')">💳 Billing</button>
     <button class="more-sheet-item" data-tab="employee" id="bn-employee-item" role="menuitem" onclick="moreMenuGo('employee')" style="display:none;">👥 Employee</button>
+    <button class="more-sheet-item" data-tab="history" id="bn-history-item" role="menuitem" onclick="moreMenuGo('history')" style="display:none;">🕑 History</button>
     <button class="more-sheet-item" data-tab="settings" role="menuitem" onclick="moreMenuGo('settings')">⚙️ Settings</button>
   </div>
 
@@ -3062,6 +3084,7 @@
       <button class="tab-btn" data-tab="reports" id="reports-tab-btn" onclick="switchTab('reports')">📊 Reports<span id="reports-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
       <button class="tab-btn" data-tab="billing" onclick="switchTab('billing')">💳 Billing</button>
       <button class="tab-btn" data-tab="employee" id="employee-tab-btn" onclick="switchTab('employee')" style="display:none;">👥 Employee</button>
+      <button class="tab-btn" data-tab="history" id="history-tab-btn" onclick="switchTab('history')" style="display:none;">🕑 History</button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -3564,6 +3587,26 @@
         <button type="button" class="emp-add-btn" onclick="openEmployeeInviteModal()">+ Invite employee</button>
       </div>
       <div id="emp-list" class="emp-list"><div class="emp-empty">Loading…</div></div>
+    </div>
+
+    <!-- HISTORY (activity log / audit trail) -->
+    <div class="tab-panel" id="history-tab">
+      <div class="hist-header">
+        <div>
+          <h2 class="emp-h2">Activity History</h2>
+          <p class="emp-sub">A tamper-proof record of key actions — who did what and when. Kept for 90 days.</p>
+        </div>
+      </div>
+      <div class="hist-filters" id="hist-filters">
+        <button type="button" class="hist-chip active" data-cat="all" onclick="setHistoryFilter('all')">All</button>
+        <button type="button" class="hist-chip" data-cat="orders" onclick="setHistoryFilter('orders')">Orders</button>
+        <button type="button" class="hist-chip" data-cat="products" onclick="setHistoryFilter('products')">Products</button>
+        <button type="button" class="hist-chip" data-cat="payments" onclick="setHistoryFilter('payments')">Payments</button>
+        <button type="button" class="hist-chip" data-cat="store" onclick="setHistoryFilter('store')">Store</button>
+        <button type="button" class="hist-chip" data-cat="billing" onclick="setHistoryFilter('billing')">Billing</button>
+      </div>
+      <div id="hist-list" class="hist-list"><div class="hist-empty">Loading…</div></div>
+      <button type="button" class="hist-more-btn" id="hist-more-btn" style="display:none;" onclick="loadHistoryPage(false)">Load more</button>
     </div>
 
     <!-- SETTINGS -->
@@ -8438,6 +8481,12 @@ function applyEmployeeTabVisibility() {
   const item = document.getElementById('bn-employee-item');
   if (btn) btn.style.display = show ? '' : 'none';
   if (item) item.style.display = show ? '' : 'none';
+  // History tab follows the same gate (owner-only, Pro). Staff can't read the
+  // activity collection per Firestore rules anyway.
+  const hBtn = document.getElementById('history-tab-btn');
+  const hItem = document.getElementById('bn-history-item');
+  if (hBtn) hBtn.style.display = show ? '' : 'none';
+  if (hItem) hItem.style.display = show ? '' : 'none';
 }
 
 // Owners + superadmins have full access; staff are gated by their permission map.
@@ -10868,6 +10917,8 @@ function switchTab(tab, reset = true) {
     applySettingsGating();
   } else if (tab === 'employee') {
     renderEmployeeList();
+  } else if (tab === 'history') {
+    renderHistoryTab();
   } else if (tab === 'reports') {
     // First open: seed default period (Last 30 Days). Subsequent re-opens
     // keep whatever range the owner left set.
@@ -10905,6 +10956,125 @@ function closeMoreMenu() {
 function moreMenuGo(tab) {
   closeMoreMenu();
   switchTab(tab);
+}
+
+// ============================================================
+// HISTORY (activity log / audit trail) — owner view.
+// Reads the immutable tenants/{tid}/activity collection (written only by
+// Firestore triggers) newest-first, 25 at a time via a cursor. Category
+// filtering is client-side over the loaded entries so no composite index is
+// needed — fine at pilot volume; switch to indexed queries if it grows.
+// ============================================================
+const HISTORY_PAGE = 25;
+let historyEntries = [];     // loaded docs (newest-first)
+let historyCursor = null;    // last doc snapshot for startAfter
+let historyFilter = 'all';
+let historyDone = false;
+let historyLoading = false;
+
+const HIST_ICONS = {
+  'order.placed': '🛒', 'order.confirmed': '✅', 'order.cancelled': '🚫', 'order.refunded': '↩️',
+  'product.created': '➕', 'product.updated': '✏️', 'product.deleted': '🗑️', 'stock.adjusted': '📦',
+  'payment.received': '💰', 'payment.rejected': '⛔',
+  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️'
+};
+
+function histTimeLabel(ts) {
+  let d = null;
+  try { d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null); } catch (_) { d = null; }
+  if (!d || isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  if (diff < 7 * 86400000) return Math.floor(diff / 86400000) + 'd ago';
+  return d.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function historyRowHtml(e) {
+  const ico = HIST_ICONS[e.type] || '•';
+  const actor = e.actor || {};
+  const role = (actor.role || 'system');
+  const who = actor.email || (role === 'customer' ? 'customer' : (role === 'system' ? 'system' : '—'));
+  const roleTag = `<span class="hist-role ${escHtml(role)}">${escHtml(role)}</span>`;
+  const when = histTimeLabel(e.createdAt);
+  return `<div class="hist-row">
+    <div class="hist-ico">${ico}</div>
+    <div class="hist-body">
+      <div class="hist-summary">${escHtml(e.summary || e.type || 'Activity')}</div>
+      <div class="hist-meta">
+        <span class="hist-actor">${escHtml(who)}</span>${roleTag}
+        ${when ? `<span>${escHtml(when)}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderHistoryList() {
+  const list = document.getElementById('hist-list');
+  if (!list) return;
+  const rows = historyFilter === 'all'
+    ? historyEntries
+    : historyEntries.filter(e => e.category === historyFilter);
+  if (rows.length === 0) {
+    list.innerHTML = `<div class="hist-empty">${historyLoading ? 'Loading…' : 'No activity yet for this filter.'}</div>`;
+  } else {
+    list.innerHTML = rows.map(historyRowHtml).join('');
+  }
+  const moreBtn = document.getElementById('hist-more-btn');
+  if (moreBtn) moreBtn.style.display = historyDone ? 'none' : '';
+}
+
+async function loadHistoryPage(reset) {
+  if (historyLoading) return;
+  historyLoading = true;
+  if (reset) { historyEntries = []; historyCursor = null; historyDone = false; }
+  try {
+    let q = tcol('activity').orderBy('createdAt', 'desc');
+    if (historyCursor) q = q.startAfter(historyCursor);
+    q = q.limit(HISTORY_PAGE);
+    const snap = await q.get();
+    snap.forEach(doc => historyEntries.push({ id: doc.id, ...doc.data() }));
+    if (snap.size > 0) historyCursor = snap.docs[snap.docs.length - 1];
+    if (snap.size < HISTORY_PAGE) historyDone = true;
+  } catch (err) {
+    console.error('History load error:', err);
+    const list = document.getElementById('hist-list');
+    if (list && historyEntries.length === 0) {
+      list.innerHTML = `<div class="hist-empty">Couldn't load history${err && err.message ? ' — ' + escHtml(err.message) : ''}.</div>`;
+    }
+  } finally {
+    historyLoading = false;
+    renderHistoryList();
+  }
+}
+
+function renderHistoryTab() {
+  historyFilter = 'all';
+  document.querySelectorAll('#hist-filters .hist-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.cat === 'all'));
+  const list = document.getElementById('hist-list');
+  if (list) list.innerHTML = '<div class="hist-empty">Loading…</div>';
+  loadHistoryPage(true);
+}
+
+function setHistoryFilter(cat) {
+  historyFilter = cat;
+  document.querySelectorAll('#hist-filters .hist-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.cat === cat));
+  renderHistoryList();
+  // If the current filter has nothing loaded yet but more pages exist,
+  // pull another page so the owner isn't staring at an empty filter.
+  if (cat !== 'all' && !historyDone &&
+      historyEntries.filter(e => e.category === cat).length === 0) {
+    loadHistoryPage(false);
+  }
 }
 
 // ---------- PRODUCTS ----------
