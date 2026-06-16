@@ -133,6 +133,10 @@
     .header-title .badge { display: none; }
     .header-user { width: 100%; justify-content: space-between; font-size: 12px; }
     .header-user #signed-email { max-width: none; flex: 1; }
+    /* All-tenants action buttons: wrap to a tidy full-width row on mobile
+       instead of overflowing off-screen. */
+    .section-title { align-items: flex-start; }
+    .section-title .actions { width: 100%; justify-content: flex-start; }
   }
 
   /* Stats — flex column so values bottom-align even when labels wrap to
@@ -165,7 +169,7 @@
   /* Section */
   .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
   .section-title > span { min-width: 0; }
-  .section-title .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .section-title .actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
   .tenants-result-meta { font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 8px; letter-spacing: 0.2px; }
 
   /* Tenants toolbar (search) */
