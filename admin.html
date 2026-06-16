@@ -3087,8 +3087,8 @@
       <span>📊 Reports</span><span id="bn-reports-lock" style="display:none;">🔒</span>
     </button>
     <button class="more-sheet-item" data-tab="billing" role="menuitem" onclick="moreMenuGo('billing')">💳 Billing</button>
-    <button class="more-sheet-item" data-tab="employee" id="bn-employee-item" role="menuitem" onclick="moreMenuGo('employee')" style="display:none;">👥 Employee</button>
-    <button class="more-sheet-item" data-tab="history" id="bn-history-item" role="menuitem" onclick="moreMenuGo('history')" style="display:none;">🕑 History</button>
+    <button class="more-sheet-item" data-tab="employee" id="bn-employee-item" role="menuitem" onclick="moreMenuGo('employee')" style="display:none;">👥 Employee<span id="bn-employee-lock" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
+    <button class="more-sheet-item" data-tab="history" id="bn-history-item" role="menuitem" onclick="moreMenuGo('history')" style="display:none;">🕑 History<span id="bn-history-lock" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
     <button class="more-sheet-item" data-tab="settings" role="menuitem" onclick="moreMenuGo('settings')">⚙️ Settings</button>
   </div>
 
@@ -3100,8 +3100,8 @@
       <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">🏭 Suppliers</button>
       <button class="tab-btn" data-tab="reports" id="reports-tab-btn" onclick="switchTab('reports')">📊 Reports<span id="reports-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
       <button class="tab-btn" data-tab="billing" onclick="switchTab('billing')">💳 Billing</button>
-      <button class="tab-btn" data-tab="employee" id="employee-tab-btn" onclick="switchTab('employee')" style="display:none;">👥 Employee</button>
-      <button class="tab-btn" data-tab="history" id="history-tab-btn" onclick="switchTab('history')" style="display:none;">🕑 History</button>
+      <button class="tab-btn" data-tab="employee" id="employee-tab-btn" onclick="switchTab('employee')" style="display:none;">👥 Employee<span id="employee-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
+      <button class="tab-btn" data-tab="history" id="history-tab-btn" onclick="switchTab('history')" style="display:none;">🕑 History<span id="history-lock-icon" style="display:none;margin-left:6px;font-size:11px;">🔒</span></button>
       <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -8326,6 +8326,32 @@ function applyReportsTabLock() {
 //   - tier           → which paid tier unlocks it (currently always 'growth')
 //   - unlocksWith    → ✓ list rendered in the "What you unlock" card
 const LOCKED_FEATURES = {
+  staff: {
+    title: '👥 Staff Accounts & Roles — a Pro feature',
+    icon: '👥',
+    blurb: 'Give each employee their own secure login with only the access you choose — so you never share your owner password. Full visibility and control over what your team can see and do.',
+    tier: 'pro',
+    unlocksWith: [
+      'A separate login for every employee (their own email)',
+      'Role presets — Cashier, Stock clerk, Manager — or choose permissions yourself',
+      'Hide financials, customer info, prices and deletions from staff',
+      'Built-in safeguards on stock and price changes',
+      'Suspend or remove an employee\'s access anytime'
+    ]
+  },
+  history: {
+    title: '🕑 Activity History — a Pro feature',
+    icon: '🕑',
+    blurb: 'A complete, tamper-proof record of who did what and when — every order, stock change, price edit and payment. Written by the system, so it can\'t be edited or deleted.',
+    tier: 'pro',
+    unlocksWith: [
+      'Every key action with the staff/owner who did it + a timestamp',
+      'Orders, stock, prices, payments, settings and logins',
+      'Search and filter by category, with easy paging',
+      'Tamper-proof — can\'t be edited or deleted, even by you',
+      'Kept for 90 days'
+    ]
+  },
   reports: {
     title: '📊 Reports — a Growth feature',
     icon: '📊',
@@ -8496,19 +8522,27 @@ function empEmailKeyHex(email) {
   return hex;
 }
 
+// Employee + History are Pro features, but we use the visible-but-locked
+// pattern (like Reports) so non-Pro OWNERS discover them: the tab always shows
+// for owners with a 🔒 until Pro, and switchTab intercepts the tap into an
+// upgrade modal. Staff never see these owner-only tabs at all.
 function applyEmployeeTabVisibility() {
   const tier = (subscriptionData && subscriptionData.tier) || 'free';
-  const show = !IS_STAFF && tier === 'pro';
-  const btn = document.getElementById('employee-tab-btn');
-  const item = document.getElementById('bn-employee-item');
-  if (btn) btn.style.display = show ? '' : 'none';
-  if (item) item.style.display = show ? '' : 'none';
-  // History tab follows the same gate (owner-only, Pro). Staff can't read the
-  // activity collection per Firestore rules anyway.
-  const hBtn = document.getElementById('history-tab-btn');
-  const hItem = document.getElementById('bn-history-item');
-  if (hBtn) hBtn.style.display = show ? '' : 'none';
-  if (hItem) hItem.style.display = show ? '' : 'none';
+  const showForOwner = !IS_STAFF;     // owners see the tabs on every tier
+  const locked = tier !== 'pro';      // …with a lock until Pro
+  [
+    ['employee-tab-btn', 'bn-employee-item', 'employee-lock-icon', 'bn-employee-lock'],
+    ['history-tab-btn',  'bn-history-item',  'history-lock-icon',  'bn-history-lock']
+  ].forEach(([btnId, itemId, lockId, bnLockId]) => {
+    const btn = document.getElementById(btnId);
+    const item = document.getElementById(itemId);
+    if (btn) btn.style.display = showForOwner ? '' : 'none';
+    if (item) item.style.display = showForOwner ? '' : 'none';
+    const lock = document.getElementById(lockId);
+    if (lock) lock.style.display = (showForOwner && locked) ? '' : 'none';
+    const bnLock = document.getElementById(bnLockId);
+    if (bnLock) bnLock.style.display = (showForOwner && locked) ? '' : 'none';
+  });
 }
 
 // Owners + superadmins have full access; staff are gated by their permission map.
@@ -10898,6 +10932,15 @@ function switchTab(tab, reset = true) {
     const tier = (subscriptionData && subscriptionData.tier) || 'free';
     if (tier === 'free') {
       openLockedFeatureModal('reports');
+      return;
+    }
+  }
+  // Employee + History are Pro features shown locked to non-Pro owners —
+  // intercept the tap into the upgrade modal instead of routing in.
+  if ((tab === 'employee' || tab === 'history') && !IS_STAFF) {
+    const tier = (subscriptionData && subscriptionData.tier) || 'free';
+    if (tier !== 'pro') {
+      openLockedFeatureModal(tab === 'employee' ? 'staff' : 'history');
       return;
     }
   }
