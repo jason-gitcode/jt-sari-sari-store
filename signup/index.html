@@ -1869,18 +1869,33 @@
 
   /* Closing CTA on the guide page */
   .guide-cta {
+    position: relative; overflow: hidden;
     max-width: 760px; margin: 52px auto 0;
-    background: linear-gradient(135deg, #0f172a, #1e293b);
+    background: linear-gradient(135deg, #34613f 0%, #3f7149 100%);
     border-radius: var(--radius-lg);
     padding: 40px 36px; text-align: center;
     box-shadow: var(--shadow-lg);
   }
+  /* Decorative brand-green blobs — darker top-right, lighter bottom-left. */
+  .guide-cta::before {
+    content: ''; position: absolute; z-index: 0;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(0, 0, 0, 0.10);
+    top: -64px; right: -44px;
+  }
+  .guide-cta::after {
+    content: ''; position: absolute; z-index: 0;
+    width: 160px; height: 160px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.09);
+    bottom: -56px; left: -36px;
+  }
   .guide-cta h2 {
+    position: relative; z-index: 1;
     color: #fff; font-size: 26px; font-weight: 800;
     letter-spacing: -0.02em; margin-bottom: 10px;
   }
-  .guide-cta p { color: #94a3b8; font-size: 16px; margin-bottom: 24px; }
-  .guide-cta .btn-hero { background: #fff; color: var(--ink); }
+  .guide-cta p { position: relative; z-index: 1; color: rgba(255, 255, 255, 0.82); font-size: 16px; margin-bottom: 24px; }
+  .guide-cta .btn-hero { position: relative; z-index: 1; background: #fff; color: var(--ink); }
   .guide-cta .btn-hero:hover { background: #f1f5f9; }
 
   /* Stack screenshot below text on narrower viewports */
