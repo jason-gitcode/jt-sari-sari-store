@@ -11176,7 +11176,9 @@ function historyRowHtml(e, d) {
   const cat = e.category || 'other';
   const actor = e.actor || {};
   const role = (actor.role || 'system');
-  const who = actor.email || (role === 'customer' ? 'Customer' : (role === 'system' ? 'System' : '—'));
+  let who = actor.email || (role === 'customer' ? 'Customer' : (role === 'system' ? 'System' : '—'));
+  // Credential (no-email) staff: show their username, not the synthetic address.
+  if (who && who.endsWith('.staff.pabilimart.com')) who = '@' + who.split('@')[0];
   const time = d ? histClock(d) : '';
   // The meta line already shows the actor, so drop a redundant trailing
   // "by <actor email>" the trigger appended to the summary.
@@ -12594,6 +12596,17 @@ async function handleAdminAuth(user) {
     // already gates financials/buttons (owner = full access).
     IS_STAFF = (auth_result.reason === 'staff');
     STAFF_PERMS = IS_STAFF ? (auth_result.permissions || {}) : null;
+    // Staff can't read subscription/current (it's billing-gated), so the tier
+    // would default to 'free' — wrongly showing the plan-limit/upgrade banner
+    // AND blocking product adds at the false 5-product cap (which is also why
+    // their actions don't reach the activity log). A logged-in staff is always
+    // on a Pro store (a downgrade suspends staff), so use a Pro tier fallback.
+    if (IS_STAFF && !subscriptionData) {
+      subscriptionData = { tier: 'pro', status: 'active' };
+      if (typeof renderTierBadge === 'function') renderTierBadge();
+      if (typeof renderProductCapStatus === 'function') renderProductCapStatus();
+      if (typeof renderSupplierCapStatus === 'function') renderSupplierCapStatus();
+    }
     // First login for an owner-provisioned (username) employee: force them to
     // set their own password before they can use the admin.
     if (IS_STAFF && auth_result.mustChangePassword) {
