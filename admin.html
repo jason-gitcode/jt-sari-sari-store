@@ -872,6 +872,9 @@
     .emp-field { display: block; margin-bottom: 12px; }
     .emp-field span { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
     .emp-field input { width: 100%; padding: 10px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; font-size: 14px; background: var(--surface, #fff); color: var(--ink); }
+    .emp-login-toggle { display: flex; gap: 8px; }
+    .emp-login-opt { flex: 1; padding: 9px 12px; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; background: var(--surface, #fff); color: var(--ink-soft, #64748b); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .emp-login-opt.active { background: var(--ink, #0f172a); color: #fff; border-color: var(--ink, #0f172a); }
     .emp-edit-head { font-size: 13px; color: var(--muted); margin-bottom: 14px; padding: 10px 12px; background: var(--surface-2, #f1f5f9); border-radius: 8px; }
     .emp-edit-head strong { color: var(--ink); }
     .emp-presets { margin: 4px 0 16px; }
@@ -2947,6 +2950,24 @@
   <div class="ars-text">Signing you in…</div>
 </div>
 
+<!-- FORCE PASSWORD CHANGE — first login for owner-provisioned (username) staff -->
+<div class="login-screen hidden" id="force-pw-screen">
+  <div class="login-box">
+    <h1>🔑 Set your password</h1>
+    <p>Welcome! For your security, set your own password before you continue — only you will know it.</p>
+    <div class="field">
+      <label for="force-pw-new">New password</label>
+      <input id="force-pw-new" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+    </div>
+    <div class="field">
+      <label for="force-pw-confirm">Confirm password</label>
+      <input id="force-pw-confirm" type="password" autocomplete="new-password" placeholder="Re-type your password" onkeydown="if(event.key==='Enter')submitForcePasswordChange()" />
+    </div>
+    <button type="button" class="auth-btn" id="force-pw-btn" onclick="submitForcePasswordChange()">Save &amp; continue</button>
+    <div class="login-error" id="force-pw-error"></div>
+  </div>
+</div>
+
 <!-- ADMIN LOGIN -->
 <div class="login-screen hidden" id="login-screen">
   <div class="login-box">
@@ -2960,8 +2981,8 @@
     <div class="login-divider"><span>or</span></div>
 
     <div class="field">
-      <label for="admin-auth-email">Email</label>
-      <input id="admin-auth-email" type="email" autocomplete="email" placeholder="you@email.com" />
+      <label for="admin-auth-email">Email or username</label>
+      <input id="admin-auth-email" type="text" autocomplete="username" placeholder="you@email.com or username" />
     </div>
     <div class="field">
       <label for="admin-auth-password">Password</label>
@@ -4409,7 +4430,21 @@
     <div class="supp-modal-body">
       <div id="emp-invite-fields">
         <label class="emp-field"><span>Name</span><input type="text" id="emp-name-input" placeholder="e.g. Juan dela Cruz" maxlength="80" autocomplete="off"></label>
-        <label class="emp-field"><span>Email</span><input type="email" id="emp-email-input" placeholder="employee@email.com" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+        <div class="emp-field">
+          <span>How will they sign in?</span>
+          <div class="emp-login-toggle">
+            <button type="button" class="emp-login-opt active" id="emp-login-email-btn" onclick="empSetLoginMode('email')">Has email</button>
+            <button type="button" class="emp-login-opt" id="emp-login-cred-btn" onclick="empSetLoginMode('credential')">No email</button>
+          </div>
+        </div>
+        <div id="emp-email-wrap">
+          <label class="emp-field"><span>Email</span><input type="email" id="emp-email-input" placeholder="employee@email.com" autocapitalize="none" autocorrect="off" spellcheck="false"></label>
+        </div>
+        <div id="emp-cred-wrap" style="display:none;">
+          <label class="emp-field"><span>Username</span><input type="text" id="emp-username-input" placeholder="e.g. juan" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="30"></label>
+          <label class="emp-field"><span>Temporary password</span><input type="text" id="emp-password-input" placeholder="At least 6 characters" autocomplete="off"></label>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.45;">Give the employee this <strong>username + password</strong>. They'll set their own password on first login — after that, only they know it.</div>
+        </div>
       </div>
       <div id="emp-edit-head" class="emp-edit-head" style="display:none;"></div>
       <div class="emp-presets">
@@ -7790,16 +7825,21 @@ function adminAuthError(e) {
   return map[code] || (e && e.message) || 'Please try again.';
 }
 async function adminEmailAuth() {
-  const email = (document.getElementById('admin-auth-email').value || '').trim();
+  const raw = (document.getElementById('admin-auth-email').value || '').trim();
   const pw = document.getElementById('admin-auth-password').value || '';
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
-  if (!email || !pw) { errEl.textContent = 'Enter your email and password.'; return; }
+  if (!raw || !pw) { errEl.textContent = 'Enter your email (or username) and password.'; return; }
+  // Employees provisioned without an email of their own sign in with just a
+  // username — map it to their synthetic login address for THIS store. (Owners
+  // always type a real email, which contains "@", so they're unaffected.)
+  const isUsername = !raw.includes('@');
+  const email = isUsername ? `${raw.toLowerCase()}@${TENANT_ID}.staff.pabilimart.com` : raw;
   const btn = document.getElementById('admin-email-btn');
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Please wait…';
   try {
-    if (adminAuthMode === 'signup') {
+    if (adminAuthMode === 'signup' && !isUsername) {
       const cred = await auth.createUserWithEmailAndPassword(email, pw);
       await cred.user.sendEmailVerification({ url: window.location.origin + window.location.pathname });
     } else {
@@ -7808,6 +7848,42 @@ async function adminEmailAuth() {
     // onAuthStateChanged routes: verified → access gate, unverified → overlay.
   } catch (e) {
     errEl.textContent = adminAuthError(e);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+// ---- Forced first-login password change for credential (username) staff ----
+let _pendingPwUser = null;
+let _pendingPwUsername = null;
+function showForcePasswordChange(user, username) {
+  _pendingPwUser = user; _pendingPwUsername = username || null;
+  if (typeof hideAuthSplash === 'function') hideAuthSplash();
+  document.getElementById('login-screen').classList.add('hidden');
+  const aa = document.getElementById('admin-area'); if (aa) aa.style.display = 'none';
+  const fp = document.getElementById('force-pw-screen'); if (fp) fp.classList.remove('hidden');
+  ['force-pw-error', 'force-pw-new', 'force-pw-confirm'].forEach((id, i) => {
+    const el = document.getElementById(id); if (el) { if (i === 0) el.textContent = ''; else el.value = ''; }
+  });
+}
+async function submitForcePasswordChange() {
+  const newPw = document.getElementById('force-pw-new').value || '';
+  const confirmPw = document.getElementById('force-pw-confirm').value || '';
+  const err = document.getElementById('force-pw-error');
+  err.textContent = '';
+  if (newPw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
+  if (newPw !== confirmPw) { err.textContent = 'Passwords do not match.'; return; }
+  const btn = document.getElementById('force-pw-btn');
+  const label = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await firebase.app().functions('asia-southeast1').httpsCallable('setStaffPassword')({ tid: TENANT_ID, newPassword: newPw });
+    document.getElementById('force-pw-screen').classList.add('hidden');
+    showAdmin();
+    if (typeof applyStaffGating === 'function') applyStaffGating();
+    const ae = document.getElementById('account-email');
+    if (ae) ae.textContent = _pendingPwUsername || (_pendingPwUser ? _pendingPwUser.email : '');
+    showToast('Password saved. Welcome!', 'success');
+  } catch (e) {
+    err.textContent = (e && e.message) ? e.message : 'Could not save password. Please try again.';
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
@@ -8626,7 +8702,7 @@ async function renderEmployeeList() {
       base.collection('members').get(), base.collection('staff_invites').get()
     ]);
     const rows = [];
-    members.forEach(d => { const m = d.data() || {}; rows.push({ uid: d.id, email: m.email || '', name: m.name || '', preset: m.preset, status: m.status === 'suspended' ? 'suspended' : 'active', kind: 'member' }); });
+    members.forEach(d => { const m = d.data() || {}; rows.push({ uid: d.id, email: m.email || '', name: m.name || '', preset: m.preset, status: m.status === 'suspended' ? 'suspended' : 'active', kind: 'member', username: m.username || null, loginType: m.loginType || null }); });
     invites.forEach(d => { const m = d.data() || {}; rows.push({ uid: null, email: m.email || '', name: m.name || '', preset: m.preset, status: 'invited', kind: 'invite' }); });
     if (rows.length === 0) {
       el.innerHTML = '<div class="emp-empty">No employees yet. Tap <strong>Invite employee</strong> to add your first staff login.</div>';
@@ -8637,11 +8713,12 @@ async function renderEmployeeList() {
       const badge = r.status === 'invited' ? '<span class="emp-badge invited">Invited</span>' : '<span class="emp-badge active">Active</span>';
       const role = r.preset ? `<span class="emp-role">${empEsc(r.preset)}</span>` : '';
       const payload = empEsc(JSON.stringify({ uid: r.uid, email: r.email, kind: r.kind }));
+      const subline = (r.loginType === 'credential' && r.username) ? `@${r.username} · username login` : r.email;
       return `<div class="emp-row">
         <div class="emp-avatar">${empEsc(empInitials(display))}</div>
         <div class="emp-row-main">
           <button type="button" class="emp-row-name" data-emp='${payload}' onclick="openEmployeeFromRow(this)">${empEsc(display)}</button>
-          <div class="emp-row-email">${empEsc(r.email)}</div>
+          <div class="emp-row-email">${empEsc(subline)}</div>
         </div>
         ${role}${badge}
       </div>`;
@@ -8709,15 +8786,26 @@ function applyEmpPreset(preset) {
   empSyncImpliedViews();
 }
 
+function empSetLoginMode(mode) {
+  empModalCtx.loginMode = mode;
+  document.getElementById('emp-login-email-btn').classList.toggle('active', mode === 'email');
+  document.getElementById('emp-login-cred-btn').classList.toggle('active', mode === 'credential');
+  document.getElementById('emp-email-wrap').style.display = (mode === 'email') ? '' : 'none';
+  document.getElementById('emp-cred-wrap').style.display = (mode === 'credential') ? '' : 'none';
+  document.getElementById('emp-save-btn').textContent = (mode === 'credential') ? 'Create login' : 'Send invite';
+}
+
 function openEmployeeInviteModal() {
-  empModalCtx = { mode: 'invite' };
+  empModalCtx = { mode: 'invite', loginMode: 'email' };
   document.getElementById('emp-modal-title').textContent = 'Invite employee';
   document.getElementById('emp-invite-fields').style.display = '';
   document.getElementById('emp-edit-head').style.display = 'none';
   document.getElementById('emp-name-input').value = '';
   document.getElementById('emp-email-input').value = '';
+  document.getElementById('emp-username-input').value = '';
+  document.getElementById('emp-password-input').value = '';
   document.getElementById('emp-remove-btn').style.display = 'none';
-  document.getElementById('emp-save-btn').textContent = 'Send invite';
+  empSetLoginMode('email');
   empRenderPermGroups({});
   applyEmpPreset('cashier');
   document.getElementById('emp-modal').classList.add('show');
@@ -8761,7 +8849,15 @@ async function saveEmployeeFromModal() {
   const saveBtn = document.getElementById('emp-save-btn');
   saveBtn.disabled = true;
   try {
-    if (empModalCtx.mode === 'invite') {
+    if (empModalCtx.mode === 'invite' && empModalCtx.loginMode === 'credential') {
+      const name = document.getElementById('emp-name-input').value.trim();
+      const username = document.getElementById('emp-username-input').value.trim().toLowerCase();
+      const password = document.getElementById('emp-password-input').value;
+      if (!/^[a-z0-9][a-z0-9._-]{1,29}$/.test(username)) { showToast('Username: 2–30 chars, lowercase letters/numbers/.-_ , starting with a letter or number.', 'error'); saveBtn.disabled = false; return; }
+      if (password.length < 6) { showToast('Password must be at least 6 characters.', 'error'); saveBtn.disabled = false; return; }
+      await empStaffFn('createStaffCredential')({ tid: TENANT_ID, name, username, password, preset: presetArg, permissions: perms });
+      showToast(`Login created. Username: ${username} — give them this + the password you set.`);
+    } else if (empModalCtx.mode === 'invite') {
       const email = document.getElementById('emp-email-input').value.trim().toLowerCase();
       const name = document.getElementById('emp-name-input').value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('Enter a valid email address.', 'error'); saveBtn.disabled = false; return; }
@@ -12439,7 +12535,11 @@ async function checkAdminAuthorization(user) {
       if (tier === 'free' || tier === 'growth') {
         return { allowed: false, reason: 'staff-suspended' };
       }
-      return { allowed: true, reason: 'staff', permissions: m.permissions || {} };
+      return {
+        allowed: true, reason: 'staff', permissions: m.permissions || {},
+        mustChangePassword: m.mustChangePassword === true,
+        username: m.username || null, loginType: m.loginType || null
+      };
     }
   } catch (e) { /* no member doc / read denied — fall through */ }
   // 2) OWNER (unchanged): read the tenant doc + match ownerEmails.
@@ -12491,10 +12591,16 @@ async function handleAdminAuth(user) {
     // already gates financials/buttons (owner = full access).
     IS_STAFF = (auth_result.reason === 'staff');
     STAFF_PERMS = IS_STAFF ? (auth_result.permissions || {}) : null;
+    // First login for an owner-provisioned (username) employee: force them to
+    // set their own password before they can use the admin.
+    if (IS_STAFF && auth_result.mustChangePassword) {
+      showForcePasswordChange(user, auth_result.username);
+      return;
+    }
     showAdmin();
     if (typeof applyStaffGating === 'function') applyStaffGating();
     const ae = document.getElementById('account-email');
-    if (ae) ae.textContent = user.email;
+    if (ae) ae.textContent = (IS_STAFF && auth_result.username) ? auth_result.username : user.email;
     const aec = document.getElementById('allowed-emails-count');
     if (aec) {
       const count = (auth_result.reason === 'superadmin' ? SUPERADMIN_EMAILS.length : TENANT_OWNER_EMAILS.length);

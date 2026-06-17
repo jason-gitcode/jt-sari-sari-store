@@ -1729,12 +1729,15 @@ exports.removeStaffMember = onCall(async (request) => {
   let cleanupEmail = inviteEmail || null;
   if (memberUid) {
     const mref = tref.collection('members').doc(memberUid);
-    if (!cleanupEmail) {
-      const msnap = await mref.get();
-      cleanupEmail = String((msnap.data() || {}).email || '').toLowerCase() || null;
-    }
+    const mdata = (await mref.get()).data() || {};
+    if (!cleanupEmail) cleanupEmail = String(mdata.email || '').toLowerCase() || null;
     await mref.delete();
     try { await revokeTenantClaim(memberUid, tid); } catch (err) { console.warn('[removeStaffMember] claim revoke failed:', err.message); }
+    // Credential (no-email) logins are tenant-owned synthetic accounts — delete
+    // the Auth user so the username frees up and no orphan login is left behind.
+    if (mdata.loginType === 'credential') {
+      try { await getAuth().deleteUser(memberUid); } catch (err) { console.warn('[removeStaffMember] auth delete failed:', err.message); }
+    }
     removed = 'member';
   }
   if (inviteEmail) {
@@ -1790,6 +1793,86 @@ exports.leaveStore = onCall(async (request) => {
     });
   } catch (err) { /* non-fatal */ }
 
+  return { ok: true };
+});
+
+// ---- createStaffCredential — owner provisions a USERNAME + PASSWORD login for
+// an employee with NO email of their own. The Auth user is created server-side
+// already-verified (no email is ever sent); the username is just a login id on
+// a subdomain we control. Member is active immediately, with mustChangePassword
+// so the employee sets their own password on first login. ----
+const STAFF_CRED_DOMAIN = 'staff.pabilimart.com';
+function staffCredentialEmail(tid, username) {
+  return `${username}@${tid}.${STAFF_CRED_DOMAIN}`;
+}
+
+exports.createStaffCredential = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  const { tref } = await requireStaffManager(tid, request.auth.token);
+
+  const name = String(data.name || '').trim().slice(0, 80);
+  const username = String(data.username || '').trim().toLowerCase();
+  const password = String(data.password || '');
+  if (!/^[a-z0-9][a-z0-9._-]{1,29}$/.test(username)) {
+    throw new HttpsError('invalid-argument', 'Username must be 2–30 characters: lowercase letters, numbers, and . _ - (start with a letter or number).');
+  }
+  if (password.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+
+  const preset = STAFF_ROLE_PRESETS[String(data.preset || '')] ? String(data.preset) : null;
+  const permissions = preset ? presetPermissions(preset) : sanitizeStaffPermissions(data.permissions);
+
+  const [membersSnap, invitesSnap] = await Promise.all([
+    tref.collection('members').get(),
+    tref.collection('staff_invites').get()
+  ]);
+  if (membersSnap.size + invitesSnap.size >= STAFF_CAP) {
+    throw new HttpsError('resource-exhausted', `You can have up to ${STAFF_CAP} employees.`);
+  }
+
+  const email = staffCredentialEmail(tid, username);
+  let existing = null;
+  try { existing = await getAuth().getUserByEmail(email); }
+  catch (err) { if (err.code !== 'auth/user-not-found') throw new HttpsError('internal', err.message || 'Lookup failed.'); }
+  if (existing) throw new HttpsError('already-exists', 'That username is already taken in this store. Pick another.');
+
+  const userRecord = await getAuth().createUser({ email, password, emailVerified: true, displayName: name || username });
+  const uid = userRecord.uid;
+
+  await tref.collection('members').doc(uid).set({
+    email, username, name: name || username, role: 'staff',
+    permissions, status: 'active',
+    loginType: 'credential', mustChangePassword: true,
+    invitedBy: request.auth.token.email,
+    createdAt: FieldValue.serverTimestamp()
+  });
+  await grantTenantClaim(uid, tid);
+  try {
+    await db.collection('staff_invite_lookup').doc(staffEmailKey(email)).set(
+      { email, tenants: { [tid]: true } }, { merge: true }
+    );
+  } catch (e) { console.warn('[createStaffCredential] lookup write failed:', e.message); }
+
+  return { ok: true, uid, username, email };
+});
+
+// ---- setStaffPassword — a credential staff member sets their OWN password
+// (first-login forced change). Self only; updates the Auth password and clears
+// the mustChangePassword flag (members can't write their own doc via rules). ----
+exports.setStaffPassword = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const data = request.data || {};
+  const tid = String(data.tid || '').trim().toLowerCase();
+  const newPassword = String(data.newPassword || '');
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  if (newPassword.length < 6) throw new HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+  const uid = request.auth.uid;
+  const mref = db.collection('tenants').doc(tid).collection('members').doc(uid);
+  if (!(await mref.get()).exists) throw new HttpsError('permission-denied', 'Not a member of this store.');
+  await getAuth().updateUser(uid, { password: newPassword });
+  await mref.update({ mustChangePassword: false, passwordChangedAt: FieldValue.serverTimestamp() });
   return { ok: true };
 });
 
