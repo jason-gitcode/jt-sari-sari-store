@@ -38,9 +38,9 @@
     --muted: #8a9ab4;
     --line: #25324a;
     --line-2: #1b2640;
-    --accent: #818cf8;
-    --accent-dark: #6366f1;
-    --accent-soft: #2c2f63;
+    --accent: #34d399;
+    --accent-dark: #10b981;
+    --accent-soft: #123524;
     --success: #34d399;
     --error: #f87171;
     --warn: #fbbf24;
@@ -64,9 +64,9 @@
     --muted: #64748b;
     --line: #e7eaf1;
     --line-2: #eef1f6;
-    --accent: #4f46e5;
-    --accent-dark: #4338ca;
-    --accent-soft: #eef2ff;
+    --accent: #15803d;
+    --accent-dark: #166534;
+    --accent-soft: #dcfce7;
     --success: #16a34a;
     --error: #dc2626;
     --warn: #d97706;
@@ -672,8 +672,10 @@
   .modal h3 { font-size: var(--fs-xl); letter-spacing: -0.01em; }
   .section-card .desc { font-size: var(--fs-base); }
 
-  /* Sticky, frosted header */
-  .header { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--surface) 86%, transparent); -webkit-backdrop-filter: saturate(140%) blur(10px); backdrop-filter: saturate(140%) blur(10px); }
+  /* Sticky, frosted header with brand strip */
+  .header { position: sticky; top: 0; z-index: 40; border-top: 3px solid var(--accent); background: color-mix(in srgb, var(--surface) 86%, transparent); -webkit-backdrop-filter: saturate(140%) blur(10px); backdrop-filter: saturate(140%) blur(10px); }
+  /* Functional section header: green brand accent bar before the title */
+  .section-title > span:first-child { border-left: 3px solid var(--accent); padding-left: 11px; line-height: 1.15; }
   .theme-toggle-btn { border-radius: var(--r-sm); transition: background var(--t), transform var(--t), border-color var(--t); }
   .theme-toggle-btn:hover { transform: translateY(-1px); border-color: var(--accent); filter: none; }
   .header-title .badge { letter-spacing: .06em; font-weight: 700; }
@@ -691,9 +693,10 @@
   /* Cards — uniform radius, soft shadow, gentle hover */
   .section-card, .signin-card, .pending-payment-card, .table-wrap, .modal { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
   .stat { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: transform var(--t-slow), box-shadow var(--t-slow), border-color var(--t-slow); position: relative; overflow: hidden; }
-  .stat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0; transition: opacity var(--t); }
-  .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--line-2); }
-  .stat:hover::before { opacity: 1; }
+  .stat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); opacity: 1; transition: width var(--t); }
+  .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--accent); }
+  .stat:hover::before { width: 6px; }
+  .stat-value { color: var(--accent-dark); }
   .stat-value { font-size: var(--fs-3xl); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .stat-label { font-size: var(--fs-2xs); }
   .stats { gap: 12px; }
