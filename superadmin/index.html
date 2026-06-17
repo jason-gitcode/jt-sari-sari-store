@@ -199,6 +199,17 @@
   .tenants-page-indicator strong { color: var(--text); }
   .tenants-pager .btn-icon[disabled] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
+  /* Platform activity feed */
+  .pa-list { display: flex; flex-direction: column; }
+  .pa-empty { color: var(--muted); font-size: 13px; padding: 18px; text-align: center; }
+  .pa-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .pa-row:last-child { border-bottom: 0; }
+  .pa-ico { flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px; background: var(--surface-2); }
+  .pa-body { flex: 1; min-width: 0; }
+  .pa-summary { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
+  .pa-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .pa-tenant { font-weight: 700; color: var(--text); }
+
   /* Tx history tenant typeahead */
   .tx-typeahead { position: relative; }
   .tx-typeahead input {
@@ -711,6 +722,21 @@
       <button type="button" class="btn btn-icon" id="tenants-prev-btn" onclick="goPrevTenantsPage()">← Prev</button>
       <span class="tenants-page-indicator">Page <strong id="tenants-page-num">1</strong></span>
       <button type="button" class="btn btn-icon" id="tenants-next-btn" onclick="goNextTenantsPage()">Next →</button>
+    </div>
+
+    <!-- ===== PLATFORM ACTIVITY FEED ===== -->
+    <div class="section-title" style="margin-top:32px;">
+      <span>🛡️ Platform activity <span id="pa-meta" class="tenants-result-meta"></span></span>
+      <div class="actions">
+        <button type="button" class="btn btn-icon" id="pa-refresh-btn" onclick="loadPlatformActivity(true)">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="desc">Newest key actions across every store — orders, stock, prices, payments, modes, sign-ins. Read-only and tamper-proof; auto-expires after 90 days.</div>
+      <div id="pa-list" class="pa-list"><div class="pa-empty">Loading…</div></div>
+      <div style="display:flex;justify-content:center;margin-top:12px;">
+        <button type="button" class="btn btn-icon" id="pa-more-btn" onclick="loadPlatformActivity(false)" style="display:none;">Load more</button>
+      </div>
     </div>
 
     <!-- ===== PENDING SUBSCRIPTION PAYMENTS ===== -->
@@ -1656,12 +1682,80 @@ auth.onAuthStateChanged(user => {
   loadTenants();
   loadInviteCodes();
   loadPendingPayments();
+  loadPlatformActivity(true);
   subscribePlatformBilling();
   // Auto-load the tx history table on first sign-in. The tenant filter
   // is now a typeahead (queries Firestore on input), so no pre-population
   // is needed.
   loadTransactionHistory();
 });
+
+// ============================================================
+// PLATFORM ACTIVITY FEED (cross-tenant, superadmin) — collection-group read
+// of every tenant's immutable activity log, newest-first with cursor paging.
+// ============================================================
+const PA_PAGE = 40;
+let paCursor = null, paLoading = false, paDone = false, paItems = [];
+const PA_ICONS = {
+  'order.placed': '🛒', 'order.confirmed': '✅', 'order.cancelled': '🚫', 'order.refunded': '↩️',
+  'product.created': '➕', 'product.updated': '✏️', 'product.deleted': '🗑️', 'stock.adjusted': '📦',
+  'payment.received': '💰', 'payment.rejected': '⛔',
+  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️', 'staff.left': '🚪',
+  'auth.login': '🔑', 'auth.logout': '👋'
+};
+function paTime(ts) {
+  try { const d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null); return d ? d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : ''; }
+  catch (e) { return ''; }
+}
+function paRowHtml(e) {
+  const ico = PA_ICONS[e.type] || '•';
+  const a = e.actor || {};
+  let who = a.email || (a.role === 'customer' ? 'Customer' : (a.role === 'system' ? 'System' : '—'));
+  if (who && who.endsWith('.staff.pabilimart.com')) who = '@' + who.split('@')[0];
+  return `<div class="pa-row">
+    <span class="pa-ico">${ico}</span>
+    <div class="pa-body">
+      <div class="pa-summary">${escText(e.summary || e.type || 'Activity')}</div>
+      <div class="pa-meta"><span class="pa-tenant">${escText(e.tid || '—')}</span> · ${escText(who)} · ${escText(paTime(e.createdAt))}</div>
+    </div>
+  </div>`;
+}
+function renderPlatformActivity() {
+  const list = document.getElementById('pa-list');
+  if (!list) return;
+  list.innerHTML = paItems.length ? paItems.map(paRowHtml).join('') : '<div class="pa-empty">No activity yet.</div>';
+  const more = document.getElementById('pa-more-btn');
+  if (more) more.style.display = paDone ? 'none' : '';
+  const meta = document.getElementById('pa-meta');
+  if (meta) meta.textContent = paItems.length ? `${paItems.length}${paDone ? '' : '+'} shown` : '';
+}
+async function loadPlatformActivity(reset) {
+  if (paLoading) return;
+  paLoading = true;
+  const btn = document.getElementById('pa-refresh-btn');
+  if (reset) {
+    paItems = []; paCursor = null; paDone = false;
+    if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing…'; }
+    const list = document.getElementById('pa-list'); if (list) list.innerHTML = '<div class="pa-empty">Loading…</div>';
+  }
+  try {
+    let q = db.collectionGroup('activity').orderBy('createdAt', 'desc');
+    if (paCursor) q = q.startAfter(paCursor);
+    q = q.limit(PA_PAGE);
+    const snap = await q.get();
+    snap.forEach(d => paItems.push({ id: d.id, ...d.data() }));
+    if (snap.size > 0) paCursor = snap.docs[snap.docs.length - 1];
+    if (snap.size < PA_PAGE) paDone = true;
+    renderPlatformActivity();
+  } catch (err) {
+    console.error('[platform activity]', err);
+    const list = document.getElementById('pa-list');
+    if (list && paItems.length === 0) list.innerHTML = `<div class="pa-empty">Couldn't load activity — ${escText(err && err.message ? err.message : 'error')}<br>(If this mentions an index, it's still building — try again in a minute.)</div>`;
+  } finally {
+    paLoading = false;
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
+}
 
 // ============================================================
 // TRANSACTION HISTORY (all + per-tenant)

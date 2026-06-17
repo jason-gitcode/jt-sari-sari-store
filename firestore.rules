@@ -286,6 +286,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Collection-group read for the superadmin platform-wide activity feed.
+    // Per-tenant access stays governed by the nested tenants/{tid}/activity rule
+    // (owner/super); this adds the cross-tenant read for superadmins only. The
+    // log stays immutable — no write rule here.
+    match /{path=**}/activity/{eventId} {
+      allow read: if isSuperadmin();
+    }
+
     // ============================================================
     // PUBLIC DIRECTORY — anonymous-readable list of {slug, name}
     // pairs used by the signup-page store-finder. Writes happen only
