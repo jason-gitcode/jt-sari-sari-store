@@ -6006,15 +6006,6 @@ function showPayNowModal() {
   document.getElementById('paynow-ref-code').textContent = refCode;
   document.getElementById('paynow-gcash-name').textContent = platformBillingData.gcashAccountName || '—';
   document.getElementById('paynow-gcash-number').textContent = platformBillingData.gcashNumber || '—';
-  // Maya Wallet alt is optional.
-  const mayaWrap = document.getElementById('paynow-maya-wrap');
-  if (platformBillingData.mayaNumber) {
-    document.getElementById('paynow-maya-name').textContent = platformBillingData.mayaAccountName || '—';
-    document.getElementById('paynow-maya-number').textContent = platformBillingData.mayaNumber || '—';
-    mayaWrap.style.display = '';
-  } else {
-    mayaWrap.style.display = 'none';
-  }
   // Reset receipt preview + status
   renderPayNowReceipt();
   document.getElementById('paynow-status').textContent = '';
@@ -14710,23 +14701,10 @@ function playNewOrderSound() {
           <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-gcash-number', this)">Copy</button>
         </div>
       </div>
-      <div class="paynow-account-block" id="paynow-maya-wrap" style="display:none;">
-        <h4>💜 Maya Wallet</h4>
-        <div class="paynow-account-row">
-          <span class="label">Account name</span>
-          <span class="val" id="paynow-maya-name">—</span>
-          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-name', this)">Copy</button>
-        </div>
-        <div class="paynow-account-row">
-          <span class="label">Number</span>
-          <span class="val" id="paynow-maya-number">—</span>
-          <button type="button" class="paynow-copy-btn" onclick="paynowCopy('paynow-maya-number', this)">Copy</button>
-        </div>
-      </div>
     </div>
 
     <div class="paynow-instructions">
-      ⚠️ <strong>Important:</strong> when sending the payment via GCash or Maya,
+      ⚠️ <strong>Important:</strong> when sending the payment via GCash,
       paste the reference code (above) into the <strong>Message / Note</strong>
       field exactly as shown — it's how we match your payment to your store.
       Don't add extra characters.
