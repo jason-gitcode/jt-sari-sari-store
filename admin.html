@@ -8646,6 +8646,18 @@ function actorStamp() {
 function actorFields() {
   return { _actor: actorStamp(), _actorAt: firebase.firestore.FieldValue.serverTimestamp() };
 }
+// Record a sign-in once per browser session (owners + staff only). The activity
+// collection is server-only, so this goes through the logStaffLogin callable.
+// A plain page reload reuses the session flag and does NOT re-log.
+function maybeLogLogin(reason) {
+  if (reason !== 'owner' && reason !== 'staff') return; // skip superadmin/platform
+  if (!TENANT_ID) return;
+  const u = firebase.auth().currentUser;
+  const key = 'pmLoginLogged:' + TENANT_ID + ':' + (u ? u.uid : '');
+  try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
+  firebase.app().functions('asia-southeast1').httpsCallable('logStaffLogin')({ tid: TENANT_ID })
+    .catch(err => console.warn('[login-log] failed:', err && err.message));
+}
 
 // Phase 1b gating: hide tabs a staff member lacks the *view* permission for +
 // the owner-only Employee tab, then bounce off any now-hidden tab to Home.
@@ -11148,7 +11160,8 @@ const HIST_ICONS = {
   'order.placed': '🛒', 'order.confirmed': '✅', 'order.cancelled': '🚫', 'order.refunded': '↩️',
   'product.created': '➕', 'product.updated': '✏️', 'product.deleted': '🗑️', 'stock.adjusted': '📦',
   'payment.received': '💰', 'payment.rejected': '⛔',
-  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️', 'staff.left': '🚪'
+  'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️', 'staff.left': '🚪',
+  'auth.login': '🔑'
 };
 
 function escHtml(s) {
@@ -12607,6 +12620,8 @@ async function handleAdminAuth(user) {
       if (typeof renderProductCapStatus === 'function') renderProductCapStatus();
       if (typeof renderSupplierCapStatus === 'function') renderSupplierCapStatus();
     }
+    // Record this sign-in in the activity log (owners + staff, once per session).
+    maybeLogLogin(auth_result.reason);
     // First login for an owner-provisioned (username) employee: force them to
     // set their own password before they can use the admin.
     if (IS_STAFF && auth_result.mustChangePassword) {

@@ -1876,6 +1876,39 @@ exports.setStaffPassword = onCall(async (request) => {
   return { ok: true };
 });
 
+// ---- logStaffLogin — record a sign-in (owner or staff) in the activity log.
+// Called once per browser session by the client. Superadmin platform logins are
+// not recorded as a store's activity. ----
+exports.logStaffLogin = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  const token = request.auth.token || {};
+  const tid = String((request.data || {}).tid || '').trim().toLowerCase();
+  if (!tid) throw new HttpsError('invalid-argument', 'tid is required.');
+  const uid = request.auth.uid;
+  const email = String(token.email || '').trim().toLowerCase();
+  const tref = db.collection('tenants').doc(tid);
+  const tsnap = await tref.get();
+  if (!tsnap.exists) throw new HttpsError('not-found', 'Store not found.');
+  const tenant = tsnap.data() || {};
+  const ownerEmails = (Array.isArray(tenant.ownerEmails) ? tenant.ownerEmails : []).map(e => String(e).toLowerCase());
+  let role = null, who = email;
+  if (ownerEmails.includes(email)) {
+    role = 'owner';
+  } else if (SUPERADMIN_EMAILS.has(email)) {
+    return { ok: true, skipped: 'superadmin' };
+  } else {
+    const m = (await tref.collection('members').doc(uid).get()).data();
+    if (m && m.status === 'active') { role = 'staff'; who = m.name || m.username || email; }
+  }
+  if (!role) throw new HttpsError('permission-denied', 'Not authorised for this store.');
+  await logActivity(tid, `login-${uid}-${Date.now()}`, {
+    type: 'auth.login', category: 'store', targetId: uid,
+    summary: `${who} signed in`,
+    actor: { uid, email, role }, source: 'self'
+  });
+  return { ok: true };
+});
+
 // ============================================================
 // rejectManualPayment — superadmin-only. Marks a payment rejected with
 // a reason. Does NOT modify the subscription doc.
