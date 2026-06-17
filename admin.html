@@ -8034,6 +8034,12 @@ function subscribeToProducts() {
     // Phase D: refresh product-cap pill + Add Product disabled state +
     // upgrade banner. Counts change with every snapshot.
     renderProductCapStatus();
+    // Keep the Restocking & Reorder report live: it's computed from the
+    // in-memory products array, so editing stock must re-run it or the
+    // report keeps showing the old out-of-stock row until the next control
+    // change. Pure client-side rebuild — no extra Firestore reads. Early-
+    // returns when the Reports DOM isn't mounted, so it's free off-tab.
+    if (typeof renderRestockingReport === 'function') renderRestockingReport();
   }, err => {
     console.error('Firestore error:', err);
     showToast('Error connecting to database', 'error');
