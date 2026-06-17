@@ -28,43 +28,69 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    /* Dark (default) */
-    --bg: #0f172a;
-    --surface: #1e293b;
-    --surface-2: #334155;
+    /* Dark (default) — refined */
+    --bg: #0b1120;
+    --surface: #131c2e;
+    --surface-2: #1d2940;
+    --surface-3: #25324a;
     --text: #f1f5f9;
-    --muted: #94a3b8;
-    --line: #334155;
-    --accent: #3b82f6;
-    --accent-dark: #2563eb;
-    --success: #22c55e;
-    --error: #ef4444;
-    --warn: #f59e0b;
+    --text-2: #cbd5e1;
+    --muted: #8a9ab4;
+    --line: #25324a;
+    --line-2: #1b2640;
+    --accent: #818cf8;
+    --accent-dark: #6366f1;
+    --accent-soft: #2c2f63;
+    --success: #34d399;
+    --error: #f87171;
+    --warn: #fbbf24;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.30);
+    --shadow: 0 2px 8px rgba(0,0,0,.35);
+    --shadow-md: 0 8px 24px rgba(0,0,0,.42);
+    --shadow-lg: 0 18px 48px rgba(0,0,0,.55);
+    /* Type scale + radius + motion (theme-independent) */
+    --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-base: 13px;
+    --fs-md: 14px; --fs-lg: 15px; --fs-xl: 18px; --fs-2xl: 22px; --fs-3xl: 28px;
+    --r-sm: 8px; --r: 10px; --r-lg: 14px; --r-pill: 999px;
+    --t: .15s ease; --t-slow: .25s cubic-bezier(.4,0,.2,1);
   }
   [data-theme="light"] {
-    --bg: #f6f7f9;
+    --bg: #f4f6fa;
     --surface: #ffffff;
-    --surface-2: #f1f5f9;
+    --surface-2: #f4f6fa;
+    --surface-3: #eef2f7;
     --text: #0f172a;
+    --text-2: #475569;
     --muted: #64748b;
-    --line: #e2e8f0;
-    --accent: #2563eb;
-    --accent-dark: #1d4ed8;
+    --line: #e7eaf1;
+    --line-2: #eef1f6;
+    --accent: #4f46e5;
+    --accent-dark: #4338ca;
+    --accent-soft: #eef2ff;
     --success: #16a34a;
     --error: #dc2626;
-    --warn: #f59e0b;
+    --warn: #d97706;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.04);
+    --shadow: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.03);
+    --shadow-md: 0 8px 24px rgba(15,23,42,.09);
+    --shadow-lg: 0 18px 48px rgba(15,23,42,.14);
   }
   html, body { height: 100%; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    font-size: var(--fs-base);
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   .hidden { display: none !important; }
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+  .container { max-width: 1180px; margin: 0 auto; padding: 28px 22px; }
   @media (max-width: 640px) {
-    .container { padding: 14px 12px; }
+    .container { padding: 16px 13px; }
   }
 
   /* Sign-in screen */
@@ -636,6 +662,83 @@
       font-size: 16px !important;
     }
   }
+
+  /* ===================== v2 design polish ===================== */
+  /* Uniform heading rhythm */
+  .signin-card h1 { font-size: var(--fs-2xl); letter-spacing: -0.02em; }
+  .signin-card p { font-size: var(--fs-md); }
+  .header-title h1 { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -0.01em; }
+  .section-title { font-size: var(--fs-md); font-weight: 650; letter-spacing: -0.01em; margin-bottom: 14px; }
+  .modal h3 { font-size: var(--fs-xl); letter-spacing: -0.01em; }
+  .section-card .desc { font-size: var(--fs-base); }
+
+  /* Sticky, frosted header */
+  .header { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--surface) 86%, transparent); -webkit-backdrop-filter: saturate(140%) blur(10px); backdrop-filter: saturate(140%) blur(10px); }
+  .theme-toggle-btn { border-radius: var(--r-sm); transition: background var(--t), transform var(--t), border-color var(--t); }
+  .theme-toggle-btn:hover { transform: translateY(-1px); border-color: var(--accent); filter: none; }
+  .header-title .badge { letter-spacing: .06em; font-weight: 700; }
+
+  /* Buttons — uniform, tactile, focus-ringed */
+  .btn { border-radius: var(--r-sm); font-size: var(--fs-md); font-weight: 550; transition: background var(--t), border-color var(--t), color var(--t), transform var(--t), box-shadow var(--t); }
+  .btn:hover { background: var(--surface-3); border-color: var(--line-2); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+  .btn:active { transform: translateY(0); box-shadow: none; }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn-primary { color: #fff; }
+  .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); box-shadow: var(--shadow-md); }
+  .btn-danger:hover { background: color-mix(in srgb, var(--error) 12%, transparent); border-color: var(--error); transform: translateY(-1px); }
+  .btn-icon { font-size: var(--fs-sm); padding: 7px 11px; }
+
+  /* Cards — uniform radius, soft shadow, gentle hover */
+  .section-card, .signin-card, .pending-payment-card, .table-wrap, .modal { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+  .stat { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); transition: transform var(--t-slow), box-shadow var(--t-slow), border-color var(--t-slow); position: relative; overflow: hidden; }
+  .stat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0; transition: opacity var(--t); }
+  .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--line-2); }
+  .stat:hover::before { opacity: 1; }
+  .stat-value { font-size: var(--fs-3xl); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .stat-label { font-size: var(--fs-2xs); }
+  .stats { gap: 12px; }
+
+  /* Inputs — accent focus ring */
+  .tenants-search-wrap input, .tx-typeahead input, .modal input, .section-card .form-grid input { transition: border-color var(--t), box-shadow var(--t), background var(--t); }
+  .tenants-search-wrap input:focus, .tx-typeahead input:focus, .modal input:focus, .form-grid input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* Tables — quiet header, hover rows */
+  th { font-size: var(--fs-xs); letter-spacing: .045em; }
+  tbody tr { transition: background var(--t); }
+  tbody tr:hover { background: var(--surface-2); }
+
+  /* Pills — uniform */
+  td.plan .pill, .pending-payment-tier-pill { border-radius: var(--r-pill); font-weight: 600; letter-spacing: .01em; }
+
+  /* Activity feed — padded hover rows, accent tenant tag */
+  .pa-row { padding: 11px 10px; border-radius: var(--r); border-bottom: 1px solid var(--line-2); transition: background var(--t); }
+  .pa-row:hover { background: var(--surface-2); }
+  .pa-ico { width: 30px; height: 30px; border-radius: var(--r-sm); font-size: var(--fs-md); }
+  .pa-tenant { color: var(--accent); }
+
+  /* Pending actions — tactile */
+  .pending-action-btn { border-radius: var(--r-sm); transition: transform var(--t), box-shadow var(--t), background var(--t), filter var(--t); }
+  .pending-action-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+  .pending-action-btn.view:hover { background: var(--surface-3); }
+
+  /* Modals — depth + blur backdrop */
+  .modal-backdrop { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); background: rgba(8,12,22,.55); }
+  .modal { box-shadow: var(--shadow-lg); }
+  .modal-x-close { transition: background var(--t), color var(--t); }
+
+  /* Typeahead dropdown depth + hover */
+  .tx-typeahead-results { box-shadow: var(--shadow-lg); border-radius: var(--r); }
+  .tx-typeahead-item { transition: background var(--t); }
+
+  /* Clickable name/code cells */
+  .row-open-btn { transition: color var(--t), text-decoration-color var(--t); }
+  .row-open-btn:hover { color: var(--accent-dark); }
+
+  /* Slim on-brand scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  ::-webkit-scrollbar-track { background: transparent; }
 </style>
 </head>
 <body>
