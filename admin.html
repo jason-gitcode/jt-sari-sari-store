@@ -995,6 +995,9 @@
     .supp-modal-footer .btn-secondary:hover { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
     .supp-modal-footer .btn-primary { background: var(--ink); border: 1px solid var(--ink); color: var(--surface); padding: 7px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
     .supp-modal-footer .btn-primary:hover { background: var(--ink-soft); }
+    /* Tactile press feedback so footer buttons (e.g. "Create login") don't feel flat on tap. */
+    .supp-modal-footer button { transition: transform .08s ease, background .15s ease, box-shadow .15s ease; }
+    .supp-modal-footer button:active:not(:disabled) { transform: translateY(1px) scale(0.97); }
     .supp-modal-footer .supp-del-btn { background: transparent; border: 1px solid #fecaca; color: var(--danger); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .supp-modal-footer .supp-del-btn:hover { background: #fee2e2; }
     [data-theme="dark"] .supp-modal-footer .supp-del-btn { border-color: rgba(248,113,113,0.4); }
