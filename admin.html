@@ -7971,7 +7971,17 @@ async function adminCheckVerified() {
   } catch (e) { showToast(adminAuthError(e), 'error'); }
 }
 
-function logout() {
+async function logout() {
+  // Record the sign-out BEFORE we drop the auth token (owner/staff only; the
+  // callable skips superadmin + anyone unauthorised). Non-fatal — sign out
+  // regardless if it fails or is slow.
+  try {
+    const u = firebase.auth().currentUser;
+    if (TENANT_ID && u) {
+      await firebase.app().functions('asia-southeast1').httpsCallable('logStaffLogin')({ tid: TENANT_ID, event: 'logout' });
+      try { sessionStorage.removeItem('pmLoginLogged:' + TENANT_ID + ':' + u.uid); } catch (e) {}
+    }
+  } catch (e) { console.warn('[logout-log] failed:', e && e.message); }
   if (unsubscribeProducts)  { unsubscribeProducts();  unsubscribeProducts  = null; }
   if (unsubscribeOrders)    { unsubscribeOrders();    unsubscribeOrders    = null; }
   if (unsubscribeSuppliers) { unsubscribeSuppliers(); unsubscribeSuppliers = null; }
@@ -11161,7 +11171,7 @@ const HIST_ICONS = {
   'product.created': '➕', 'product.updated': '✏️', 'product.deleted': '🗑️', 'stock.adjusted': '📦',
   'payment.received': '💰', 'payment.rejected': '⛔',
   'plan.changed': '⭐', 'mode.changed': '🔔', 'settings.changed': '⚙️', 'staff.left': '🚪',
-  'auth.login': '🔑'
+  'auth.login': '🔑', 'auth.logout': '👋'
 };
 
 function escHtml(s) {

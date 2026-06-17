@@ -1901,9 +1901,10 @@ exports.logStaffLogin = onCall(async (request) => {
     if (m && m.status === 'active') { role = 'staff'; who = m.name || m.username || email; }
   }
   if (!role) throw new HttpsError('permission-denied', 'Not authorised for this store.');
-  await logActivity(tid, `login-${uid}-${Date.now()}`, {
-    type: 'auth.login', category: 'store', targetId: uid,
-    summary: `${who} signed in`,
+  const isLogout = String((request.data || {}).event || 'login') === 'logout';
+  await logActivity(tid, `${isLogout ? 'logout' : 'login'}-${uid}-${Date.now()}`, {
+    type: isLogout ? 'auth.logout' : 'auth.login', category: 'store', targetId: uid,
+    summary: `${who} signed ${isLogout ? 'out' : 'in'}`,
     actor: { uid, email, role }, source: 'self'
   });
   return { ok: true };
