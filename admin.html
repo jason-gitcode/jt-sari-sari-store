@@ -2752,6 +2752,37 @@
       @page { margin: 12mm; }
     }
 
+    /* Supplier Order Sheet — its own print path. Builds a clean, standalone
+       sheet in #order-sheet-print (appended to <body> by printOrderSheet) and
+       hides everything else. Kept separate from .printing-report so printing an
+       order sheet doesn't drag in the whole Reports tab. */
+    #order-sheet-print { display: none; }
+    @media print {
+      html.printing-order-sheet,
+      body.printing-order-sheet {
+        position: static !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: auto !important;
+        background: #fff !important;
+        color: #000 !important;
+      }
+      body.printing-order-sheet > *:not(#order-sheet-print) { display: none !important; }
+      body.printing-order-sheet #order-sheet-print { display: block !important; }
+    }
+
+    /* Supplier Order Sheet panel (screen) — reuses .budget-planner shell. */
+    .os-supplier-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+    .os-supplier-head strong { font-size: var(--fs-md); color: var(--ink); }
+    .os-supplier-meta { font-size: var(--fs-xs); color: var(--muted); }
+    .os-table .os-qty {
+      width: 66px; padding: 4px 6px; text-align: right;
+      border: 1px solid var(--line); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--ink); font-size: var(--fs-sm);
+    }
+    .os-table .os-check { width: 16px; height: 16px; cursor: pointer; }
+    .os-footer { margin-top: 10px; font-weight: 600; color: var(--ink); font-size: var(--fs-sm); }
+
     /* Restocking report — controls + urgency badges. */
     .restock-controls {
       display: flex; flex-wrap: wrap; gap: 12px;
@@ -3499,6 +3530,27 @@
             <button class="dash-export-btn" onclick="onBudgetCalculate()">Calculate</button>
           </div>
           <div id="budget-planner-results" class="bp-results"></div>
+        </div>
+
+        <!-- Supplier Order Sheet — pick a supplier, adjust quantities, then
+             print or email the resulting restock order. Reuses the
+             .budget-planner card shell for a consistent look. -->
+        <div class="budget-planner" id="order-sheet-panel">
+          <div class="budget-planner-head">
+            <h3>📋 Supplier Order Sheet</h3>
+            <p>Pick a supplier to build a restock order from items in the categories they cover. Tick items, adjust quantities, then print it for the warehouse or email it to the supplier.</p>
+          </div>
+          <div class="budget-planner-controls">
+            <label class="bp-control">
+              <span class="bp-control-label">Supplier</span>
+              <select id="order-sheet-supplier" onchange="onOrderSheetSupplierChange()">
+                <option value="">— Select a supplier —</option>
+              </select>
+            </label>
+            <button class="dash-export-btn dash-export-btn--ghost" id="order-sheet-print-btn" onclick="printOrderSheet()" disabled>🖨 Print / PDF</button>
+            <button class="dash-export-btn" id="order-sheet-email-btn" onclick="emailOrderSheet()" disabled>✉ Email to supplier</button>
+          </div>
+          <div id="order-sheet-results" class="bp-results"></div>
         </div>
 
         <!-- Table -->
@@ -13449,6 +13501,12 @@ function renderRestockingReport() {
         }).join('')}
     </tbody>`;
 
+  // Keep the Order Sheet supplier dropdown in sync (new suppliers appear,
+  // deleted ones drop out). Cheap; preserves the current selection. We do
+  // NOT re-render the order-sheet table here so in-progress qty edits survive
+  // a background snapshot refresh — the owner re-picks the supplier to refresh.
+  populateOrderSheetSuppliers();
+
   // Re-run the budget plan if the owner already calculated one. Without
   // this the plan goes stale when they change Analyse-last / Cover-next
   // controls (suggested qtys change → plan should change too).
@@ -13696,6 +13754,290 @@ function exportRestockingReportCSV() {
   a.href = url; a.download = `${fileBase}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// SUPPLIER ORDER SHEET — pick a supplier, trim the auto-built restock list +
+// adjust quantities, then print it (warehouse reference) or email it (mailto).
+//
+// Supplier↔product linking is CATEGORY-BASED: the restock rows already carry
+// supplierMatches (suppliers whose `categories` cover the product's category),
+// computed in renderRestockingReport. A product whose category is covered by
+// two suppliers appears on both their sheets — the owner decides where to buy.
+// "Unassigned" collects products no supplier covers, so nothing is invisible.
+//
+// All client-side: reads __lastRestockData + the in-memory suppliers/products
+// arrays. No Firestore reads or writes. The DOM is the source of truth for the
+// owner's checkbox + quantity edits (read at print/email time) so a background
+// products snapshot can't clobber an in-progress sheet.
+// ============================================================
+let orderSheetSupplierId = '';
+
+function osStoreName() {
+  return (typeof storeSettingsData !== 'undefined' && storeSettingsData && storeSettingsData.storeName)
+    ? storeSettingsData.storeName : 'My Store';
+}
+
+function populateOrderSheetSuppliers() {
+  const sel = document.getElementById('order-sheet-supplier');
+  if (!sel) return;
+  const prev = sel.value;
+  const sorted = (suppliers || []).slice()
+    .sort((a, b) => String(a.businessName || '').localeCompare(String(b.businessName || '')));
+  let html = '<option value="">— Select a supplier —</option>';
+  sorted.forEach(s => {
+    html += `<option value="${escAttr(String(s.id))}">${escText(s.businessName || '(unnamed)')}</option>`;
+  });
+  html += '<option value="__unassigned">Unassigned (no supplier)</option>';
+  sel.innerHTML = html;
+  // Restore the previous pick if it still exists, else reset to placeholder.
+  if (prev && (prev === '__unassigned' || sorted.some(s => String(s.id) === prev))) {
+    sel.value = prev;
+  } else {
+    sel.value = '';
+    orderSheetSupplierId = '';
+  }
+}
+
+function onOrderSheetSupplierChange() {
+  const sel = document.getElementById('order-sheet-supplier');
+  orderSheetSupplierId = sel ? sel.value : '';
+  renderOrderSheet();
+}
+
+// Restock-worthy rows for the selected supplier (or unassigned bucket).
+function orderSheetItems() {
+  if (!__lastRestockData) renderRestockingReport();
+  const rows = (__lastRestockData && __lastRestockData.rows) || [];
+  if (!orderSheetSupplierId) return [];
+  const productById = {};
+  (products || []).forEach(p => { productById[String(p.id)] = p; });
+  const belongs = (r) => orderSheetSupplierId === '__unassigned'
+    ? r.supplierMatches.length === 0
+    : r.supplierMatches.some(s => String(s.id) === String(orderSheetSupplierId));
+  return rows
+    .filter(r => belongs(r) && (r.urgency === 'oos' || r.suggested > 0))
+    .map(r => {
+      const p = productById[String(r.id)];
+      const cost = p ? parseFloat(p.cost) : NaN;
+      return { ...r, cost: isFinite(cost) ? cost : null, qty: r.suggested > 0 ? r.suggested : '' };
+    });
+}
+
+function renderOrderSheet() {
+  const box = document.getElementById('order-sheet-results');
+  const printBtn = document.getElementById('order-sheet-print-btn');
+  const emailBtn = document.getElementById('order-sheet-email-btn');
+  if (!box) return;
+  const setBtns = (on) => { if (printBtn) printBtn.disabled = !on; if (emailBtn) emailBtn.disabled = !on; };
+
+  if (!orderSheetSupplierId) { box.innerHTML = ''; setBtns(false); return; }
+
+  const sup = orderSheetSupplierId === '__unassigned' ? null
+    : (suppliers || []).find(s => String(s.id) === String(orderSheetSupplierId));
+
+  let head;
+  if (orderSheetSupplierId === '__unassigned') {
+    head = `<div class="os-supplier-head"><strong>Unassigned items</strong><span class="os-supplier-meta">Products whose category isn't covered by any supplier yet.</span></div>`;
+  } else {
+    const bits = [];
+    if (sup && sup.contactPerson) bits.push(escText(sup.contactPerson));
+    if (sup && sup.contactNumber) bits.push(escText(sup.contactNumber));
+    if (sup && sup.email)         bits.push(escText(sup.email));
+    head = `<div class="os-supplier-head"><strong>${escText((sup && sup.businessName) || '(unnamed supplier)')}</strong>${bits.length ? `<span class="os-supplier-meta">${bits.join(' · ')}</span>` : ''}</div>`;
+  }
+
+  const items = orderSheetItems();
+  if (items.length === 0) {
+    box.innerHTML = head + `<div class="restock-empty">No items needing restock for this supplier right now.</div>`;
+    setBtns(false);
+    return;
+  }
+
+  const anyCost = items.some(it => it.cost != null);
+  const rowsHtml = items.map(it => {
+    const stockTxt = it.stock === null ? '∞' : String(it.stock);
+    return `<tr data-pid="${escAttr(String(it.id))}" data-name="${escAttr(it.name)}" data-category="${escAttr(it.category || '')}" data-stock="${escAttr(stockTxt)}" data-cost="${escAttr(it.cost != null ? String(it.cost) : '')}">
+      <td class="numeric"><input type="checkbox" class="os-check" checked onchange="recalcOrderSheetTotal()"></td>
+      <td>${escText(it.name)}</td>
+      <td class="numeric">${stockTxt}</td>
+      <td class="numeric">${it.suggested > 0 ? it.suggested : '—'}</td>
+      <td class="numeric"><input type="number" class="os-qty" min="0" inputmode="numeric" value="${it.qty === '' ? '' : it.qty}" oninput="recalcOrderSheetTotal()"></td>
+      ${anyCost ? `<td class="numeric">${it.cost != null ? '₱' + fmt(it.cost) : '—'}</td>` : ''}
+    </tr>`;
+  }).join('');
+
+  box.innerHTML = head + `
+    <div class="report-table-wrap os-table-wrap">
+      <table class="report-table os-table">
+        <thead><tr>
+          <th class="numeric">✓</th>
+          <th>Product</th>
+          <th class="numeric">Stock</th>
+          <th class="numeric">Suggested</th>
+          <th class="numeric">Order qty</th>
+          ${anyCost ? '<th class="numeric">Unit cost</th>' : ''}
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <div class="os-footer"><span id="order-sheet-total"></span></div>`;
+  setBtns(true);
+  recalcOrderSheetTotal();
+}
+
+// Read the live DOM (checkboxes + qty inputs) — the source of truth for the
+// owner's edits. Returns only ticked rows with a positive quantity.
+function collectOrderSheetSelections() {
+  const out = [];
+  document.querySelectorAll('#order-sheet-results tr[data-pid]').forEach(tr => {
+    const cb = tr.querySelector('.os-check');
+    if (cb && !cb.checked) return;
+    const qtyEl = tr.querySelector('.os-qty');
+    const qty = qtyEl ? (parseInt(qtyEl.value, 10) || 0) : 0;
+    if (qty <= 0) return;
+    const costAttr = tr.getAttribute('data-cost');
+    out.push({
+      pid: tr.getAttribute('data-pid'),
+      name: tr.getAttribute('data-name'),
+      category: tr.getAttribute('data-category') || '',
+      stock: tr.getAttribute('data-stock'),
+      cost: costAttr ? parseFloat(costAttr) : null,
+      qty
+    });
+  });
+  return out;
+}
+
+function recalcOrderSheetTotal() {
+  const footer = document.getElementById('order-sheet-total');
+  if (!footer) return;
+  const sels = collectOrderSheetSelections();
+  const units = sels.reduce((s, x) => s + x.qty, 0);
+  let cost = 0, hasCost = false;
+  sels.forEach(x => { if (x.cost != null) { cost += x.cost * x.qty; hasCost = true; } });
+  footer.textContent = `${sels.length} item${sels.length === 1 ? '' : 's'} · ${units} unit${units === 1 ? '' : 's'}`
+    + (hasCost ? ` · est. ₱${fmt(cost)}` : '');
+}
+
+function osSelectedSupplier() {
+  if (orderSheetSupplierId === '__unassigned') return null;
+  return (suppliers || []).find(s => String(s.id) === String(orderSheetSupplierId)) || null;
+}
+
+function buildOrderSheetHTML(sels, sup) {
+  const storeName = osStoreName();
+  const dateStr = new Date().toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Manila' });
+  const supName = sup ? (sup.businessName || '(unnamed supplier)') : 'Unassigned items';
+  const supBits = [];
+  if (sup && sup.contactPerson) supBits.push('Contact: ' + escText(sup.contactPerson));
+  if (sup && sup.contactNumber) supBits.push('Tel: ' + escText(sup.contactNumber));
+  if (sup && sup.email)         supBits.push('Email: ' + escText(sup.email));
+  if (sup && sup.address)       supBits.push(escText(sup.address));
+
+  let grand = 0, hasCost = false;
+  const body = sels.map((x, i) => {
+    const lineTotal = x.cost != null ? x.cost * x.qty : null;
+    if (lineTotal != null) { grand += lineTotal; hasCost = true; }
+    return `<tr>
+      <td style="border:1px solid #999;padding:6px 8px;text-align:right;">${i + 1}</td>
+      <td style="border:1px solid #999;padding:6px 8px;">${escText(x.name)}</td>
+      <td style="border:1px solid #999;padding:6px 8px;">${escText(x.category)}</td>
+      <td style="border:1px solid #999;padding:6px 8px;text-align:right;">${escText(x.stock)}</td>
+      <td style="border:1px solid #999;padding:6px 8px;text-align:right;font-weight:700;">${x.qty}</td>
+      <td style="border:1px solid #999;padding:6px 8px;text-align:right;">${x.cost != null ? '₱' + fmt(x.cost) : ''}</td>
+      <td style="border:1px solid #999;padding:6px 8px;text-align:right;">${lineTotal != null ? '₱' + fmt(lineTotal) : ''}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#000;font-size:13px;">
+    <h1 style="font-size:20px;margin:0 0 2px;">Restock Order Sheet</h1>
+    <div style="color:#444;margin-bottom:14px;">${escText(storeName)} · ${dateStr}</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <tr>
+        <td style="vertical-align:top;width:50%;padding:0 12px 0 0;">
+          <div style="font-weight:700;margin-bottom:2px;">Supplier</div>
+          <div style="font-size:15px;font-weight:700;">${escText(supName)}</div>
+          <div style="color:#444;line-height:1.5;">${supBits.join('<br>')}</div>
+        </td>
+        <td style="vertical-align:top;width:50%;">
+          <div style="font-weight:700;margin-bottom:2px;">Ship to</div>
+          <div>${escText(storeName)}</div>
+        </td>
+      </tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:#f0f0f0;">
+        <th style="border:1px solid #999;padding:6px 8px;text-align:right;">#</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:left;">Product</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:left;">Category</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:right;">Stock</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:right;">Order qty</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:right;">Unit cost</th>
+        <th style="border:1px solid #999;padding:6px 8px;text-align:right;">Line total</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+      ${hasCost ? `<tfoot><tr>
+        <td colspan="6" style="border:1px solid #999;padding:6px 8px;text-align:right;font-weight:700;">Estimated total</td>
+        <td style="border:1px solid #999;padding:6px 8px;text-align:right;font-weight:700;">₱${fmt(grand)}</td>
+      </tr></tfoot>` : ''}
+    </table>
+    <p style="margin-top:24px;color:#444;">Prepared by: ____________________   ·   Received by: ____________________</p>
+  </div>`;
+}
+
+function printOrderSheet() {
+  const sels = collectOrderSheetSelections();
+  if (sels.length === 0) { showToast('Tick at least one item with a quantity to print.', 'error'); return; }
+  const html = buildOrderSheetHTML(sels, osSelectedSupplier());
+  let container = document.getElementById('order-sheet-print');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'order-sheet-print';
+    document.body.appendChild(container);
+  }
+  container.innerHTML = html;
+  document.documentElement.classList.add('printing-order-sheet');
+  document.body.classList.add('printing-order-sheet');
+  const cleanup = () => {
+    document.documentElement.classList.remove('printing-order-sheet');
+    document.body.classList.remove('printing-order-sheet');
+    if (container && container.parentNode) container.parentNode.removeChild(container);
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(() => window.print(), 50);
+}
+
+function emailOrderSheet() {
+  const sels = collectOrderSheetSelections();
+  if (sels.length === 0) { showToast('Tick at least one item with a quantity to email.', 'error'); return; }
+  const sup = osSelectedSupplier();
+  const storeName = osStoreName();
+  const dateStr = manilaDateStr(new Date());
+  const subject = `Restock order — ${storeName} — ${dateStr}`;
+
+  const lines = [];
+  lines.push(`Hi${sup && sup.contactPerson ? ' ' + sup.contactPerson : ''},`);
+  lines.push('');
+  lines.push(`Please prepare the following order for ${storeName}:`);
+  lines.push('');
+  let grand = 0, hasCost = false;
+  sels.forEach((x, i) => {
+    let line = `${i + 1}. ${x.name} — qty ${x.qty}`;
+    if (x.cost != null) { const lt = x.cost * x.qty; grand += lt; hasCost = true; line += ` @ ₱${fmt(x.cost)} = ₱${fmt(lt)}`; }
+    lines.push(line);
+  });
+  lines.push('');
+  if (hasCost) lines.push(`Estimated total: ₱${fmt(grand)}`);
+  lines.push('');
+  lines.push('Thank you,');
+  lines.push(storeName);
+
+  const to = (sup && sup.email) ? sup.email : '';
+  if (!to) showToast('This supplier has no saved email — fill in the recipient in your mail app.', 'info');
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+  window.location.href = mailto;
 }
 
 // ---------- Print handler ----------
